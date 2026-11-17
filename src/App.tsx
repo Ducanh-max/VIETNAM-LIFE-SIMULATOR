@@ -23,8 +23,8 @@ function World({ mode, paused, time, quality, freeCamera, onFps, onPosition }: {
 }) {
   const sun = time === 'day' ? [120, 150, -45] : time === 'sunset' ? [-145, 48, 90] : [45, 75, -80];
   const light = time === 'day' ? '#fff3d5' : time === 'sunset' ? '#ffc08e' : '#a8bbd2';
-  const ambient = time === 'day' ? 1.25 : time === 'sunset' ? 0.95 : 0.58;
-  const intensity = time === 'day' ? 3.1 : time === 'sunset' ? 2.4 : 0.7;
+  const ambient = time === 'day' ? 0.95 : time === 'sunset' ? 0.76 : 0.58;
+  const intensity = time === 'day' ? 2.75 : time === 'sunset' ? 2.25 : 0.7;
   const background = time === 'day' ? '#a7c8cf' : time === 'sunset' ? '#cf8d85' : '#1c2b35';
   const shadows = qualityConfig[quality].shadow;
   return <>
@@ -33,10 +33,10 @@ function World({ mode, paused, time, quality, freeCamera, onFps, onPosition }: {
     {time !== 'night' && <Sky distance={450000} sunPosition={sun as [number, number, number]} inclination={time === 'day' ? 0.5 : 0.62} turbidity={time === 'day' ? 3.5 : 5.5} rayleigh={time === 'day' ? 1.6 : 2.2} />}
     {time === 'night' && <Stars radius={350} depth={80} count={750} factor={3} fade speed={0.35} />}
     <hemisphereLight args={[time === 'night' ? '#6b829b' : '#d6e9eb', '#677264', ambient]} />
-    <ambientLight intensity={time === 'night' ? 0.2 : 0.35} />
+    <ambientLight intensity={time === 'night' ? 0.2 : 0.18} />
     <directionalLight position={sun as [number, number, number]} color={light} intensity={intensity} castShadow={shadows > 0}
       shadow-mapSize={[shadows, shadows]} shadow-camera-left={-190} shadow-camera-right={190} shadow-camera-top={190} shadow-camera-bottom={-190}
-      shadow-camera-near={1} shadow-camera-far={520} shadow-bias={-0.0003} />
+      shadow-camera-near={1} shadow-camera-far={520} shadow-bias={-0.0003} shadow-normalBias={0.025} />
     <Landscape time={time} />
     <Landmarks time={time} />
     <Urban time={time} />
@@ -120,7 +120,7 @@ function App() {
         gl={{ antialias: config.antialias, powerPreference: 'high-performance' }} onCreated={({ gl }) => {
           gl.outputColorSpace = THREE.SRGBColorSpace;
           gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.18;
+          gl.toneMappingExposure = 1.08;
         }}>
         <MemoWorld mode={mode} paused={controlsPaused} time={time} quality={quality} freeCamera={freeCamera} onFps={setFps} onPosition={setPosition} />
       </Canvas>

@@ -1,6 +1,6 @@
 # ĐỜI VIỆT — Hà Nội 3D
 
-Bản thử nghiệm game web 3D tại khu Hồ Hoàn Kiếm. Dự án dùng React, Vite, TypeScript, Three.js, React Three Fiber, Drei và Tailwind CSS. Cảnh hiển thị bằng hình học WebGL thực, không dùng ảnh tĩnh làm gameplay.
+Bản đang phát triển của game web 3D tại khu Hồ Hoàn Kiếm. Dự án dùng React, Vite, TypeScript, Three.js, React Three Fiber, Drei và Tailwind CSS. Cảnh hiển thị bằng hình học WebGL thực, không dùng ảnh tĩnh làm gameplay.
 
 ## Trạng thái hiện tại
 
@@ -8,9 +8,10 @@ Bản thử nghiệm game web 3D tại khu Hồ Hoàn Kiếm. Dự án dùng Rea
 - Có thể đi bằng WASD, chạy bằng Shift, xoay camera bằng **các phím mũi tên** hoặc chuột và qua Cầu Thê Húc đến đảo Ngọc Sơn. Nhấp vào cảnh để khóa con trỏ; nhấn Esc để thả con trỏ. Nhấn **V** để bật/tắt drone; drone bay bằng WASD, lên/xuống bằng Space/Ctrl và tăng tốc bằng Shift.
 - Có va chạm đơn giản với mép hồ, nhà phố và hai tòa đền chính. Drone có thể bay qua các công trình và mặt hồ.
 - Có ánh sáng ban ngày, hoàng hôn và ban đêm; bốn cấu hình Low / Medium / High / Ultra; HUD FPS đọc từ vòng lặp render thực tế.
-- Bờ hồ, hai đảo và trục cầu lấy theo tọa độ OpenStreetMap. Diện tích xung quanh là một lát cắt cách điệu, chưa phải bản sao đô thị chính xác từng thửa đất.
+- Bờ hồ, hai đảo và trục cầu lấy theo tọa độ OpenStreetMap. Đường bờ được làm mềm nhẹ, có mép kè nổi khối, đường dạo, dải cây và đường phố. Diện tích xung quanh là một lát cắt cách điệu, chưa phải bản sao đô thị chính xác từng thửa đất.
+- Tháp Rùa có ba tầng thu nhỏ dần, tường đục cửa vòm và chân đế; khu đền có mái ngói cong, hiên cột, cổng hai tầng và đình nhỏ; cầu đỏ có mặt cầu cong liền mạch, lan can và 15 nhịp. Nhà phố có bảy biến thể mặt tiền, mái, ban công và cửa hàng.
 
-**Mức độ mô hình:** Tháp Rùa, Cầu Thê Húc và khu Đền Ngọc Sơn hiện là mô hình hình học tự dựng để kiểm thử bố cục và gameplay. Chúng thể hiện các đặc điểm nhận diện chính như nhiều tầng/cửa vòm, cầu đỏ cong 15 nhịp và mái ngói/cổng đền. Chúng **chưa phải** mô hình khảo cứu kiến trúc chính xác hoặc asset hoàn thiện để nghiệm thu đồ họa cuối cùng. Chưa tích hợp GLB/GLTF bên ngoài.
+**Mức độ mô hình:** Tháp Rùa, Cầu Thê Húc và khu Đền Ngọc Sơn là mô hình hình học tự dựng theo các đặc điểm nhận diện chính. Bản nâng cấp này cải thiện silhouette và cảnh quan rõ rệt so với blockout, nhưng **chưa phải** mô hình khảo cứu kiến trúc chính xác hoặc asset hoàn thiện để nghiệm thu đồ họa cuối cùng. Chưa tích hợp GLB/GLTF bên ngoài. Phản chiếu mặt nước hiện là giả lập sắc trời và góc nhìn, chưa phản chiếu hình học thật.
 
 ## Chạy local
 
@@ -65,9 +66,9 @@ VIETNAM-LIFE-SIMULATOR/
 | Hạng mục | Hiện trạng | Cần bổ sung |
 | --- | --- | --- |
 | Tháp Rùa | Mô hình hình học nhiều tầng, cửa vòm | GLB có tỷ lệ/hoa văn/mặt đứng đối chiếu ảnh và đo đạc thực tế; texture tường cũ, mái, chi tiết chữ |
-| Đền Ngọc Sơn | Mô hình tổng thể sân, hai điện, cổng, tường | Các hạng mục Đắc Nguyệt Lầu, Trấn Ba Đình, bút tháp, nghiên mực; mái và trang trí chuẩn xác |
+| Đền Ngọc Sơn | Hai điện mái cong, cổng hai tầng, sân, tường, đình nhỏ và bút tháp cách điệu | Mô hình khảo cứu Đắc Nguyệt Lầu, Trấn Ba Đình, bút tháp, nghiên mực; mái và trang trí chuẩn xác |
 | Cầu Thê Húc | Hình học đỏ cong, 15 nhịp, lan can và cột | Chi tiết kết cấu, vật liệu sơn/gỗ, hoa văn và số đo khảo cứu |
-| Nhà phố | Mặt tiền được tạo bằng mã, biển hiệu tiếng Việt | Asset nhà phố, cửa hàng và texture ảnh thực tế có quyền sử dụng |
+| Nhà phố | Bảy biến thể mặt tiền tạo bằng mã, biển hiệu tiếng Việt | Asset nhà phố, cửa hàng và texture ảnh thực tế có quyền sử dụng |
 | Nhân vật/NPC/xe | Hình học đơn giản, hoạt cảnh chân tay cơ bản | GLB rigged và animation đứng/đi/chạy; xe máy, ô tô, NPC chất lượng cao |
 | Mặt nước | Shader gợn sóng và màu trời | Phản chiếu cảnh thật theo mức đồ họa; hiện chỉ mô phỏng màu/ánh sáng |
 
@@ -75,7 +76,7 @@ Quy ước asset mới: **1 đơn vị = 1 mét**, Y hướng lên, phía bắc 
 
 ## Hiệu năng và giới hạn
 
-Cây và cột đèn dùng `InstancedMesh`, cảnh dùng frustum culling mặc định của Three.js, bóng đổ có khoảng cách giới hạn, và chất lượng được chọn theo DPR/độ phân giải bóng. Chưa có LOD động, texture compression, tải tài nguyên theo khu vực hay streaming thực sự. Nên bổ sung các kỹ thuật đó khi chuyển sang GLB có texture lớn. Chỉ số FPS cần đo trên máy và trình duyệt đích ở 1080p; không có cam kết 60 FPS.
+Cây và cột đèn dùng `InstancedMesh`; mặt tiền nhà gần camera dùng mức chi tiết cao hơn, cảnh dùng frustum culling mặc định của Three.js, bóng đổ có khoảng cách giới hạn, và chất lượng được chọn theo DPR/độ phân giải bóng. Chưa có LOD cho mọi hạng mục, texture compression, tải tài nguyên theo khu vực hay streaming thực sự. Nên bổ sung các kỹ thuật đó khi chuyển sang GLB có texture lớn. Chỉ số FPS cần đo trên máy và trình duyệt đích ở 1080p; không có cam kết 60 FPS.
 
 ## Triển khai Vercel
 

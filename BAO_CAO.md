@@ -1,12 +1,19 @@
-# Báo cáo bản đầu tiên — ĐỜI VIỆT
+# Báo cáo nâng cấp Hồ Hoàn Kiếm — ĐỜI VIỆT
 
-## Kết quả thực hiện
+## File đã sửa
 
-- Tạo dự án mới `doi-viet-3d` bằng React + Vite + TypeScript, Three.js, React Three Fiber, Drei và Tailwind CSS.
-- Dựng cảnh Hồ Hoàn Kiếm bằng đường bờ thực từ OpenStreetMap: trục bắc–nam khoảng **634 m**, trục đông–tây khoảng **249 m**. Hai đảo được giữ đúng tương quan; tuyến Cầu Thê Húc theo dữ liệu bản đồ dài khoảng **46,3 m**.
-- Dựng mô hình 3D tự tạo cho Tháp Rùa, Cầu Thê Húc và khu Đền Ngọc Sơn; thêm đường nhựa, vỉa hè, cây, đèn, ghế, nhà phố, biển hiệu tiếng Việt, xe và người làm cảnh.
-- Thêm trang chủ, trang game, HUD, cài đặt, tạm dừng, hướng dẫn, nhân vật đi/chạy, camera góc nhìn thứ ba và drone bật/tắt bằng phím V.
-- Shader mặt nước gợn nhẹ; vật liệu đường/vỉa hè/cỏ có color, roughness và normal map tạo từ mã.
+- `src/world/Historic.tsx`: dựng lại hình khối Tháp Rùa, mái/hiên khu đền và Cầu Thê Húc.
+- `src/world/Landscape.tsx`: mặt nước, mép kè, bờ đảo, dải cây và tán cây nhiều biến thể.
+- `src/world/Urban.tsx`: bảy biến thể nhà phố, chi tiết cửa hàng và mức chi tiết theo khoảng cách.
+- `src/world/geo.ts`: làm mềm đường bờ từ dữ liệu OSM và khớp độ cao đi bộ trên cầu.
+- `src/App.tsx`: cân lại ánh sáng, bóng và tone mapping.
+- `README.md`, `BAO_CAO.md`: cập nhật trạng thái và giới hạn.
+
+## Cải thiện hình ảnh
+
+Hồ vẫn theo dữ liệu OpenStreetMap, khoảng 634 × 249 m; tuyến cầu dài khoảng 46,3 m. Đường bờ được làm mềm nhẹ. Kè có thành và viền đá, đảo có thân nổi thay vì một mặt phẳng. Vỉa hè có dải trồng cây. Tán cây gồm ba khối tròn biến thiên kích thước, vị trí và màu bằng instancing.
+
+Tháp Rùa có ba tầng thu nhỏ dần, cửa vòm xuyên tường, gờ tầng, trụ góc và chân đế. Đền có hai điện mái ngói cong, hiên cột đỏ, sân, cổng hai tầng, đình nhỏ và bút tháp cách điệu. Cầu Thê Húc có mặt cầu cong liền mạch, 15 nhịp, trụ, tay vịn và cột lan can. Bảy biến thể nhà phố thay đổi chiều cao, mặt tiền, mái, cửa hàng, ban công và ô cửa. Shader nước kết hợp nhiễu nhiều tỷ lệ, gợn nhẹ và phản xạ Fresnel giả lập.
 
 ## Kiểm tra
 
@@ -14,24 +21,21 @@
 | --- | --- |
 | TypeScript `tsc -b` | Đạt, không có lỗi kiểu |
 | `scripts/check-map.mjs` | Đạt: hồ 634 × 249 m, cầu 46,3 m |
-| Vite production build | Đạt, 596 modules; JS 1.180 kB (333 kB gzip), CSS 15,86 kB (4,49 kB gzip) |
-| Trình duyệt/WebGL runtime | Chưa kiểm tra được: cổng quyền truy cập trình duyệt từ chối mở `http://127.0.0.1:5173/` |
+| Vite production build | Đạt; 596 module; JS khoảng 1,19 MB (336 kB gzip), CSS khoảng 16,3 kB (4,6 kB gzip) |
+| Trình duyệt/WebGL runtime | Chưa kiểm tra được: quyền truy cập trình duyệt của tác nhân vẫn chặn `http://127.0.0.1:5173/` |
 | FPS ở 1080p | Chưa đo được; HUD sẽ hiển thị FPS khi chạy trên trình duyệt |
-| Ảnh gameplay thực tế | Chưa có vì không thể mở bản xem trước trong môi trường này |
+| Ảnh gameplay | Chưa có ảnh chụp runtime đã xác thực |
 
-Vite có cảnh báo chunk JS trên 500 kB. Cần kiểm tra thời gian tải và tách chunk khi có thêm asset; cảnh báo này không làm build thất bại. Không thể xác nhận “không có lỗi console nghiêm trọng” cho tới khi chạy kiểm thử WebGL trên trình duyệt.
+Vite cảnh báo JS chunk lớn hơn 500 kB. Build vẫn thành công. Chưa thể xác nhận không có lỗi WebGL/console cho đến khi xem trong trình duyệt. Không tuyên bố đạt 50–60 FPS khi chưa đo.
 
-## Mô hình đã có và còn thiếu
+## Còn đơn giản
 
-Các mô hình **đã có** là hình học tự dựng trong mã: Tháp Rùa ba tầng/cửa vòm; Cầu Thê Húc đỏ 15 nhịp; hai điện đền, cổng và sân; nhà phố, cây, đèn, ghế, xe và người đơn giản. Không có GLB/GLTF bên ngoài.
+Các công trình vẫn là mô hình procedural stylized, chưa phải GLB/GLTF khảo cứu chính xác. Mái, hoa văn, mặt đứng Đắc Nguyệt Lầu, Trấn Ba Đình và bút tháp còn cách điệu. Nước chưa phản chiếu cây và công trình thật. Nhà phố không theo đúng từng thửa quanh hồ; nhân vật, xe và người đi bộ còn đơn giản. Chưa có texture ảnh thực, LOD đầy đủ hoặc tải asset theo khu vực.
 
-Các asset **còn thiếu** để đạt mục tiêu đồ họa cuối: mô hình khảo cứu chính xác cho Tháp Rùa/Đền Ngọc Sơn/Cầu Thê Húc, chi tiết bề mặt và hoa văn, nhân vật rigged có animation, texture và xe chất lượng cao. Mặt nước chưa có phản chiếu hình học của công trình/cây. Xem bảng tích hợp trong `README.md`.
+## Bước tiếp theo
 
-## Các bước kiểm tra tiếp theo
+1. Chạy trên Chrome/Edge ở 1920×1080; xem trực tiếp các góc bờ đông, cầu, đảo và Tháp Rùa; kiểm tra console và đo FPS cho từng preset.
+2. Điều chỉnh bố cục và vật liệu theo ảnh gameplay thực tế, đặc biệt cổng đền, mái ngói và mặt tiền nhà phố.
+3. Tạo GLB khảo cứu cho ba công trình chính từ ảnh thực có quyền dùng; thêm vật liệu PBR và LOD theo khoảng cách.
 
-1. Mở game trên Chrome/Edge desktop có WebGL 2 và đi từ bờ đông bắc qua cầu đến đảo.
-2. Xem console, kiểm tra mặt nước/đảo/nhà phố không có lỗi shader hoặc mesh.
-3. Đo FPS ở 1920×1080 trên PC tầm trung cho từng preset; điều chỉnh bóng, số nhà và tán cây theo số đo.
-4. Thay dần mô hình tự dựng bằng GLB khảo cứu đúng kiến trúc và có quyền sử dụng; thêm LOD, nén texture, tải theo khu vực.
-
-Hướng dẫn chạy và triển khai Vercel ở `README.md`.
+Hướng dẫn chạy local và triển khai Vercel ở `README.md`.

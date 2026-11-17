@@ -7,9 +7,75 @@ const limestone = new THREE.MeshStandardMaterial({ color: '#c5baa0', roughness: 
 const agedStone = new THREE.MeshStandardMaterial({ color: '#9a927c', roughness: 0.98 });
 const darkOpening = new THREE.MeshStandardMaterial({ color: '#41433b', roughness: 0.95 });
 const redPaint = new THREE.MeshStandardMaterial({ color: '#a9231c', roughness: 0.52, metalness: 0.05 });
+const bridgeDeckPaint = new THREE.MeshStandardMaterial({ color: '#aa3225', roughness: 0.66, side: THREE.DoubleSide });
 const roofTile = new THREE.MeshStandardMaterial({ color: '#6f3d32', roughness: 0.86 });
 const templeWall = new THREE.MeshStandardMaterial({ color: '#d7c39d', roughness: 0.9 });
 const timber = new THREE.MeshStandardMaterial({ color: '#643d31', roughness: 0.7 });
+const gold = new THREE.MeshStandardMaterial({ color: '#b69a58', metalness: 0.25, roughness: 0.55 });
+const mutedRed = new THREE.MeshStandardMaterial({ color: '#813b30', roughness: 0.8 });
+
+function roofGeometry(width: number, depth: number, rise: number) {
+  const columns = 16;
+  const rows = 10;
+  const vertices: number[] = [];
+  const uv: number[] = [];
+  const indices: number[] = [];
+  for (let iz = 0; iz <= rows; iz++) {
+    const tz = iz / rows;
+    const z = (tz - 0.5) * depth;
+    for (let ix = 0; ix <= columns; ix++) {
+      const tx = ix / columns;
+      const x = (tx - 0.5) * width;
+      const edge = Math.abs(x) / (width / 2);
+      const end = Math.abs(z) / (depth / 2);
+      const y = rise * (1 - edge) + 0.26 * Math.pow(edge, 8) + 0.2 * Math.pow(end, 8);
+      vertices.push(x, y, z);
+      uv.push(tx * 3, tz * 4);
+      if (ix < columns && iz < rows) {
+        const a = iz * (columns + 1) + ix;
+        indices.push(a, a + columns + 1, a + 1, a + 1, a + columns + 1, a + columns + 2);
+      }
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function roofTilesTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#71473a';
+  ctx.fillRect(0, 0, 256, 256);
+  for (let row = 0; row < 16; row++) {
+    const y = row * 16;
+    ctx.fillStyle = row % 3 === 0 ? '#87503d' : '#805040';
+    ctx.fillRect(0, y, 256, 14);
+    ctx.strokeStyle = '#4b312a';
+    ctx.lineWidth = 2;
+    for (let x = -16; x < 272; x += 32) {
+      const shift = row % 2 ? 16 : 0;
+      ctx.beginPath();
+      ctx.moveTo(x + shift, y);
+      ctx.lineTo(x + shift, y + 15);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#a66a4c';
+    ctx.beginPath();
+    ctx.moveTo(0, y + 14);
+    ctx.lineTo(256, y + 14);
+    ctx.stroke();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.anisotropy = 4;
+  return texture;
+}
 
 function archWallGeometry(width: number, height: number, openings: number) {
   const shape = new THREE.Shape();
@@ -50,6 +116,8 @@ function TowerTier({ width, depth, height, y, openings }: { width: number; depth
     <mesh position={[0, height * 0.46, 0]} castShadow><boxGeometry args={[width - 0.7, height * 0.5, depth - 0.7]} /><primitive object={darkOpening} attach="material" /></mesh>
     <mesh position={[0, height + 0.06, 0]} castShadow receiveShadow><boxGeometry args={[width + 0.65, 0.34, depth + 0.65]} /><primitive object={agedStone} attach="material" /></mesh>
     <mesh position={[0, height + 0.27, 0]} castShadow><boxGeometry args={[width + 0.3, 0.15, depth + 0.3]} /><primitive object={limestone} attach="material" /></mesh>
+    <mesh position={[0, 0.27, depth / 2 + 0.1]} castShadow><boxGeometry args={[width + 0.25, 0.2, 0.5]} /><primitive object={agedStone} attach="material" /></mesh>
+    {Array.from({ length: openings - 1 }, (_, i) => <mesh key={i} position={[-width / 2 + (i + 1) * width / openings, height / 2, depth / 2 + 0.1]} castShadow><boxGeometry args={[0.23, height - 0.2, 0.24]} /><primitive object={agedStone} attach="material" /></mesh>)}
     {[-1, 1].map((sideSign) => [-1, 1].map((other) => <mesh key={`${sideSign}-${other}`} position={[sideSign * (width / 2 - 0.08), height / 2, other * (depth / 2 - 0.08)]} castShadow><boxGeometry args={[0.25, height, 0.25]} /><primitive object={agedStone} attach="material" /></mesh>))}
   </group>;
 }
@@ -57,15 +125,15 @@ function TowerTier({ width, depth, height, y, openings }: { width: number; depth
 export function TurtleTower({ time }: { time: TimeOfDay }) {
   const [x, z] = turtleCenter;
   return <group position={[x, 0.32, z]}>
-    <mesh position={[0, 0.55, 0]} castShadow receiveShadow><boxGeometry args={[17.5, 1.1, 12.8]} /><primitive object={agedStone} attach="material" /></mesh>
-    <mesh position={[0, 1.18, 0]} castShadow receiveShadow><boxGeometry args={[16.5, 0.18, 11.8]} /><primitive object={limestone} attach="material" /></mesh>
-    <TowerTier width={14.8} depth={9.8} height={3.5} y={1.28} openings={3} />
-    <TowerTier width={11.4} depth={7.4} height={3.05} y={5.15} openings={3} />
-    <TowerTier width={7.3} depth={4.9} height={2.65} y={8.55} openings={2} />
-    <mesh position={[0, 11.65, 0]} castShadow><boxGeometry args={[8, 0.38, 5.7]} /><primitive object={agedStone} attach="material" /></mesh>
-    {[-1, 1].map((sign) => <mesh key={sign} position={[sign * 3.35, 12.1, 0]} castShadow><boxGeometry args={[0.55, 0.7, 5.4]} /><primitive object={limestone} attach="material" /></mesh>)}
-    {[-1, 1].map((sign) => <mesh key={sign} position={[0, 12.1, sign * 2.3]} castShadow><boxGeometry args={[7.2, 0.7, 0.48]} /><primitive object={limestone} attach="material" /></mesh>)}
-    <mesh position={[0, 12.85, 0]} castShadow><cylinderGeometry args={[0.42, 0.66, 1.1, 8]} /><primitive object={agedStone} attach="material" /></mesh>
+    <mesh position={[0, 0.48, 0]} castShadow receiveShadow><boxGeometry args={[14.2, 0.96, 10.8]} /><primitive object={agedStone} attach="material" /></mesh>
+    <mesh position={[0, 1.05, 0]} castShadow receiveShadow><boxGeometry args={[13.1, 0.22, 9.8]} /><primitive object={limestone} attach="material" /></mesh>
+    <TowerTier width={11.8} depth={8.5} height={3.15} y={1.18} openings={3} />
+    <TowerTier width={9.15} depth={6.5} height={2.8} y={4.74} openings={3} />
+    <TowerTier width={6.55} depth={4.65} height={2.45} y={7.94} openings={2} />
+    <mesh position={[0, 10.8, 0]} castShadow><boxGeometry args={[7.3, 0.35, 5.4]} /><primitive object={agedStone} attach="material" /></mesh>
+    {[-1, 1].map((sign) => <mesh key={sign} position={[sign * 3.05, 11.22, 0]} castShadow><boxGeometry args={[0.42, 0.55, 5.1]} /><primitive object={limestone} attach="material" /></mesh>)}
+    {[-1, 1].map((sign) => <mesh key={sign} position={[0, 11.22, sign * 2.13]} castShadow><boxGeometry args={[6.2, 0.55, 0.42]} /><primitive object={limestone} attach="material" /></mesh>)}
+    <mesh position={[0, 11.85, 0]} castShadow><cylinderGeometry args={[0.34, 0.55, 0.9, 8]} /><primitive object={agedStone} attach="material" /></mesh>
     {time !== 'day' && <pointLight position={[1, 6, 3]} color="#ffd09b" intensity={time === 'night' ? 34 : 16} distance={34} decay={2} />}
   </group>;
 }
@@ -77,73 +145,102 @@ function Beam({ from, to, radius, material }: { from: THREE.Vector3; to: THREE.V
   return <mesh position={middle} quaternion={quaternion} castShadow><cylinderGeometry args={[radius, radius, direction.length(), 7]} /><primitive object={material} attach="material" /></mesh>;
 }
 
+function bridgePoint(t: number) {
+  const [start, end] = bridgeEnds;
+  return new THREE.Vector3(THREE.MathUtils.lerp(start[0], end[0], t), 0.56 + Math.sin(Math.PI * t) * 1.45, THREE.MathUtils.lerp(start[1], end[1], t));
+}
+
+function bridgeDeckGeometry(normal: THREE.Vector2) {
+  const vertices: number[] = [];
+  const indices: number[] = [];
+  for (let i = 0; i <= 60; i++) {
+    const p = bridgePoint(i / 60);
+    for (const y of [0, -0.23]) for (const sign of [-1, 1]) vertices.push(p.x + normal.x * 1.35 * sign, p.y + y, p.z + normal.y * 1.35 * sign);
+    if (i < 60) {
+      const a = i * 4;
+      for (const [l, r] of [[0, 1], [2, 3], [0, 2], [1, 3]]) {
+        indices.push(a + l, a + 4 + l, a + r, a + r, a + 4 + l, a + 4 + r);
+      }
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 export function TheHucBridge() {
   const [start, end] = bridgeEnds;
-  const posts = Array.from({ length: 16 }, (_, i) => {
-    const t = i / 15;
-    return {
-      x: THREE.MathUtils.lerp(start[0], end[0], t),
-      z: THREE.MathUtils.lerp(start[1], end[1], t),
-      y: 0.65 + Math.sin(Math.PI * t) * 1.55,
-    };
-  });
-  const normal = new THREE.Vector2(-(end[1] - start[1]), end[0] - start[0]).normalize();
+  const normal = useMemo(() => new THREE.Vector2(-(end[1] - start[1]), end[0] - start[0]).normalize(), [start, end]);
+  const deck = useMemo(() => bridgeDeckGeometry(normal), [normal]);
+  const rails = useMemo(() => [-1, 1].flatMap((sign) => [0.55, 1.03].map((height) => {
+    const points = Array.from({ length: 31 }, (_, i) => {
+      const p = bridgePoint(i / 30);
+      return new THREE.Vector3(p.x + normal.x * 1.37 * sign, p.y + height, p.z + normal.y * 1.37 * sign);
+    });
+    return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 50, height > 1 ? 0.085 : 0.065, 6, false);
+  })), [normal]);
   return <group>
-    {posts.slice(0, -1).map((post, i) => {
-      const next = posts[i + 1];
-      const center = new THREE.Vector3((post.x + next.x) / 2, (post.y + next.y) / 2, (post.z + next.z) / 2);
-      const length = Math.hypot(next.x - post.x, next.z - post.z);
-      const angle = -Math.atan2(next.z - post.z, next.x - post.x);
+    <mesh geometry={deck} material={bridgeDeckPaint} castShadow receiveShadow />
+    {rails.map((geometry, index) => <mesh key={index} geometry={geometry} material={redPaint} castShadow />)}
+    {Array.from({ length: 16 }, (_, i) => {
+      const p = bridgePoint(i / 15);
       return <group key={i}>
-        <mesh position={center} rotation={[0, angle, 0]} castShadow receiveShadow><boxGeometry args={[length + 0.08, 0.18, 2.7]} /><primitive object={redPaint} attach="material" /></mesh>
-        <mesh position={[center.x, center.y - 0.17, center.z]} rotation={[0, angle, 0]} castShadow><boxGeometry args={[length + 0.08, 0.22, 2.9]} /><primitive object={timber} attach="material" /></mesh>
-        {[-1, 1].map((sign) => {
-          const a = new THREE.Vector3(post.x + normal.x * 1.38 * sign, post.y + 1.02, post.z + normal.y * 1.38 * sign);
-          const b = new THREE.Vector3(next.x + normal.x * 1.38 * sign, next.y + 1.02, next.z + normal.y * 1.38 * sign);
-          return <group key={sign}>
-            <Beam from={a} to={b} radius={0.105} material={redPaint} />
-            <Beam from={new THREE.Vector3(a.x, a.y - 0.55, a.z)} to={new THREE.Vector3(b.x, b.y - 0.55, b.z)} radius={0.075} material={redPaint} />
-          </group>;
-        })}
+        <mesh position={[p.x, p.y - 0.23, p.z]} rotation={[0, -Math.atan2(end[1] - start[1], end[0] - start[0]), 0]} castShadow><boxGeometry args={[0.085, 0.025, 2.56]} /><primitive object={timber} attach="material" /></mesh>
+        {[-1, 1].map((sign) => <group key={sign} position={[p.x + normal.x * 1.37 * sign, p.y, p.z + normal.y * 1.37 * sign]}>
+          <mesh position={[0, 0.52, 0]} castShadow><boxGeometry args={[0.15, 1.16, 0.15]} /><primitive object={redPaint} attach="material" /></mesh>
+          <mesh position={[0, 1.14, 0]}><sphereGeometry args={[0.13, 8, 6]} /><primitive object={gold} attach="material" /></mesh>
+        </group>)}
       </group>;
     })}
-    {posts.map((post, i) => [-1, 1].map((sign) => <group key={`${i}-${sign}`} position={[post.x + normal.x * 1.38 * sign, post.y, post.z + normal.y * 1.38 * sign]}>
-      <mesh position={[0, 0.52, 0]} castShadow><boxGeometry args={[0.19, 1.18, 0.19]} /><primitive object={redPaint} attach="material" /></mesh>
-      <mesh position={[0, 1.16, 0]} castShadow><sphereGeometry args={[0.15, 8, 6]} /><primitive object={redPaint} attach="material" /></mesh>
-      {i % 3 === 0 && <mesh position={[0, -post.y / 2, 0]} castShadow><cylinderGeometry args={[0.22, 0.24, post.y, 8]} /><primitive object={redPaint} attach="material" /></mesh>}
-    </group>))}
+    {[2, 5, 8, 11, 14].map((index) => {
+      const p = bridgePoint(index / 15);
+      return [-1, 1].map((sign) => <Beam key={`${index}-${sign}`} from={new THREE.Vector3(p.x + normal.x * 1.05 * sign, 0.08, p.z + normal.y * 1.05 * sign)} to={new THREE.Vector3(p.x + normal.x * 1.05 * sign, p.y - 0.24, p.z + normal.y * 1.05 * sign)} radius={0.15} material={redPaint} />);
+    })}
   </group>;
 }
 
-function TiledRoof({ width, depth, y }: { width: number; depth: number; y: number }) {
-  const slope = Math.hypot(width / 2 + 1.1, 2.5);
+function TiledRoof({ width, depth, y, rise = 2.15 }: { width: number; depth: number; y: number; rise?: number }) {
+  const geometry = useMemo(() => roofGeometry(width + 2.1, depth + 2.4, rise), [width, depth, rise]);
+  const texture = useMemo(() => roofTilesTexture(), []);
+  const tileMaterial = useMemo(() => new THREE.MeshStandardMaterial({ map: texture, color: '#bd9c89', side: THREE.DoubleSide, roughness: 0.88 }), [texture]);
   return <group>
-    {[-1, 1].map((sign) => <group key={sign}>
-      <mesh position={[sign * width / 4, y + 1.25, 0]} rotation={[0, 0, -sign * 0.36]} castShadow receiveShadow><boxGeometry args={[slope + 1.1, 0.22, depth + 1.9]} /><primitive object={roofTile} attach="material" /></mesh>
-      {Array.from({ length: Math.floor(depth / 0.9) }, (_, i) => <mesh key={i} position={[sign * width / 4, y + 1.35, -depth / 2 + i * 0.9]} rotation={[0, 0, -sign * 0.36]}><boxGeometry args={[slope + 1.1, 0.035, 0.08]} /><meshStandardMaterial color="#9a5b45" roughness={0.9} /></mesh>)}
-    </group>)}
-    <mesh position={[0, y + 2.57, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow><cylinderGeometry args={[0.16, 0.16, depth + 2.1, 8]} /><primitive object={agedStone} attach="material" /></mesh>
-    {[-1, 1].map((sign) => <mesh key={sign} position={[0, y + 2.72, sign * (depth / 2 + 0.8)]} castShadow><sphereGeometry args={[0.28, 8, 8]} /><primitive object={agedStone} attach="material" /></mesh>)}
+    <mesh position={[0, y, 0]} geometry={geometry} material={tileMaterial} castShadow receiveShadow />
+    <mesh position={[0, y - 0.12, 0]} castShadow><boxGeometry args={[width + 1.6, 0.15, depth + 1.8]} /><primitive object={timber} attach="material" /></mesh>
+    <mesh position={[0, y + rise + 0.03, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow><cylinderGeometry args={[0.18, 0.18, depth + 2.6, 8]} /><primitive object={gold} attach="material" /></mesh>
+    {[-1, 1].map((sign) => <mesh key={sign} position={[0, y + rise + 0.13, sign * (depth / 2 + 1.1)]} castShadow><coneGeometry args={[0.35, 0.7, 8]} /><primitive object={gold} attach="material" /></mesh>)}
   </group>;
 }
 
 function TempleHall({ x, z, width, depth, height }: { x: number; z: number; width: number; depth: number; height: number }) {
   return <group position={[x, 0.35, z]}>
-    <mesh position={[0, 0.4, 0]} castShadow receiveShadow><boxGeometry args={[width + 1.4, 0.8, depth + 1.4]} /><primitive object={agedStone} attach="material" /></mesh>
-    <mesh position={[0, 0.95 + height / 2, 0]} castShadow receiveShadow><boxGeometry args={[width, height, depth]} /><primitive object={templeWall} attach="material" /></mesh>
-    {[-1, 1].map((side) => [-1, 1].map((other) => <mesh key={`${side}-${other}`} position={[side * (width / 2 - 0.45), height / 2 + 1, other * (depth / 2 + 0.1)]} castShadow><cylinderGeometry args={[0.25, 0.27, height + 0.3, 8]} /><primitive object={redPaint} attach="material" /></mesh>))}
-    <mesh position={[width / 2 + 0.02, 2.1, 0]}><boxGeometry args={[0.08, 2.9, 2.7]} /><primitive object={timber} attach="material" /></mesh>
-    <mesh position={[width / 2 + 0.08, 2.15, 0]}><boxGeometry args={[0.08, 2.3, 1.5]} /><primitive object={darkOpening} attach="material" /></mesh>
-    <TiledRoof width={width + 0.8} depth={depth + 0.8} y={height + 0.95} />
+    <mesh position={[0, 0.38, 0]} castShadow receiveShadow><boxGeometry args={[width + 2, 0.76, depth + 1.8]} /><primitive object={agedStone} attach="material" /></mesh>
+    <mesh position={[-0.65, 0.95 + height / 2, 0]} castShadow receiveShadow><boxGeometry args={[width - 1.3, height, depth - 1.1]} /><primitive object={templeWall} attach="material" /></mesh>
+    <mesh position={[width / 2 - 0.8, 2.5, 0]}><boxGeometry args={[0.12, 3.15, depth - 1.2]} /><primitive object={mutedRed} attach="material" /></mesh>
+    {Array.from({ length: 5 }, (_, i) => {
+      const zz = -depth / 2 + 1.5 + i * (depth - 3) / 4;
+      return <group key={i}>
+        <mesh position={[width / 2 - 0.69, 2.35, zz]}><boxGeometry args={[0.09, 2.65, 1.15]} /><primitive object={i === 2 ? darkOpening : timber} attach="material" /></mesh>
+        <mesh position={[width / 2 - 0.59, 2.35, zz]}><boxGeometry args={[0.06, 2.45, 0.055]} /><primitive object={gold} attach="material" /></mesh>
+        <mesh position={[width / 2 + 0.35, 2.65, zz]} castShadow><cylinderGeometry args={[0.19, 0.22, 3.8, 10]} /><primitive object={redPaint} attach="material" /></mesh>
+        <mesh position={[width / 2 + 0.35, 4.68, zz]} castShadow><boxGeometry args={[0.45, 0.26, 0.45]} /><primitive object={gold} attach="material" /></mesh>
+      </group>;
+    })}
+    <mesh position={[width / 2 + 0.35, 4.55, 0]} castShadow><boxGeometry args={[0.43, 0.35, depth + 0.25]} /><primitive object={timber} attach="material" /></mesh>
+    <mesh position={[width / 2 + 1.25, 0.38, 0]} receiveShadow><boxGeometry args={[1.7, 0.18, depth - 0.8]} /><primitive object={limestone} attach="material" /></mesh>
+    <TiledRoof width={width + 1.4} depth={depth + 0.6} y={height + 0.95} />
   </group>;
 }
 
 function Gate({ position, width = 5 }: { position: [number, number, number]; width?: number }) {
   return <group position={position}>
-    {[-1, 1].map((sign) => <mesh key={sign} position={[0, 2.25, sign * width / 2]} castShadow><boxGeometry args={[0.7, 4.5, 0.7]} /><primitive object={templeWall} attach="material" /></mesh>)}
-    <mesh position={[0, 4.3, 0]} castShadow><boxGeometry args={[0.8, 0.6, width + 0.9]} /><primitive object={redPaint} attach="material" /></mesh>
-    <mesh position={[0, 4.6, 0]} castShadow><boxGeometry args={[1.4, 0.18, width + 1.4]} /><primitive object={roofTile} attach="material" /></mesh>
-    <mesh position={[0.05, 3.4, 0]}><boxGeometry args={[0.83, 0.55, 2.3]} /><meshStandardMaterial color="#282e2a" roughness={0.85} /></mesh>
+    {[-1, 1].map((sign) => <mesh key={sign} position={[0, 2.05, sign * width / 2]} castShadow><boxGeometry args={[1.2, 4.1, 0.83]} /><primitive object={templeWall} attach="material" /></mesh>)}
+    <mesh position={[0, 4.03, 0]} castShadow><boxGeometry args={[1.24, 0.5, width + 1.2]} /><primitive object={mutedRed} attach="material" /></mesh>
+    <mesh position={[0, 4.42, 0]} castShadow><boxGeometry args={[1.65, 0.2, width + 1.6]} /><primitive object={agedStone} attach="material" /></mesh>
+    <mesh position={[0, 5.17, 0]} castShadow><boxGeometry args={[1.35, 1.36, width - 0.5]} /><primitive object={templeWall} attach="material" /></mesh>
+    <mesh position={[0.73, 5.1, 0]}><boxGeometry args={[0.08, 0.78, 2.35]} /><primitive object={darkOpening} attach="material" /></mesh>
+    <TiledRoof width={1.55} depth={width + 0.2} y={6.05} rise={0.75} />
   </group>;
 }
 
@@ -156,6 +253,17 @@ export function NgocSonTemple({ time }: { time: TimeOfDay }) {
     <TempleHall x={cx - 10} z={cz + 0.5} width={12} depth={14} height={4.3} />
     <TempleHall x={cx + 2.2} z={cz - 0.2} width={9} depth={11} height={3.7} />
     <Gate position={[islandEnd[0] - 1.4, 0.42, islandEnd[1]]} />
+    <group position={[cx - 5, 0.34, cz + 16]}>
+      <mesh position={[0, 0.35, 0]} receiveShadow><boxGeometry args={[7.5, 0.7, 7.5]} /><primitive object={agedStone} attach="material" /></mesh>
+      {[-1, 1].map((x) => [-1, 1].map((z) => <mesh key={`${x}-${z}`} position={[x * 2.6, 2.5, z * 2.6]} castShadow><cylinderGeometry args={[0.2, 0.23, 4.2, 8]} /><primitive object={redPaint} attach="material" /></mesh>))}
+      <mesh position={[0, 4.45, 0]} castShadow><boxGeometry args={[6.6, 0.33, 6.6]} /><primitive object={timber} attach="material" /></mesh>
+      <TiledRoof width={6.7} depth={6.7} y={4.55} />
+    </group>
+    <group position={[bridgeEnds[0][0] + 9, 0.24, bridgeEnds[0][1] - 8]}>
+      <mesh position={[0, 0.35, 0]} castShadow><boxGeometry args={[3.3, 0.7, 3.3]} /><primitive object={agedStone} attach="material" /></mesh>
+      {[0, 1, 2].map((level) => <mesh key={level} position={[0, 1.25 + level * 1.65, 0]} rotation={[0, Math.PI / 4, 0]} castShadow><cylinderGeometry args={[1.25 - level * 0.27, 1.45 - level * 0.27, 1.6, 4]} /><primitive object={templeWall} attach="material" /></mesh>)}
+      <mesh position={[0, 6.25, 0]} castShadow><coneGeometry args={[0.8, 1.65, 4]} /><primitive object={gold} attach="material" /></mesh>
+    </group>
     {[-1, 1].map((sign) => <group key={sign} position={[cx - 3, 0.3, cz + sign * 10.6]}>
       <mesh castShadow position={[0, 1.4, 0]}><boxGeometry args={[24, 2.8, 0.32]} /><primitive object={templeWall} attach="material" /></mesh>
       <mesh castShadow position={[0, 3.0, 0]}><boxGeometry args={[25, 0.27, 0.75]} /><primitive object={roofTile} attach="material" /></mesh>

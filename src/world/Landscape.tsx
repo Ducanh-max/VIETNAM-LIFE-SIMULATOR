@@ -29,6 +29,20 @@ function ringGeometry(outer: Point[], inner: Point[]): THREE.ShapeGeometry {
   return geometry;
 }
 
+function bodyGeometry(outer: Point[], inner?: Point[], depth = 0.4): THREE.ExtrudeGeometry {
+  const shape = shapeFor(outer);
+  if (inner) {
+    const hole = new THREE.Path();
+    inner.forEach(([x, z], index) => index ? hole.lineTo(x, -z) : hole.moveTo(x, -z));
+    hole.closePath();
+    shape.holes.push(hole);
+  }
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 2 });
+  geometry.rotateX(-Math.PI / 2);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 function surfaceMaps(kind: 'stone' | 'asphalt' | 'grass') {
   const size = 256;
   const colorCanvas = document.createElement('canvas');
@@ -71,13 +85,13 @@ function surfaceMaps(kind: 'stone' | 'asphalt' | 'grass') {
 const waterVertex = `
   uniform float uTime;
   varying vec2 vWorld;
-  varying vec3 vNormal;
+  varying vec3 vPosition;
   void main() {
     vWorld = position.xz;
     vec3 displaced = position;
-    displaced.y += sin(position.x * 0.25 + uTime * 0.8) * 0.035;
-    displaced.y += sin(position.z * 0.2 - uTime * 0.58) * 0.025;
-    vNormal = normalize(vec3(-0.06 * cos(position.x * 0.25 + uTime * 0.8), 1.0, -0.04 * cos(position.z * 0.2 - uTime * 0.58)));
+    displaced.y += sin(position.x * 0.13 + position.z * 0.05 + uTime * 0.7) * 0.025;
+    displaced.y += sin(position.z * 0.19 - position.x * 0.07 - uTime * 0.53) * 0.018;
+    vPosition = (modelMatrix * vec4(displaced, 1.0)).xyz;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
   }
 `;
@@ -86,15 +100,26 @@ const waterFragment = `
   uniform vec3 uWater;
   uniform vec3 uSky;
   varying vec2 vWorld;
-  varying vec3 vNormal;
+  varying vec3 vPosition;
+  float hash21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float noise2(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),
+               mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x), f.y);
+  }
   void main() {
-    float a = sin(vWorld.x * 0.52 + vWorld.y * 0.11 + uTime * 0.95);
-    float b = sin(vWorld.y * 0.35 - vWorld.x * 0.14 - uTime * 0.7);
-    float c = sin((vWorld.x + vWorld.y) * 0.12 + uTime * 0.4);
-    float wave = a * b * 0.5 + c * 0.2;
-    float glint = pow(max(0.0, a * b), 12.0) * 0.13;
-    vec3 color = mix(uWater, uSky, 0.23 + wave * 0.055 + glint);
-    color += vec3(0.05, 0.09, 0.08) * pow(max(0.0, vNormal.y), 16.0) * glint;
+    vec2 flow = vWorld * 0.027 + vec2(uTime * 0.018, -uTime * 0.013);
+    float broad = noise2(flow);
+    float fine = noise2(vWorld * 0.13 + vec2(-uTime * 0.065, uTime * 0.04));
+    float ripple = sin(vWorld.x * 0.29 + vWorld.y * 0.16 + uTime * 1.1 + broad * 5.0);
+    float wave = broad * 0.6 + fine * 0.28 + ripple * 0.12;
+    vec3 normal = normalize(vec3((fine - 0.5) * 0.15, 1.0, (broad - 0.5) * 0.17));
+    vec3 viewDir = normalize(cameraPosition - vPosition);
+    float fresnel = pow(1.0 - max(dot(viewDir, normal), 0.0), 3.0);
+    float glint = pow(max(0.0, ripple * 0.5 + fine * 0.5), 9.0) * 0.12;
+    vec3 color = mix(uWater * (0.89 + wave * 0.2), uSky, 0.11 + fresnel * 0.46 + glint);
+    color += vec3(0.08, 0.11, 0.09) * glint;
     gl_FragColor = vec4(color, 1.0);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
@@ -158,6 +183,7 @@ export function StreetFurniture({ time }: { time: TimeOfDay }) {
   const treeTrunks = useRef<THREE.InstancedMesh>(null);
   const treeCrowns = useRef<THREE.InstancedMesh>(null);
   const treeCrowns2 = useRef<THREE.InstancedMesh>(null);
+  const treeCrowns3 = useRef<THREE.InstancedMesh>(null);
   const lampPosts = useRef<THREE.InstancedMesh>(null);
   const lampHeads = useRef<THREE.InstancedMesh>(null);
   useLayoutEffect(() => {
@@ -166,36 +192,47 @@ export function StreetFurniture({ time }: { time: TimeOfDay }) {
     const position = new THREE.Vector3();
     const quaternion = new THREE.Quaternion();
     samples.forEach(({ point, outward }, i) => {
-      const x = point[0] + outward[0] * 5.5;
-      const z = point[1] + outward[1] * 5.5;
-      const height = 6.5 + (i * 31 % 7) * 0.46;
+      const x = point[0] + outward[0] * (5.2 + (i * 17 % 4) * 0.37);
+      const z = point[1] + outward[1] * (5.2 + (i * 17 % 4) * 0.37);
+      const height = 6.1 + (i * 31 % 9) * 0.44;
+      const spread = 0.86 + (i * 13 % 5) * 0.085;
       position.set(x, height / 2, z);
-      scale.set(0.7, height, 0.7);
+      scale.set(0.58 + i % 3 * 0.09, height, 0.58 + i % 3 * 0.09);
       matrix.compose(position, quaternion, scale);
       treeTrunks.current?.setMatrixAt(i, matrix);
-      position.set(x, height + 1.5, z);
-      scale.set(5.4 + i % 3, 5.2, 5.4 + i % 3);
+      position.set(x, height + 1.2, z);
+      scale.set(4.5 * spread, 3.8 + i % 3 * 0.45, 4.4 * spread);
       matrix.compose(position, quaternion, scale);
       treeCrowns.current?.setMatrixAt(i, matrix);
-      position.set(x + 1.4, height + 3.1, z - 0.6);
-      scale.set(4.5, 4.1, 4.5);
+      position.set(x + (i % 2 ? 1.6 : -1.4), height + 2.5, z + (i % 3 - 1) * 1.2);
+      scale.set(3.7 * spread, 3.1, 3.7 * spread);
       matrix.compose(position, quaternion, scale);
       treeCrowns2.current?.setMatrixAt(i, matrix);
+      position.set(x + (i % 3 - 1) * 1.1, height + 0.25, z - (i % 2 ? 2.1 : -1.7));
+      scale.set(3.0 * spread, 2.65, 3.2 * spread);
+      matrix.compose(position, quaternion, scale);
+      treeCrowns3.current?.setMatrixAt(i, matrix);
+      const tint = new THREE.Color().setHSL(0.285 + (i * 19 % 9) * 0.005, 0.25 + (i % 4) * 0.025, 0.32 + (i * 7 % 6) * 0.025);
+      treeCrowns.current?.setColorAt(i, tint);
+      treeCrowns2.current?.setColorAt(i, tint.clone().multiplyScalar(1.13));
+      treeCrowns3.current?.setColorAt(i, tint.clone().multiplyScalar(0.93));
       position.set(x + outward[0] * 3, 2.9, z + outward[1] * 3);
-      scale.set(0.16, 5.8, 0.16);
+      scale.set(i % 2 ? 0.001 : 0.16, i % 2 ? 0.001 : 5.8, i % 2 ? 0.001 : 0.16);
       matrix.compose(position, quaternion, scale);
       lampPosts.current?.setMatrixAt(i, matrix);
       position.y = 5.9;
-      scale.set(0.72, 0.72, 0.72);
+      scale.set(i % 2 ? 0.001 : 0.72, i % 2 ? 0.001 : 0.72, i % 2 ? 0.001 : 0.72);
       matrix.compose(position, quaternion, scale);
       lampHeads.current?.setMatrixAt(i, matrix);
     });
-    for (const ref of [treeTrunks, treeCrowns, treeCrowns2, lampPosts, lampHeads]) if (ref.current) ref.current.instanceMatrix.needsUpdate = true;
+    for (const ref of [treeTrunks, treeCrowns, treeCrowns2, treeCrowns3, lampPosts, lampHeads]) if (ref.current) ref.current.instanceMatrix.needsUpdate = true;
+    for (const ref of [treeCrowns, treeCrowns2, treeCrowns3]) if (ref.current?.instanceColor) ref.current.instanceColor.needsUpdate = true;
   }, [samples]);
   return <>
     <instancedMesh ref={treeTrunks} args={[undefined, undefined, samples.length]} castShadow receiveShadow><cylinderGeometry args={[0.55, 0.78, 1, 7]} /><meshStandardMaterial color="#65533d" roughness={0.96} /></instancedMesh>
-    <instancedMesh ref={treeCrowns} args={[undefined, undefined, samples.length]} castShadow><icosahedronGeometry args={[1, 1]} /><meshStandardMaterial color="#315b3d" roughness={0.98} flatShading /></instancedMesh>
-    <instancedMesh ref={treeCrowns2} args={[undefined, undefined, samples.length]} castShadow><icosahedronGeometry args={[1, 1]} /><meshStandardMaterial color="#4a7547" roughness={0.98} flatShading /></instancedMesh>
+    <instancedMesh ref={treeCrowns} args={[undefined, undefined, samples.length]} castShadow><sphereGeometry args={[1, 12, 9]} /><meshStandardMaterial color="#ffffff" roughness={0.98} /></instancedMesh>
+    <instancedMesh ref={treeCrowns2} args={[undefined, undefined, samples.length]} castShadow><sphereGeometry args={[1, 11, 8]} /><meshStandardMaterial color="#ffffff" roughness={0.98} /></instancedMesh>
+    <instancedMesh ref={treeCrowns3} args={[undefined, undefined, samples.length]} castShadow><sphereGeometry args={[1, 10, 8]} /><meshStandardMaterial color="#ffffff" roughness={0.98} /></instancedMesh>
     <instancedMesh ref={lampPosts} args={[undefined, undefined, samples.length]}><cylinderGeometry args={[1, 1, 1, 6]} /><meshStandardMaterial color="#313d3b" metalness={0.6} roughness={0.4} /></instancedMesh>
     <instancedMesh ref={lampHeads} args={[undefined, undefined, samples.length]}><sphereGeometry args={[1, 8, 6]} /><meshStandardMaterial color={time === 'day' ? '#efe5bf' : '#ffcc82'} emissive="#ffbb66" emissiveIntensity={time === 'day' ? 0 : time === 'sunset' ? 1.2 : 2.6} /></instancedMesh>
     {samples.filter((_, index) => index % 3 === 0).map(({ point, outward, tangent }, index) => <group key={index} position={[point[0] + outward[0] * 3, 0.45, point[1] + outward[1] * 3]} rotation={[0, Math.atan2(tangent[0], tangent[1]), 0]}>
@@ -213,14 +250,22 @@ export function Landscape({ time }: { time: TimeOfDay }) {
   const sidewalk = useMemo(() => ringGeometry(offsetPolygon(shore, 11), shore), []);
   const road = useMemo(() => ringGeometry(offsetPolygon(shore, 28), offsetPolygon(shore, 11)), []);
   const curb = useMemo(() => ringGeometry(offsetPolygon(shore, 1.2), shore), []);
+  const revetment = useMemo(() => ringGeometry(offsetPolygon(shore, 1.85), offsetPolygon(shore, 0.7)), []);
+  const shoreBody = useMemo(() => bodyGeometry(offsetPolygon(shore, 1.05), shore, 0.34), []);
+  const planting = useMemo(() => ringGeometry(offsetPolygon(shore, 7.25), offsetPolygon(shore, 4.75)), []);
   const islandGeometries = useMemo(() => [fillGeometry(templeIsland), fillGeometry(turtleIsland)], []);
+  const islandBodies = useMemo(() => [bodyGeometry(templeIsland), bodyGeometry(turtleIsland)], []);
   const laneMarks = useMemo(() => sampleRing(offsetPolygon(shore, 20), 9).filter((_, i) => i % 2 === 0), []);
   return <>
     <mesh receiveShadow position={[0, -0.3, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[1300, 1300]} /><meshStandardMaterial map={grassMap} normalMap={grassNormal} roughnessMap={grassRough} roughness={1} /></mesh>
     <LakeWater time={time} />
+    <mesh geometry={shoreBody} position={[0, -0.08, 0]} receiveShadow><meshStandardMaterial color="#a29b85" roughness={0.98} /></mesh>
     <mesh geometry={sidewalk} receiveShadow position={[0, 0.14, 0]}><meshStandardMaterial map={stoneMap} normalMap={stoneNormal} roughnessMap={stoneRough} roughness={0.9} /></mesh>
     <mesh geometry={road} receiveShadow position={[0, 0.08, 0]}><meshStandardMaterial map={roadMap} normalMap={roadNormal} roughnessMap={roadRough} roughness={0.94} /></mesh>
     <mesh geometry={curb} receiveShadow position={[0, 0.24, 0]}><meshStandardMaterial color="#b8b4a5" roughness={0.92} /></mesh>
+    <mesh geometry={revetment} receiveShadow position={[0, 0.28, 0]}><meshStandardMaterial color="#a1977d" roughness={0.98} /></mesh>
+    <mesh geometry={planting} receiveShadow position={[0, 0.17, 0]}><meshStandardMaterial map={grassMap} normalMap={grassNormal} roughnessMap={grassRough} roughness={1} /></mesh>
+    {islandBodies.map((geometry, index) => <mesh key={`body-${index}`} geometry={geometry} receiveShadow position={[0, -0.12, 0]}><meshStandardMaterial color={index ? '#8d8c74' : '#7f8970'} roughness={1} /></mesh>)}
     {islandGeometries.map((geometry, index) => <mesh key={index} geometry={geometry} receiveShadow position={[0, 0.28, 0]}><meshStandardMaterial map={index ? stoneMap : grassMap} roughness={1} /></mesh>)}
     {laneMarks.map(({ point, tangent }, index) => <mesh key={index} position={[point[0], 0.095, point[1]]} rotation={[-Math.PI / 2, 0, Math.atan2(tangent[1], tangent[0])]}><planeGeometry args={[4.2, 0.2]} /><meshBasicMaterial color="#e7dca8" /></mesh>)}
     <StreetFurniture time={time} />

@@ -9,7 +9,21 @@ export function project([lon, lat]: number[]): Point {
   return [(lon - map.center.lon) * METERS_PER_LON, -(lat - map.center.lat) * METERS_PER_LAT];
 }
 
-export const shore = map.lake.coordinates[0].map(project);
+function softenClosedRing(points: Point[]): Point[] {
+  const ring = points.length > 1 && points[0][0] === points[points.length - 1][0] && points[0][1] === points[points.length - 1][1]
+    ? points.slice(0, -1) : points;
+  const smooth: Point[] = [];
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+    smooth.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25]);
+    smooth.push([a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]);
+  }
+  smooth.push([...smooth[0]] as Point);
+  return smooth;
+}
+
+export const shore = softenClosedRing(map.lake.coordinates[0].map(project));
 export const islands = map.lake.coordinates.slice(1).map((ring) => ring.map(project));
 export const turtleIsland = islands[1];
 export const templeIsland = islands[0];
@@ -68,7 +82,7 @@ export function positionOnBridge(point: Point): number {
   const dx = b[0] - a[0];
   const dz = b[1] - a[1];
   const t = Math.max(0, Math.min(1, ((point[0] - a[0]) * dx + (point[1] - a[1]) * dz) / (dx * dx + dz * dz)));
-  return distanceToSegment(point, a, b) < 2.5 ? 0.48 + Math.sin(Math.PI * t) * 1.7 : 0.35;
+  return distanceToSegment(point, a, b) < 2.5 ? 0.56 + Math.sin(Math.PI * t) * 1.45 : 0.35;
 }
 
 export const mapAttribution = map.source;

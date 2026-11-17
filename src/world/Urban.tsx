@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { bridgeEnds, centerOf, shore, type Point } from './geo';
 import type { TimeOfDay } from './Landscape';
@@ -28,7 +29,8 @@ function makeBuildings(): Building[] {
         const detailed = distanceToBridge < 170 || (sx > 42 && sz < 60 && sz > -205);
         const index = placements.length;
         placements.push({ x: sx + ox * 37, z: sz + oz * 37, yaw: Math.atan2(-ox, -oz),
-          width: 9.2, depth: 13.5, floors: 3 + index % 3, detailed, index });
+          width: 8.4 + (index * 3 % 5) * 0.55, depth: 11.5 + (index * 7 % 4) * 1.05,
+          floors: 2 + (index * 5 % 4), detailed, index });
       }
       next += 15.5;
     }
@@ -59,8 +61,11 @@ const signs = [
   ['PHỞ GÀ 36', '#80522b'], ['TRÀ SEN TÂY HỒ', '#4d624a'], ['BÁNH MÌ HÀ NỘI', '#bd6c35'],
   ['GỐM & QUÀ VIỆT', '#3c5662'], ['HIỆU ẢNH BỜ HỒ', '#6f3b43'],
 ];
+const signCache = new Map<string, THREE.CanvasTexture>();
 
 function signTexture(label: string, background: string): THREE.CanvasTexture {
+  const cached = signCache.get(label);
+  if (cached) return cached;
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 128;
@@ -78,6 +83,7 @@ function signTexture(label: string, background: string): THREE.CanvasTexture {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
+  signCache.set(label, texture);
   return texture;
 }
 
@@ -85,29 +91,55 @@ function ShopHouse({ building, time }: { building: Building; time: TimeOfDay }) 
   const { x, z, yaw, width, depth, floors, detailed, index } = building;
   const height = floors * 3.35 + 1;
   const wallColor = palette[index % palette.length];
+  const variant = index % 7;
   const sign = signs[index % signs.length];
   const signMap = useMemo(() => signTexture(sign[0], sign[1]), [sign]);
   const glass = time === 'night' ? '#c8a375' : '#476267';
+  const detailedFacade = useRef<THREE.Group>(null);
+  const simpleFacade = useRef<THREE.Group>(null);
+  useFrame(({ camera }) => {
+    const near = detailed && (camera.position.x - x) ** 2 + (camera.position.z - z) ** 2 < 125 ** 2;
+    if (detailedFacade.current) detailedFacade.current.visible = near;
+    if (simpleFacade.current) simpleFacade.current.visible = !near;
+  });
   return <group position={[x, 0, z]} rotation={[0, yaw, 0]}>
     <mesh position={[0, height / 2, 0]} castShadow receiveShadow><boxGeometry args={[width, height, depth]} /><meshStandardMaterial color={wallColor} roughness={0.86} /></mesh>
-    <mesh position={[0, height + 0.38, 0]} castShadow><boxGeometry args={[width + 0.28, 0.6, depth + 0.3]} /><meshStandardMaterial color="#70675e" roughness={0.88} /></mesh>
+    <mesh position={[0, height + 0.13, 0]} castShadow><boxGeometry args={[width + 0.35, 0.26, depth + 0.45]} /><meshStandardMaterial color="#776d60" roughness={0.88} /></mesh>
+    {variant % 3 === 0 ? <>
+      <mesh position={[0, height + 0.63, depth / 2 - 0.25]} castShadow><boxGeometry args={[width + 0.4, 0.84, 0.35]} /><meshStandardMaterial color={wallColor} roughness={0.9} /></mesh>
+      <mesh position={[0, height + 0.63, -depth / 2 + 0.25]} castShadow><boxGeometry args={[width + 0.4, 0.84, 0.35]} /><meshStandardMaterial color={wallColor} roughness={0.9} /></mesh>
+    </> : <mesh position={[variant % 2 ? -width * 0.18 : width * 0.16, height + 0.71, -depth * 0.12]} castShadow><boxGeometry args={[width * 0.42, 1.15, depth * 0.38]} /><meshStandardMaterial color={wallColor} roughness={0.9} /></mesh>}
     <mesh position={[0, 1.45, depth / 2 + 0.07]}><boxGeometry args={[width - 0.5, 2.7, 0.11]} /><meshStandardMaterial color={glass} metalness={0.25} roughness={0.27} emissive={time === 'night' ? '#6e4629' : '#000000'} emissiveIntensity={time === 'night' ? 0.5 : 0} /></mesh>
+    <mesh position={[0, 1.45, depth / 2 + 0.17]}><boxGeometry args={[0.11, 2.7, 0.11]} /><meshStandardMaterial color="#d5c9ae" roughness={0.8} /></mesh>
+    <mesh position={[0, 1.45, depth / 2 + 0.19]}><boxGeometry args={[width - 0.6, 0.1, 0.1]} /><meshStandardMaterial color="#d5c9ae" roughness={0.8} /></mesh>
     <mesh position={[0, 3.3, depth / 2 + 0.17]}><planeGeometry args={[width - 0.25, 1.12]} /><meshBasicMaterial map={signMap} side={THREE.DoubleSide} /></mesh>
-    {detailed && <>
-      <mesh position={[0, 2.16, depth / 2 + 1.25]} rotation={[0.16, 0, 0]} castShadow><boxGeometry args={[width + 0.5, 0.08, 2.2]} /><meshStandardMaterial color={sign[1]} roughness={0.78} /></mesh>
+    <mesh position={[0, 3.87, depth / 2 + 0.26]} castShadow><boxGeometry args={[width + 0.45, 0.12, 0.55]} /><meshStandardMaterial color="#6f5142" roughness={0.84} /></mesh>
+    {detailed && <group ref={detailedFacade}>
+      <mesh position={[0, 2.18, depth / 2 + 1.18]} rotation={[0.16, 0, 0]} castShadow><boxGeometry args={[width + 0.45, 0.09, 2.1]} /><meshStandardMaterial color={sign[1]} roughness={0.78} /></mesh>
       {Array.from({ length: floors - 1 }, (_, floor) => <group key={floor} position={[0, 4.05 + floor * 3.25, depth / 2 + 0.11]}>
-        {[-1.85, 1.85].map((wx) => <group key={wx} position={[wx, 0, 0]}>
-          <mesh position={[0, 0, 0.03]}><boxGeometry args={[2.75, 2.2, 0.1]} /><meshStandardMaterial color={glass} metalness={0.26} roughness={0.22} emissive={time === 'night' && (floor + index) % 3 === 0 ? '#ab7245' : '#000000'} emissiveIntensity={0.55} /></mesh>
+        {[-width * 0.23, width * 0.23].map((wx) => <group key={wx} position={[wx, 0, 0]}>
+          <mesh position={[0, 0, 0.03]}><boxGeometry args={[width * 0.3, 2.2, 0.1]} /><meshStandardMaterial color={glass} metalness={0.26} roughness={0.22} emissive={time === 'night' && (floor + index) % 3 === 0 ? '#ab7245' : '#000000'} emissiveIntensity={0.55} /></mesh>
           <mesh position={[0, 0, 0.12]}><boxGeometry args={[0.08, 2.18, 0.11]} /><meshStandardMaterial color="#ebe2cf" /></mesh>
-          <mesh position={[0, 0, 0.12]}><boxGeometry args={[2.73, 0.08, 0.11]} /><meshStandardMaterial color="#ebe2cf" /></mesh>
+          <mesh position={[0, 0, 0.12]}><boxGeometry args={[width * 0.3, 0.08, 0.11]} /><meshStandardMaterial color="#ebe2cf" /></mesh>
+          {variant === 2 || variant === 5 ? <mesh position={[0, 0, 0.2]}><boxGeometry args={[width * 0.3 + 0.22, 2.32, 0.12]} /><meshStandardMaterial color="#875e46" roughness={0.8} wireframe /></mesh> : null}
         </group>)}
-        <mesh position={[0, -1.28, 0.65]} castShadow><boxGeometry args={[width - 0.2, 0.16, 1.35]} /><meshStandardMaterial color="#a49b85" roughness={0.9} /></mesh>
-        <mesh position={[0, -0.65, 1.31]}><boxGeometry args={[width - 0.2, 1.1, 0.08]} /><meshStandardMaterial color="#6d746c" roughness={0.65} metalness={0.35} wireframe /></mesh>
+        {variant !== 1 && <>
+          <mesh position={[0, -1.28, 0.65]} castShadow><boxGeometry args={[width - 0.2, 0.16, 1.35]} /><meshStandardMaterial color="#a49b85" roughness={0.9} /></mesh>
+          <mesh position={[0, -0.66, 1.3]}><boxGeometry args={[width - 0.3, 0.95, 0.09]} /><meshStandardMaterial color={variant % 2 ? '#776b5a' : '#4e625c'} roughness={0.62} metalness={0.18} wireframe /></mesh>
+        </>}
+        {variant === 3 && <mesh position={[0, 1.28, 0.3]} castShadow><boxGeometry args={[width + 0.45, 0.18, 0.7]} /><meshStandardMaterial color="#e2d9c5" roughness={0.9} /></mesh>}
       </group>)}
-      <mesh position={[width / 2 - 1.45, 5.25, depth / 2 + 0.45]} castShadow><boxGeometry args={[1.45, 0.75, 0.75]} /><meshStandardMaterial color="#dad8cd" roughness={0.75} /></mesh>
-      <mesh position={[width / 2 - 1.45, 5.25, depth / 2 + 0.85]}><circleGeometry args={[0.28, 12]} /><meshStandardMaterial color="#889690" /></mesh>
-    </>}
-    {!detailed && Array.from({ length: floors - 1 }, (_, floor) => <mesh key={floor} position={[0, 5 + floor * 3.2, depth / 2 + 0.08]}><boxGeometry args={[width - 1.5, 1.8, 0.08]} /><meshStandardMaterial color={glass} roughness={0.28} metalness={0.2} /></mesh>)}
+      {variant % 2 === 0 && <>
+        <mesh position={[width / 2 - 1.45, 5.25, depth / 2 + 0.45]} castShadow><boxGeometry args={[1.45, 0.75, 0.75]} /><meshStandardMaterial color="#dad8cd" roughness={0.75} /></mesh>
+        <mesh position={[width / 2 - 1.45, 5.25, depth / 2 + 0.85]}><circleGeometry args={[0.28, 12]} /><meshStandardMaterial color="#889690" /></mesh>
+      </>}
+    </group>}
+    <group ref={simpleFacade}>
+      {Array.from({ length: floors - 1 }, (_, floor) => <group key={floor} position={[0, 5 + floor * 3.2, depth / 2 + 0.08]}>
+        <mesh><boxGeometry args={[width - 1.5, 1.8, 0.08]} /><meshStandardMaterial color={glass} roughness={0.28} metalness={0.2} /></mesh>
+        <mesh position={[0, -1.07, 0.22]}><boxGeometry args={[width - 0.6, 0.14, 0.45]} /><meshStandardMaterial color="#a29c8d" roughness={0.9} /></mesh>
+      </group>)}
+    </group>
   </group>;
 }
 
