@@ -76,7 +76,13 @@ function App() {
       else if (panel) setPanel(null);
       else if (mode === 'game') setPaused((value) => !value);
     };
-    const onKeyDown = (event: KeyboardEvent) => { if (event.code === 'Escape') onEscape(); };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code === 'Escape') onEscape();
+      if (event.code === 'KeyV' && !event.repeat && mode === 'game' && !paused && panel === null) {
+        event.preventDefault();
+        setFreeCamera((value) => !value);
+      }
+    };
     window.addEventListener('hashchange', onHash);
     window.addEventListener('keydown', onKeyDown);
     return () => {
@@ -89,6 +95,7 @@ function App() {
     window.location.hash = 'play';
     setMode('game');
     setPaused(false);
+    setFreeCamera(false);
     setPanel('help');
   };
   const returnHome = () => {
@@ -96,6 +103,7 @@ function App() {
     window.location.hash = 'home';
     setMode('home');
     setPaused(false);
+    setFreeCamera(false);
     setPanel(null);
   };
   const lockPointer = () => {
@@ -138,8 +146,9 @@ function App() {
         <div className="game-brand" onClick={returnHome} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') returnHome(); }}>ĐỜI VIỆT<span> / HÀ NỘI 3D</span></div>
         <div className="game-actions"><button title="Trợ giúp" aria-label="Trợ giúp" onClick={() => openPanel('help')}>?</button><button title="Cài đặt" aria-label="Cài đặt" onClick={() => openPanel('settings')}><Icon name="settings" /></button><button title={paused ? 'Tiếp tục' : 'Tạm dừng'} aria-label={paused ? 'Tiếp tục' : 'Tạm dừng'} onClick={() => { if (document.pointerLockElement) document.exitPointerLock(); setPaused(!paused); }}><Icon name={paused ? 'play' : 'pause'} /></button></div>
       </header>
-      <div className="area-tag"><Icon name="compass" /><span>ĐANG KHÁM PHÁ<strong>Hồ Hoàn Kiếm, Hà Nội</strong></span></div>
-      <div className="game-bottom"><span>W A S D <b>Di chuyển</b></span><span>CHUỘT <b>Xoay góc nhìn</b></span><span>SHIFT <b>Chạy</b></span><span className="fps-pill">{position[0].toFixed(0)} : {position[1].toFixed(0)} · {fps || '—'} FPS</span></div>
+      <div className="area-tag"><Icon name="compass" /><span>{freeCamera ? 'CHẾ ĐỘ DRONE' : 'ĐANG KHÁM PHÁ'}<strong>Hồ Hoàn Kiếm, Hà Nội</strong></span></div>
+      {freeCamera && <div className="drone-reticle" aria-hidden="true">+</div>}
+      <div className="game-bottom"><span>W A S D <b>{freeCamera ? 'Bay ngang' : 'Di chuyển'}</b></span><span>CHUỘT <b>Xoay góc nhìn</b></span><span>{freeCamera ? 'SPACE / CTRL' : 'SHIFT'} <b>{freeCamera ? 'Lên / xuống' : 'Chạy'}</b></span><span>V <b>{freeCamera ? 'Về nhân vật' : 'Bật drone'}</b></span><span className="fps-pill">{position[0].toFixed(0)} : {position[1].toFixed(0)} · {fps || '—'} FPS</span></div>
       {!panel && !paused && <button className="capture-tip" onClick={lockPointer}>Nhấp vào cảnh để điều khiển camera</button>}
       {paused && !panel && <div className="pause-scrim"><div className="pause-card"><span className="modal-kicker">TẠM DỪNG</span><h2>Dừng chân bên hồ.</h2><p>Thành phố vẫn ở đây khi bạn quay lại.</p><button className="primary-button" onClick={() => setPaused(false)}><Icon name="play" /> Tiếp tục</button><button className="text-button" onClick={returnHome}>Về trang chủ →</button></div></div>}
     </>}
@@ -149,9 +158,9 @@ function App() {
       {panel === 'settings' ? <><span className="modal-kicker">TUỲ CHỈNH TRẢI NGHIỆM</span><h2>Cài đặt</h2><p>Chọn ánh sáng và chất lượng phù hợp với máy của bạn.</p>
         <div className="setting-group"><label>Thời điểm trong ngày</label><div className="segmented">{([['day', 'Ban ngày'], ['sunset', 'Hoàng hôn'], ['night', 'Ban đêm']] as const).map(([value, label]) => <button key={value} className={time === value ? 'selected' : ''} onClick={() => setTime(value)}>{label}</button>)}</div></div>
         <div className="setting-group"><label>Chất lượng đồ họa</label><div className="segmented quality">{(['low', 'medium', 'high', 'ultra'] as Quality[]).map((value) => <button key={value} className={quality === value ? 'selected' : ''} onClick={() => setQuality(value)}>{value.toUpperCase()}</button>)}</div></div>
-        <div className="setting-group toggle-row"><div><label>Camera tự do</label><small>Dùng để kiểm tra cảnh quan. Q/E để lên xuống.</small></div><button className={`toggle ${freeCamera ? 'on' : ''}`} role="switch" aria-checked={freeCamera} onClick={() => setFreeCamera(!freeCamera)}><span /></button></div>
+        <div className="setting-group toggle-row"><div><label>Chế độ drone</label><small>Nhấn V để bật/tắt. Space/Ctrl để lên/xuống, Shift để bay nhanh.</small></div><button className={`toggle ${freeCamera ? 'on' : ''}`} role="switch" aria-checked={freeCamera} onClick={() => setFreeCamera(!freeCamera)}><span /></button></div>
         <button className="primary-button modal-primary" onClick={() => setPanel(null)}>Áp dụng</button>
-      </> : panel === 'about' ? <><span className="modal-kicker">VỀ ĐỜI VIỆT</span><h2>Một thế giới bắt đầu từ Hà Nội.</h2><p>ĐỜI VIỆT là bản thử nghiệm game web 3D mô phỏng Việt Nam. Phiên bản này tập trung vào cảnh quan Hồ Hoàn Kiếm, Cầu Thê Húc, Đền Ngọc Sơn và Tháp Rùa.</p><p>Địa hình hồ và vị trí các đảo dựa trên dữ liệu OpenStreetMap. Các công trình hiện là mô hình 3D dựng theo cấu trúc kiến trúc tham khảo; chi tiết chuyên sâu sẽ được tiếp tục hoàn thiện.</p><div className="about-stats"><div><strong>01</strong><span>Khu vực</span></div><div><strong>03</strong><span>Chế độ ánh sáng</span></div><div><strong>04</strong><span>Mức đồ họa</span></div></div><button className="primary-button modal-primary" onClick={mode === 'home' ? start : () => setPanel(null)}>{mode === 'home' ? 'Bắt đầu khám phá' : 'Quay lại game'} <span>↗</span></button></> : <><span className="modal-kicker">HƯỚNG DẪN KHÁM PHÁ</span><h2>Dạo bước bên Hồ Gươm.</h2><div className="help-grid"><div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Di chuyển</span></div><div><kbd>CHUỘT</kbd><span>Xoay camera</span></div><div><kbd>SHIFT</kbd><span>Chạy</span></div><div><kbd>ESC</kbd><span>Thoát con trỏ</span></div></div><p>Nhấp vào cảnh 3D để khóa con trỏ. Bạn có thể đi qua Cầu Thê Húc tới đảo Ngọc Sơn; bờ hồ và công trình có va chạm cơ bản.</p><button className="primary-button modal-primary" onClick={() => setPanel(null)}>Bắt đầu đi dạo <span>↗</span></button></>}
+      </> : panel === 'about' ? <><span className="modal-kicker">VỀ ĐỜI VIỆT</span><h2>Một thế giới bắt đầu từ Hà Nội.</h2><p>ĐỜI VIỆT là bản thử nghiệm game web 3D mô phỏng Việt Nam. Phiên bản này tập trung vào cảnh quan Hồ Hoàn Kiếm, Cầu Thê Húc, Đền Ngọc Sơn và Tháp Rùa.</p><p>Địa hình hồ và vị trí các đảo dựa trên dữ liệu OpenStreetMap. Các công trình hiện là mô hình 3D dựng theo cấu trúc kiến trúc tham khảo; chi tiết chuyên sâu sẽ được tiếp tục hoàn thiện.</p><div className="about-stats"><div><strong>01</strong><span>Khu vực</span></div><div><strong>03</strong><span>Chế độ ánh sáng</span></div><div><strong>04</strong><span>Mức đồ họa</span></div></div><button className="primary-button modal-primary" onClick={mode === 'home' ? start : () => setPanel(null)}>{mode === 'home' ? 'Bắt đầu khám phá' : 'Quay lại game'} <span>↗</span></button></> : <><span className="modal-kicker">HƯỚNG DẪN KHÁM PHÁ</span><h2>Dạo bước bên Hồ Gươm.</h2><div className="help-grid"><div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Di chuyển</span></div><div><kbd>CHUỘT</kbd><span>Xoay camera</span></div><div><kbd>SHIFT</kbd><span>Chạy / bay nhanh</span></div><div><kbd>V</kbd><span>Bật / tắt drone</span></div><div><kbd>SPACE</kbd><kbd>CTRL</kbd><span>Drone lên / xuống</span></div><div><kbd>ESC</kbd><span>Thoát con trỏ</span></div></div><p>Nhấp vào cảnh 3D để khóa con trỏ. Bạn có thể đi qua Cầu Thê Húc tới đảo Ngọc Sơn; bờ hồ và công trình có va chạm cơ bản.</p><button className="primary-button modal-primary" onClick={() => setPanel(null)}>Bắt đầu đi dạo <span>↗</span></button></>}
     </section></div>}
     <div className="attribution">Dữ liệu bản đồ © {mapAttribution}</div>
   </main>;

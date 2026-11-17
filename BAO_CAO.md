@@ -5,7 +5,7 @@
 - Tạo dự án mới `doi-viet-3d` bằng React + Vite + TypeScript, Three.js, React Three Fiber, Drei và Tailwind CSS.
 - Dựng cảnh Hồ Hoàn Kiếm bằng đường bờ thực từ OpenStreetMap: trục bắc–nam khoảng **634 m**, trục đông–tây khoảng **249 m**. Hai đảo được giữ đúng tương quan; tuyến Cầu Thê Húc theo dữ liệu bản đồ dài khoảng **46,3 m**.
 - Dựng mô hình 3D tự tạo cho Tháp Rùa, Cầu Thê Húc và khu Đền Ngọc Sơn; thêm đường nhựa, vỉa hè, cây, đèn, ghế, nhà phố, biển hiệu tiếng Việt, xe và người làm cảnh.
-- Thêm trang chủ, trang game, HUD, cài đặt, tạm dừng, hướng dẫn, nhân vật đi/chạy, camera góc nhìn thứ ba và camera tự do.
+- Thêm trang chủ, trang game, HUD, cài đặt, tạm dừng, hướng dẫn, nhân vật đi/chạy, camera góc nhìn thứ ba và drone bật/tắt bằng phím V.
 - Shader mặt nước gợn nhẹ; vật liệu đường/vỉa hè/cỏ có color, roughness và normal map tạo từ mã.
 
 ## Kiểm tra

@@ -54,8 +54,15 @@ export function Explorer({ mode, paused, freeCamera, onFps, onPosition }: {
   const homeTime = useRef(0);
   const cameraTarget = useRef(new THREE.Vector3());
   useEffect(() => {
+    if (freeCamera && mode === 'game') {
+      freePosition.current.copy(camera.position);
+      freePosition.current.y = Math.max(4, freePosition.current.y);
+      keys.current.clear();
+    }
+  }, [freeCamera, mode, camera]);
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'ShiftLeft', 'ShiftRight', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
+      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'ShiftLeft', 'ShiftRight', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code) || (freeCamera && ['Space', 'ControlLeft', 'ControlRight'].includes(event.code))) event.preventDefault();
       keys.current.add(event.code);
     };
     const onKeyUp = (event: KeyboardEvent) => keys.current.delete(event.code);
@@ -75,7 +82,7 @@ export function Explorer({ mode, paused, freeCamera, onFps, onPosition }: {
       window.removeEventListener('blur', onBlur);
       document.removeEventListener('mousemove', onMouse);
     };
-  }, [mode, paused, gl]);
+  }, [mode, paused, freeCamera, gl]);
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
@@ -85,7 +92,7 @@ export function Explorer({ mode, paused, freeCamera, onFps, onPosition }: {
       onFps(Math.round(frames.current / sampleTime.current));
       frames.current = 0;
       sampleTime.current = 0;
-      onPosition([position.current.x, position.current.z]);
+      onPosition(freeCamera ? [freePosition.current.x, freePosition.current.z] : [position.current.x, position.current.z]);
     }
     if (mode === 'home') {
       homeTime.current += dt * 0.11;
@@ -110,10 +117,10 @@ export function Explorer({ mode, paused, freeCamera, onFps, onPosition }: {
     running.current = walking.current && (keys.current.has('ShiftLeft') || keys.current.has('ShiftRight'));
     if (walking.current) direction.normalize();
     if (freeCamera) {
-      const speed = (running.current ? 38 : 19) * dt;
+      const speed = (keys.current.has('ShiftLeft') || keys.current.has('ShiftRight') ? 42 : 20) * dt;
       freePosition.current.addScaledVector(direction, speed);
-      if (keys.current.has('KeyE')) freePosition.current.y += speed;
-      if (keys.current.has('KeyQ')) freePosition.current.y -= speed;
+      if (keys.current.has('Space') || keys.current.has('KeyE')) freePosition.current.y += speed;
+      if (keys.current.has('ControlLeft') || keys.current.has('ControlRight') || keys.current.has('KeyQ')) freePosition.current.y -= speed;
       freePosition.current.y = THREE.MathUtils.clamp(freePosition.current.y, 2, 180);
       camera.position.lerp(freePosition.current, 1 - Math.exp(-13 * dt));
       camera.lookAt(camera.position.clone().add(forward).add(new THREE.Vector3(0, -Math.tan(pitch.current), 0)));
