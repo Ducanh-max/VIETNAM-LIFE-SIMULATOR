@@ -106,13 +106,20 @@ export function Explorer({ mode, paused, freeCamera, onFps, onPosition }: {
     }
     if (avatar.current) avatar.current.visible = !freeCamera;
     if (paused) return;
+    const turnSpeed = 1.65 * dt;
+    const tiltSpeed = 1.15 * dt;
+    if (keys.current.has('ArrowLeft')) yaw.current += turnSpeed;
+    if (keys.current.has('ArrowRight')) yaw.current -= turnSpeed;
+    if (keys.current.has('ArrowUp')) pitch.current -= tiltSpeed;
+    if (keys.current.has('ArrowDown')) pitch.current += tiltSpeed;
+    pitch.current = THREE.MathUtils.clamp(pitch.current, -0.2, 1.1);
     const forward = new THREE.Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
     const right = new THREE.Vector3(-forward.z, 0, forward.x);
     const direction = new THREE.Vector3();
-    if (keys.current.has('KeyW') || keys.current.has('ArrowUp')) direction.add(forward);
-    if (keys.current.has('KeyS') || keys.current.has('ArrowDown')) direction.sub(forward);
-    if (keys.current.has('KeyD') || keys.current.has('ArrowRight')) direction.add(right);
-    if (keys.current.has('KeyA') || keys.current.has('ArrowLeft')) direction.sub(right);
+    if (keys.current.has('KeyW')) direction.add(forward);
+    if (keys.current.has('KeyS')) direction.sub(forward);
+    if (keys.current.has('KeyD')) direction.add(right);
+    if (keys.current.has('KeyA')) direction.sub(right);
     walking.current = direction.lengthSq() > 0;
     running.current = walking.current && (keys.current.has('ShiftLeft') || keys.current.has('ShiftRight'));
     if (walking.current) direction.normalize();

@@ -5,7 +5,7 @@ Bản thử nghiệm game web 3D tại khu Hồ Hoàn Kiếm. Dự án dùng Rea
 ## Trạng thái hiện tại
 
 - Có trang chủ và trang game toàn màn hình.
-- Có thể đi bằng WASD, chạy bằng Shift, xoay camera bằng chuột và qua Cầu Thê Húc đến đảo Ngọc Sơn. Nhấp vào cảnh để khóa con trỏ; nhấn Esc để thả con trỏ. Nhấn **V** để bật/tắt drone; drone bay bằng WASD, lên/xuống bằng Space/Ctrl và tăng tốc bằng Shift.
+- Có thể đi bằng WASD, chạy bằng Shift, xoay camera bằng **các phím mũi tên** hoặc chuột và qua Cầu Thê Húc đến đảo Ngọc Sơn. Nhấp vào cảnh để khóa con trỏ; nhấn Esc để thả con trỏ. Nhấn **V** để bật/tắt drone; drone bay bằng WASD, lên/xuống bằng Space/Ctrl và tăng tốc bằng Shift.
 - Có va chạm đơn giản với mép hồ, nhà phố và hai tòa đền chính. Drone có thể bay qua các công trình và mặt hồ.
 - Có ánh sáng ban ngày, hoàng hôn và ban đêm; bốn cấu hình Low / Medium / High / Ultra; HUD FPS đọc từ vòng lặp render thực tế.
 - Bờ hồ, hai đảo và trục cầu lấy theo tọa độ OpenStreetMap. Diện tích xung quanh là một lát cắt cách điệu, chưa phải bản sao đô thị chính xác từng thửa đất.
