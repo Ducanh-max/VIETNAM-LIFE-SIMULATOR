@@ -9,7 +9,7 @@ type Asset = 'tower' | 'complex';
 type Version = 'current' | 'candidate';
 
 const reviewAssets = {
-  tower: '/models/review/thap-rua-game-review.glb',
+  tower: '/models/thap-rua-heritage.glb',
   complex: '/models/review/ngoc-son-the-huc-review.glb',
 } as const;
 
@@ -58,18 +58,17 @@ export default function HeritageReview() {
   const chooseVersion = (next: Version) => { setVersion(next); setLoadedUrl(null); };
   return <main className="heritage-review">
     <header className="heritage-review-header">
-      <div><strong>ĐỜI VIỆT · SO SÁNH MÔ HÌNH</strong><small>Chọn cùng công trình, chuyển bản đang dùng / GLB từ file Blender của bạn</small></div>
+      <div><strong>ĐỜI VIỆT · SO SÁNH MÔ HÌNH</strong><small>Chọn cùng công trình, chuyển bản trước / GLB từ file Blender của bạn</small></div>
       <nav aria-label="Chọn mô hình xem thử">
         <button className={asset === 'tower' ? 'active' : ''} onClick={() => chooseAsset('tower')}>Tháp Rùa</button>
         <button className={asset === 'complex' ? 'active' : ''} onClick={() => chooseAsset('complex')}>Đền + cầu</button>
-        <a href="/?heritagePreview=tower#play">Tháp Rùa trong game ↗</a>
         <a href="/#play">Trở về game</a>
       </nav>
     </header>
     <div className="heritage-review-versions" role="group" aria-label="Chọn phiên bản mô hình">
-      <button className={version === 'current' ? 'active' : ''} onClick={() => chooseVersion('current')}>Bản đang dùng</button>
+      <button className={version === 'current' ? 'active' : ''} onClick={() => chooseVersion('current')}>Bản trước</button>
       <button className={version === 'candidate' ? 'active' : ''} onClick={() => chooseVersion('candidate')}>GLB mới từ Blender</button>
-      <span>{version === 'candidate' ? loadedUrl ? `Đã tải: ${loadedUrl}` : 'Đang tải GLB mới…' : asset === 'tower' ? loadedUrl ? `Đã tải: ${loadedUrl}` : 'Đang tải GLB hiện tại…' : 'Mô hình procedural đang dùng trong game'}</span>
+      <span>{version === 'candidate' ? loadedUrl ? `Đã tải: ${loadedUrl}` : 'Đang tải GLB mới…' : asset === 'tower' ? loadedUrl ? `Đã tải: ${loadedUrl}` : 'Đang tải GLB cũ…' : 'Mô hình procedural trước đây'}</span>
     </div>
     <div className="heritage-review-canvas">
       <Canvas key={`${asset}-${version}`} camera={{ position: asset === 'tower' ? [13, 10, 14] : [48, 29, 68], fov: 50, near: 0.05, far: 300 }}
@@ -80,8 +79,8 @@ export default function HeritageReview() {
     </div>
     <aside className="heritage-review-note">
       {asset === 'tower'
-        ? 'Tháp Rùa mới: mesh và màu từ file Blender bạn cung cấp, cao 8,8 m. Kéo chuột để xoay, cuộn để phóng to. Bản đang dùng là GLB cũ trên website production.'
-        : 'Đền + cầu mới: màu và hình học từ file Blender của bạn. Bản đang dùng là mô hình procedural của game. GLB mới chưa khớp hướng/kích thước cầu trên bản đồ OSM nên chỉ xem riêng tại đây.'}
+        ? 'Tháp Rùa: mô hình và màu từ file Blender bạn cung cấp, cao 8,8 m. Kéo chuột để xoay, cuộn để phóng to. Bản trước là GLB cũ.'
+        : 'Đền + cầu trong trang so sánh là cụm GLB nguyên bản từ Blender. Trong game, phần đền được tách và căn vào đảo; cầu vẫn là mô hình procedural vì nhịp cầu nguồn không khớp bản đồ.'}
     </aside>
   </main>;
 }
