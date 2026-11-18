@@ -263,6 +263,12 @@ export function Landscape({ time }: { time: TimeOfDay }) {
   const approachZ = bridgeStart[1] - bridgeEnd[1];
   const approachLength = Math.hypot(approachX, approachZ);
   const approachYaw = -Math.atan2(approachZ, approachX);
+  const approachGeometry = useMemo(() => {
+    const geometry = new THREE.PlaneGeometry(22, 7.2);
+    const uv = geometry.getAttribute('uv') as THREE.BufferAttribute;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 22, uv.getY(i) * 7.2);
+    return geometry;
+  }, []);
   return <>
     <mesh receiveShadow position={[0, -0.3, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[1300, 1300]} /><meshStandardMaterial map={grassMap} normalMap={grassNormal} roughnessMap={grassRough} roughness={1} /></mesh>
     <LakeWater time={time} />
@@ -273,7 +279,7 @@ export function Landscape({ time }: { time: TimeOfDay }) {
     <mesh geometry={revetment} receiveShadow position={[0, 0.28, 0]}><meshStandardMaterial color="#a1977d" roughness={0.98} /></mesh>
     <mesh geometry={planting} receiveShadow position={[0, 0.17, 0]}><meshStandardMaterial map={grassMap} normalMap={grassNormal} roughnessMap={grassRough} roughness={1} /></mesh>
     <group position={[bridgeStart[0] + approachX / approachLength * 10, 0, bridgeStart[1] + approachZ / approachLength * 10]} rotation={[0, approachYaw, 0]}>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.31, 0]} receiveShadow><planeGeometry args={[22, 7.2]} /><meshStandardMaterial map={stoneMap} normalMap={stoneNormal} roughnessMap={stoneRough} roughness={0.9} side={THREE.DoubleSide} /></mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.31, 0]} geometry={approachGeometry} receiveShadow><meshStandardMaterial map={stoneMap} normalMap={stoneNormal} roughnessMap={stoneRough} roughness={0.9} side={THREE.DoubleSide} /></mesh>
       {[-1, 1].map((sign) => <mesh key={sign} position={[0, 0.29, sign * 3.65]} receiveShadow><boxGeometry args={[22, 0.14, 0.24]} /><meshStandardMaterial color="#aaa18c" roughness={0.95} /></mesh>)}
     </group>
     {islandBodies.map((geometry, index) => <mesh key={`body-${index}`} geometry={geometry} receiveShadow position={[0, -0.12, 0]}><meshStandardMaterial color={index ? '#8d8c74' : '#7f8970'} roughness={1} /></mesh>)}

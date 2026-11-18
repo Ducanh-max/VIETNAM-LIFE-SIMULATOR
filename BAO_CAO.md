@@ -18,6 +18,7 @@
 - Vòng tối ưu tiếp theo gộp thân và mái 100 nhà phố thành hai `InstancedMesh`, giảm khoảng 200 mesh render; dời nhân vật về giữa đường dạo và làm mã commit dễ đọc hơn. Cần đo lại sau khi vòng này triển khai.
 - Bản `8b53ac4` đã lên production; cùng cửa sổ xem trước 615 × 603 px (canvas 923 × 905 ở DPR 1,5) hiển thị khoảng 57–60 FPS ở preset High. Không thể đổi kích thước viewport của trình duyệt kiểm thử lên 1920 × 1080; vì vậy không có số FPS 1080p đáng tin cậy.
 - Vòng hoàn thiện tiếp theo lát thêm sân dẫn từ đường dạo vào đầu cầu và làm các góc mái đền cong rõ hơn. Kết quả cần xem lại sau triển khai.
+- Bản `c9adae0` đã lên production, HUD hiển thị đúng và console không có lỗi; ảnh WebGL cho thấy UV của sân dẫn bị kéo giãn. Đã sửa UV theo chiều dài/rộng thực của sân để texture đá lặp với tỷ lệ tương tự vỉa hè. Cần kiểm tra lại bản sửa UV sau triển khai.
 
 ## File đã sửa
 
