@@ -42,9 +42,16 @@ The images below compare the supplied source with real photographs, **not** a ne
 
 Optimization itself left the large forms visually stable in these matching Blender cameras: [tower](heritage-images/before-after-tower.png), [temple and bridge](heritage-images/before-after-complex.png), [bridge closer](heritage-images/before-after-bridge.png). These comparisons do not prove the monuments are historically accurate.
 
+**Colour verification:** The comparisons above intentionally used neutral Workbench/clay shading to expose silhouette. The supplied material colours were not removed. Both *exported GLBs* were imported again into Blender and rendered with their PBR materials: [coloured tower](heritage-images/glb-color-tower.png) and [coloured temple/bridge](heritage-images/glb-color-complex.png). The tower's three 2048² texture maps and the complex's 1024² base-colour, roughness and normal maps are present in the imported material graphs. The lighting and colour management in these EEVEE renders may differ from the game's Three.js renderer; WebGL appearance is still unverified.
+
+![Coloured GLB tower render](heritage-images/glb-color-tower.png)
+
+![Coloured GLB temple and bridge render](heritage-images/glb-color-complex.png)
+
 ## Preview and integration status
 
 - `/#heritage-review` is an isolated orbit viewer for the two candidate GLBs. It loads the temple and bridge together, preserving their Blender relative positions.
+- The Vercel bot reports a **Ready** [preview of the `vietnam-life-simulator` project](https://vietnam-life-simulator-git-feat-herita-a8068d-ducanhda3011-9281.vercel.app/#heritage-review). This is the review branch, not the production URL. For the tower in the map, open [the preview with `heritagePreview=tower`](https://vietnam-life-simulator-git-feat-herita-a8068d-ducanhda3011-9281.vercel.app/?heritagePreview=tower#play).
 - `/?heritagePreview=tower#play` switches **only Tháp Rùa** to the candidate GLB on this branch. The existing map position and collision remain unchanged; `LandmarkLoadBoundary` still falls back to the procedural model if loading fails. The normal `/#play` route continues to use the current production asset from `landmarkAssets.ts`.
 - The combined source is about 243 × 454 × 78 Blender units. At a scale that fits the OSM temple island (about 0.2), its red bridge covers about 23 m, while OSM's bridge segment is 46.3 m and runs in a different direction. One uniform group transform cannot fit both island and bridge without a visible mismatch. Further non-destructive segmentation and review of placement is required before this asset can enter the gameplay map.
 - No Vercel production deployment or merge was performed. The review GLBs are in this draft branch only.
@@ -53,7 +60,7 @@ Optimization itself left the large forms visually stable in these matching Blend
 
 - Blender round-trip: both GLBs imported; tower bounds 7.013 × 5.786 × 8.800 m and 1,875,386 triangles; combined asset 14 meshes and 2,777,117 triangles. Draco and WebP extensions are present.
 - `pnpm build` passed (TypeScript + Vite); `pnpm check:map` passed. Vite warns that the main JS chunk exceeds 500 kB; this existed as a performance concern and needs a separate optimization pass.
-- WebGL console, transfer time and 1920×1080 Low/High FPS **not measured**: the browser tool refused access to `http://127.0.0.1:5173` because a saved permission setting blocks network egress. No browser screenshot is claimed.
+- WebGL console, transfer time and 1920×1080 Low/High FPS **not measured**: the browser tool refused access to `http://127.0.0.1:5173` because a saved permission setting blocks network egress, and direct Vercel API inspection returned 403. The Preview URL is sourced from the Vercel bot's PR comment; no browser screenshot is claimed.
 - **Visual review: pending / not passed.** Please review the four photographic pairs and the preview build. The roof, footprint and rail discrepancies must be resolved in the original authored asset if historical fidelity is required. Since this task forbids architectural edits, this PR does not change those shapes.
 
 To reproduce the Blender processing, see [scripts/heritage/README.md](../scripts/heritage/README.md).
