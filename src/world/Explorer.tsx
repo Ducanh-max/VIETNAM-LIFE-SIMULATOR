@@ -41,7 +41,7 @@ export function Explorer({ mode, paused, freeCamera, onFps, onPosition }: {
   onPosition: (position: Point) => void;
 }) {
   const { camera, gl } = useThree();
-  const position = useRef(new THREE.Vector3(bridgeEnds[0][0] + 9, 0.35, bridgeEnds[0][1]));
+  const position = useRef(new THREE.Vector3(bridgeEnds[0][0] + 5.5, 0.35, bridgeEnds[0][1]));
   const freePosition = useRef(new THREE.Vector3(bridgeEnds[0][0] + 28, 13, bridgeEnds[0][1] + 35));
   const avatar = useRef<THREE.Group>(null);
   const keys = useRef(new Set<string>());

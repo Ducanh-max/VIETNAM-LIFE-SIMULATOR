@@ -14,6 +14,8 @@
 - Bổ sung texture đá cũ và gờ tầng cho Tháp Rùa; mái đền có viền ngói và xà gỗ; thêm biển chữ cho điện chính/cổng; cầu có dầm cong hai bên.
 - Nhà phố xa có thêm mái che cửa hàng, khung cửa, bậu và một số ban công; gợn nước phối hợp hai hướng sóng để giảm nhịp lặp.
 - Mục Giới thiệu và HUD hiển thị mã commit build. `src/world/landmarkAssets.ts` là điểm tích hợp GLB riêng từng công trình; hiện chưa có GLB phù hợp. Xem `docs/ASSETS.md`.
+- Bản triển khai `de3adf2` đã hiện trên production. Cảnh đầu thấy cầu và đền, không còn bị tán cây che; console không có lỗi. FPS trong cửa sổ xem trước: High khoảng 35–42, Medium khoảng 42, Low khoảng 57. Đây chỉ là số tham khảo của máy/trình duyệt này, không phải phép đo 1080p.
+- Vòng tối ưu tiếp theo gộp thân và mái 100 nhà phố thành hai `InstancedMesh`, giảm khoảng 200 mesh render; dời nhân vật về giữa đường dạo và làm mã commit dễ đọc hơn. Cần đo lại sau khi vòng này triển khai.
 
 ## File đã sửa
 
@@ -21,6 +23,7 @@
 - `src/world/Explorer.tsx`: điểm xuất phát và góc nhìn mặc định hướng dọc cầu.
 - `src/world/Landscape.tsx`: mặt nước, mép kè, bờ đảo, dải cây và tán cây nhiều biến thể.
 - `src/world/Urban.tsx`: bảy biến thể nhà phố, chi tiết cửa hàng và mức chi tiết theo khoảng cách.
+- `src/styles.css`: tăng độ rõ mã commit trên HUD.
 - `src/world/landmarkAssets.ts`, `src/world/LandmarkModel.tsx`, `docs/ASSETS.md`: cấu hình/loader GLB và quy tắc tích hợp; chưa có GLB để bật.
 - `src/App.tsx`: hiển thị mã commit trong HUD và Giới thiệu.
 - `README.md`, `BAO_CAO.md`: cập nhật trạng thái và giới hạn.

@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber';
-import { useMemo, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { bridgeEnds, centerOf, shore, type Point } from './geo';
 import type { TimeOfDay } from './Landscape';
@@ -87,6 +87,43 @@ function signTexture(label: string, background: string): THREE.CanvasTexture {
   return texture;
 }
 
+function BuildingShells() {
+  const walls = useRef<THREE.InstancedMesh>(null);
+  const roofs = useRef<THREE.InstancedMesh>(null);
+  useLayoutEffect(() => {
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const rotation = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    buildings.forEach((building, index) => {
+      const height = building.floors * 3.35 + 1;
+      rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), building.yaw);
+      position.set(building.x, height / 2, building.z);
+      scale.set(building.width, height, building.depth);
+      matrix.compose(position, rotation, scale);
+      walls.current?.setMatrixAt(index, matrix);
+      walls.current?.setColorAt(index, new THREE.Color(palette[index % palette.length]));
+      position.y = height + 0.13;
+      scale.set(building.width + 0.35, 0.26, building.depth + 0.45);
+      matrix.compose(position, rotation, scale);
+      roofs.current?.setMatrixAt(index, matrix);
+    });
+    if (walls.current) {
+      walls.current.instanceMatrix.needsUpdate = true;
+      if (walls.current.instanceColor) walls.current.instanceColor.needsUpdate = true;
+      walls.current.computeBoundingSphere();
+    }
+    if (roofs.current) {
+      roofs.current.instanceMatrix.needsUpdate = true;
+      roofs.current.computeBoundingSphere();
+    }
+  }, []);
+  return <>
+    <instancedMesh ref={walls} args={[undefined, undefined, buildings.length]} castShadow receiveShadow><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial color="#ffffff" roughness={0.86} /></instancedMesh>
+    <instancedMesh ref={roofs} args={[undefined, undefined, buildings.length]} castShadow><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial color="#776d60" roughness={0.88} /></instancedMesh>
+  </>;
+}
+
 function ShopHouse({ building, time }: { building: Building; time: TimeOfDay }) {
   const { x, z, yaw, width, depth, floors, detailed, index } = building;
   const height = floors * 3.35 + 1;
@@ -103,8 +140,6 @@ function ShopHouse({ building, time }: { building: Building; time: TimeOfDay }) 
     if (simpleFacade.current) simpleFacade.current.visible = !near;
   });
   return <group position={[x, 0, z]} rotation={[0, yaw, 0]}>
-    <mesh position={[0, height / 2, 0]} castShadow receiveShadow><boxGeometry args={[width, height, depth]} /><meshStandardMaterial color={wallColor} roughness={0.86} /></mesh>
-    <mesh position={[0, height + 0.13, 0]} castShadow><boxGeometry args={[width + 0.35, 0.26, depth + 0.45]} /><meshStandardMaterial color="#776d60" roughness={0.88} /></mesh>
     {variant % 3 === 0 ? <>
       <mesh position={[0, height + 0.63, depth / 2 - 0.25]} castShadow><boxGeometry args={[width + 0.4, 0.84, 0.35]} /><meshStandardMaterial color={wallColor} roughness={0.9} /></mesh>
       <mesh position={[0, height + 0.63, -depth / 2 + 0.25]} castShadow><boxGeometry args={[width + 0.4, 0.84, 0.35]} /><meshStandardMaterial color={wallColor} roughness={0.9} /></mesh>
@@ -175,6 +210,7 @@ function Pedestrian({ position, color }: { position: [number, number, number]; c
 export function Urban({ time }: { time: TimeOfDay }) {
   const shoreStart = bridgeEnds[0];
   return <>
+    <BuildingShells />
     {buildings.map((building) => <ShopHouse key={building.index} building={building} time={time} />)}
     {Array.from({ length: 12 }, (_, i) => {
       const z = shoreStart[1] + (i - 5) * 13;
