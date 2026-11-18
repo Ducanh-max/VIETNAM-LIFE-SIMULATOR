@@ -10,9 +10,14 @@
 .heritage-review-header nav { display: flex; flex-wrap: wrap; gap: 8px; }
 .heritage-review-header button, .heritage-review-header a { padding: 10px 13px; border: 1px solid #657170; border-radius: 7px; background: transparent; color: #f2f4f2; font: inherit; font-size: 13px; text-decoration: none; cursor: pointer; }
 .heritage-review-header button.active { background: #bd6a45; border-color: #bd6a45; }
+.heritage-review-versions { z-index: 2; display: flex; align-items: center; gap: 9px; padding: 9px 24px; background: #253134; }
+.heritage-review-versions button { padding: 9px 14px; border: 1px solid #778382; border-radius: 7px; background: transparent; color: #f2f4f2; font: inherit; font-size: 13px; cursor: pointer; }
+.heritage-review-versions button.active { background: #bd6a45; border-color: #bd6a45; }
+.heritage-review-versions span { margin-left: auto; color: #c6d0cf; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .heritage-review-canvas { flex: 1; min-height: 0; }
 .heritage-review-note { padding: 12px 24px; color: #dce2de; background: #192224; font-size: 13px; }
 .heritage-review-message { padding: 12px 18px; border-radius: 8px; background: #192224; color: #fff; white-space: nowrap; font: 14px "Be Vietnam Pro", Arial, sans-serif; }
 .heritage-preview-banner { position: absolute; top: 92px; left: 50%; z-index: 3; transform: translateX(-50%); padding: 9px 13px; border-radius: 8px; background: #713c2b; color: #fff; font-size: 12px; white-space: nowrap; }
 .heritage-preview-banner a { margin-left: 12px; color: #fff; text-decoration: underline; }
-@media (max-width: 850px) { .heritage-review-header { align-items: flex-start; flex-direction: column; } .heritage-review-header nav { width: 100%; } }
+.game-review-link { display: inline-flex; align-items: center; padding: 7px 10px; border: 1px solid #d7b595; border-radius: 7px; color: #fff; background: #713c2b; font-size: 12px; white-space: nowrap; text-decoration: none; }
+@media (max-width: 850px) { .heritage-review-header { align-items: flex-start; flex-direction: column; } .heritage-review-header nav { width: 100%; } .heritage-review-versions { flex-wrap: wrap; } .heritage-review-versions span { width: 100%; margin-left: 0; } }
