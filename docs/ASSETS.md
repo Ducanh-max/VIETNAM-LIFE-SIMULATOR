@@ -1,12 +1,12 @@
 # Tích hợp mô hình công trình
 
-`thap-rua.glb` là mô hình gốc tạo bằng Blender từ ảnh tham khảo, có ba tầng, cửa vòm xuyên tường và vật liệu đá PBR. Mô hình procedural cũ vẫn được dùng nếu tải GLB thất bại. Đền Ngọc Sơn và cầu Thê Húc vẫn chưa có GLB đủ chất lượng và quyền sử dụng.
+`thap-rua.glb` là mô hình gốc tạo bằng Blender, tỷ lệ dựa trên số đo kiến trúc và ảnh thực tế. Xem [đối chiếu bốn góc nhìn](THAP_RUA_REFERENCES.md). Mô hình procedural cũ vẫn được dùng nếu tải GLB thất bại. Đền Ngọc Sơn và cầu Thê Húc vẫn chưa có GLB đủ chất lượng và quyền sử dụng.
 
 Đặt file GLB đã tối ưu trong `public/models/`, rồi cập nhật từng URL trong `src/world/landmarkAssets.ts`. Mỗi mô hình dùng **1 đơn vị = 1 mét**, Y hướng lên, +X hướng đông, -Z hướng bắc, vật liệu PBR, không chứa đèn hay camera.
 
 | Asset | Gốc mô hình | Hướng |
 | --- | --- | --- |
-| `thap-rua.glb` | tâm đảo Tháp Rùa, tại mặt đất | mặt chính hướng +X; cao khoảng 12 m |
+| `thap-rua.glb` | tâm đảo Tháp Rùa, tại mặt đất | mặt đông ba cửa hướng +X; cao 8,73 m |
 | `cau-the-huc.glb` | đầu cầu bờ đông, tại mặt đất | chiều dài dọc theo -X; code xoay theo trục cầu OSM; khoảng 46,3 m |
 | `den-ngoc-son.glb` | tâm đảo Ngọc Sơn, tại mặt đất | +X hướng bờ cầu; bao gồm cổng, điện, đình và cảnh quan trong đảo |
 
