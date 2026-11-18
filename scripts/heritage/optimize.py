@@ -43,6 +43,10 @@ for material_name in ('Di sản v2 | Tán lá xanh rêu', 'Di sản v2 | Tán l�
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.modifier_apply(modifier=modifier.name)
+    # Decimate can create a duplicate foliage face. Blender's glTF exporter
+    # otherwise flags the mesh as invalid. Repair only this reduced leaf mesh.
+    if obj.data.validate(verbose=False, clean_customdata=False):
+        print('REPAIRED_FOLIAGE_MESH=' + obj.name)
 
 summary = {
     'source_triangles': sum(source_counts.values()),
