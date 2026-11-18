@@ -1,6 +1,6 @@
 # Tích hợp mô hình công trình
 
-Hiện chưa có GLB đủ chất lượng và quyền sử dụng để thay ba mô hình dựng bằng mã. Đừng bật URL trong `src/world/landmarkAssets.ts` khi file chưa được kiểm tra trong game.
+`thap-rua.glb` là mô hình gốc tạo bằng Blender từ ảnh tham khảo, có ba tầng, cửa vòm xuyên tường và vật liệu đá PBR. Mô hình procedural cũ vẫn được dùng nếu tải GLB thất bại. Đền Ngọc Sơn và cầu Thê Húc vẫn chưa có GLB đủ chất lượng và quyền sử dụng.
 
 Đặt file GLB đã tối ưu trong `public/models/`, rồi cập nhật từng URL trong `src/world/landmarkAssets.ts`. Mỗi mô hình dùng **1 đơn vị = 1 mét**, Y hướng lên, +X hướng đông, -Z hướng bắc, vật liệu PBR, không chứa đèn hay camera.
 

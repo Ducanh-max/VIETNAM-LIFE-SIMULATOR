@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo, type ReactNode } from 'react';
+import { Component, Suspense, lazy, useMemo, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { bridgeEnds, templeCenter, turtleCenter, type Point } from './geo';
 import type { TimeOfDay } from './Landscape';
@@ -356,8 +356,20 @@ export function NgocSonTemple({ time }: { time: TimeOfDay }) {
   </group>;
 }
 
+class LandmarkLoadBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
 function LandmarkSlot({ url, position, rotationY, fallback }: { url: string | null; position: [number, number, number]; rotationY?: number; fallback: ReactNode }) {
-  return url ? <Suspense fallback={fallback}><LandmarkModel url={url} position={position} rotationY={rotationY} /></Suspense> : fallback;
+  return url ? <LandmarkLoadBoundary fallback={fallback}><Suspense fallback={fallback}><LandmarkModel url={url} position={position} rotationY={rotationY} /></Suspense></LandmarkLoadBoundary> : fallback;
 }
 
 export function Landmarks({ time }: { time: TimeOfDay }) {
