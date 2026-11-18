@@ -374,11 +374,16 @@ function LandmarkSlot({ url, position, rotationY, fallback }: { url: string | nu
 
 export function Landmarks({ time }: { time: TimeOfDay }) {
   const [bridgeStart, bridgeEnd] = bridgeEnds;
+  const templeLanding = Math.hypot(bridgeStart[0] - templeCenter[0], bridgeStart[1] - templeCenter[1])
+    < Math.hypot(bridgeEnd[0] - templeCenter[0], bridgeEnd[1] - templeCenter[1]) ? bridgeStart : bridgeEnd;
+  const templeHeading = Math.atan2(templeCenter[1] - templeLanding[1], templeLanding[0] - templeCenter[0]);
   return <>
-    <LandmarkSlot url={landmarkAssets.turtleTower} position={[turtleCenter[0], 0.28, turtleCenter[1]]} fallback={<TurtleTower time={time} />} />
+    <LandmarkSlot url={landmarkAssets.turtleTower}
+      position={[turtleCenter[0], 0.28, turtleCenter[1]]} fallback={<TurtleTower time={time} />} />
     <LandmarkSlot url={landmarkAssets.theHucBridge} position={[bridgeStart[0], 0, bridgeStart[1]]}
       rotationY={Math.atan2(bridgeEnd[1] - bridgeStart[1], bridgeStart[0] - bridgeEnd[0])} fallback={<TheHucBridge />} />
-    <LandmarkSlot url={landmarkAssets.ngocSonTemple} position={[templeCenter[0], 0.28, templeCenter[1]]} fallback={<NgocSonTemple time={time} />} />
+    <LandmarkSlot url={landmarkAssets.ngocSonTemple} position={[templeCenter[0] + 4, 0.28, templeCenter[1] - 12]}
+      rotationY={templeHeading} fallback={<NgocSonTemple time={time} />} />
   </>;
 }
 
