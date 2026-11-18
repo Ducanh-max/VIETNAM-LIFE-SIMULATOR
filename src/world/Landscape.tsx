@@ -258,6 +258,11 @@ export function Landscape({ time }: { time: TimeOfDay }) {
   const islandGeometries = useMemo(() => [fillGeometry(templeIsland), fillGeometry(turtleIsland)], []);
   const islandBodies = useMemo(() => [bodyGeometry(templeIsland), bodyGeometry(turtleIsland)], []);
   const laneMarks = useMemo(() => sampleRing(offsetPolygon(shore, 20), 9).filter((_, i) => i % 2 === 0), []);
+  const [bridgeStart, bridgeEnd] = bridgeEnds;
+  const approachX = bridgeStart[0] - bridgeEnd[0];
+  const approachZ = bridgeStart[1] - bridgeEnd[1];
+  const approachLength = Math.hypot(approachX, approachZ);
+  const approachYaw = -Math.atan2(approachZ, approachX);
   return <>
     <mesh receiveShadow position={[0, -0.3, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[1300, 1300]} /><meshStandardMaterial map={grassMap} normalMap={grassNormal} roughnessMap={grassRough} roughness={1} /></mesh>
     <LakeWater time={time} />
@@ -267,6 +272,10 @@ export function Landscape({ time }: { time: TimeOfDay }) {
     <mesh geometry={curb} receiveShadow position={[0, 0.24, 0]}><meshStandardMaterial color="#b8b4a5" roughness={0.92} /></mesh>
     <mesh geometry={revetment} receiveShadow position={[0, 0.28, 0]}><meshStandardMaterial color="#a1977d" roughness={0.98} /></mesh>
     <mesh geometry={planting} receiveShadow position={[0, 0.17, 0]}><meshStandardMaterial map={grassMap} normalMap={grassNormal} roughnessMap={grassRough} roughness={1} /></mesh>
+    <group position={[bridgeStart[0] + approachX / approachLength * 10, 0, bridgeStart[1] + approachZ / approachLength * 10]} rotation={[0, approachYaw, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.31, 0]} receiveShadow><planeGeometry args={[22, 7.2]} /><meshStandardMaterial map={stoneMap} normalMap={stoneNormal} roughnessMap={stoneRough} roughness={0.9} side={THREE.DoubleSide} /></mesh>
+      {[-1, 1].map((sign) => <mesh key={sign} position={[0, 0.29, sign * 3.65]} receiveShadow><boxGeometry args={[22, 0.14, 0.24]} /><meshStandardMaterial color="#aaa18c" roughness={0.95} /></mesh>)}
+    </group>
     {islandBodies.map((geometry, index) => <mesh key={`body-${index}`} geometry={geometry} receiveShadow position={[0, -0.12, 0]}><meshStandardMaterial color={index ? '#8d8c74' : '#7f8970'} roughness={1} /></mesh>)}
     {islandGeometries.map((geometry, index) => <mesh key={index} geometry={geometry} receiveShadow position={[0, 0.28, 0]}><meshStandardMaterial map={index ? stoneMap : grassMap} roughness={1} /></mesh>)}
     {laneMarks.map(({ point, tangent }, index) => <mesh key={index} position={[point[0], 0.095, point[1]]} rotation={[-Math.PI / 2, 0, Math.atan2(tangent[1], tangent[0])]}><planeGeometry args={[4.2, 0.2]} /><meshBasicMaterial color="#e7dca8" /></mesh>)}

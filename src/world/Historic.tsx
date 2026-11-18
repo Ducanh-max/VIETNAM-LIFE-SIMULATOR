@@ -77,7 +77,7 @@ function roofGeometry(width: number, depth: number, rise: number) {
       const x = (tx - 0.5) * width;
       const edge = Math.abs(x) / (width / 2);
       const end = Math.abs(z) / (depth / 2);
-      const y = rise * (1 - edge) + 0.26 * Math.pow(edge, 8) + 0.2 * Math.pow(end, 8);
+      const y = rise * (1 - edge) + 0.18 * Math.pow(edge, 8) + 0.72 * Math.pow(end, 6) * Math.pow(edge, 3);
       vertices.push(x, y, z);
       uv.push(tx * 3, tz * 4);
       if (ix < columns && iz < rows) {
@@ -268,7 +268,7 @@ function TiledRoof({ width, depth, y, rise = 2.15 }: { width: number; depth: num
     const points = Array.from({ length: 17 }, (_, i) => {
       const z = (i / 16 - 0.5) * (depth + 2.4);
       const end = Math.abs(z) / ((depth + 2.4) / 2);
-      return new THREE.Vector3(side * (width + 2.1) / 2, 0.26 + 0.2 * Math.pow(end, 8), z);
+      return new THREE.Vector3(side * (width + 2.1) / 2, 0.18 + 0.72 * Math.pow(end, 6), z);
     });
     return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 28, 0.14, 6, false);
   }), [width, depth]);
@@ -277,6 +277,7 @@ function TiledRoof({ width, depth, y, rise = 2.15 }: { width: number; depth: num
     <mesh position={[0, y - 0.12, 0]} castShadow><boxGeometry args={[width + 1.6, 0.15, depth + 1.8]} /><primitive object={timber} attach="material" /></mesh>
     {eaves.map((edge, index) => <mesh key={index} position={[0, y, 0]} geometry={edge} material={roofTile} castShadow />)}
     {[-1, 1].map((side) => <mesh key={side} position={[side * (width / 2 + 0.86), y + 0.04, 0]} castShadow><boxGeometry args={[0.28, 0.33, depth + 1.8]} /><primitive object={timber} attach="material" /></mesh>)}
+    {[-1, 1].flatMap((side) => [-1, 1].map((end) => <Beam key={`${side}-${end}`} from={new THREE.Vector3(side * (width / 2 + 0.58), y - 0.08, end * (depth / 2 + 0.65))} to={new THREE.Vector3(side * (width / 2 + 1.04), y + 0.76, end * (depth / 2 + 1.17))} radius={0.075} material={timber} />))}
     <mesh position={[0, y + rise + 0.03, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow><cylinderGeometry args={[0.18, 0.18, depth + 2.6, 8]} /><primitive object={gold} attach="material" /></mesh>
     {[-1, 1].map((sign) => <mesh key={sign} position={[0, y + rise + 0.13, sign * (depth / 2 + 1.1)]} castShadow><coneGeometry args={[0.35, 0.7, 8]} /><primitive object={gold} attach="material" /></mesh>)}
   </group>;
@@ -313,6 +314,11 @@ function Gate({ position, width = 5 }: { position: [number, number, number]; wid
     <mesh position={[0, 5.17, 0]} castShadow><boxGeometry args={[1.35, 1.36, width - 0.5]} /><primitive object={templeWall} attach="material" /></mesh>
     <mesh position={[0.73, 5.1, 0]}><boxGeometry args={[0.08, 0.78, 2.35]} /><primitive object={darkOpening} attach="material" /></mesh>
     <mesh position={[0.81, 5.15, 0]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[2.55, 0.57]} /><meshBasicMaterial map={sign} side={THREE.DoubleSide} /></mesh>
+    {[-1, 1].map((side) => <group key={`lantern-${side}`} position={[0.76, 3.12, side * (width / 2 + 0.85)]}>
+      <mesh position={[0, 0.65, 0]}><cylinderGeometry args={[0.025, 0.025, 1.3, 5]} /><primitive object={gold} attach="material" /></mesh>
+      <mesh castShadow><sphereGeometry args={[0.38, 10, 8]} /><primitive object={redPaint} attach="material" /></mesh>
+      <mesh position={[0, -0.43, 0]}><cylinderGeometry args={[0.18, 0.18, 0.12, 8]} /><primitive object={gold} attach="material" /></mesh>
+    </group>)}
     <TiledRoof width={1.55} depth={width + 0.2} y={6.05} rise={0.75} />
   </group>;
 }

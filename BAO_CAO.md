@@ -16,6 +16,8 @@
 - Mục Giới thiệu và HUD hiển thị mã commit build. `src/world/landmarkAssets.ts` là điểm tích hợp GLB riêng từng công trình; hiện chưa có GLB phù hợp. Xem `docs/ASSETS.md`.
 - Bản triển khai `de3adf2` đã hiện trên production. Cảnh đầu thấy cầu và đền, không còn bị tán cây che; console không có lỗi. FPS trong cửa sổ xem trước: High khoảng 35–42, Medium khoảng 42, Low khoảng 57. Đây chỉ là số tham khảo của máy/trình duyệt này, không phải phép đo 1080p.
 - Vòng tối ưu tiếp theo gộp thân và mái 100 nhà phố thành hai `InstancedMesh`, giảm khoảng 200 mesh render; dời nhân vật về giữa đường dạo và làm mã commit dễ đọc hơn. Cần đo lại sau khi vòng này triển khai.
+- Bản `8b53ac4` đã lên production; cùng cửa sổ xem trước 615 × 603 px (canvas 923 × 905 ở DPR 1,5) hiển thị khoảng 57–60 FPS ở preset High. Không thể đổi kích thước viewport của trình duyệt kiểm thử lên 1920 × 1080; vì vậy không có số FPS 1080p đáng tin cậy.
+- Vòng hoàn thiện tiếp theo lát thêm sân dẫn từ đường dạo vào đầu cầu và làm các góc mái đền cong rõ hơn. Kết quả cần xem lại sau triển khai.
 
 ## File đã sửa
 
