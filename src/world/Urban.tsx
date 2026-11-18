@@ -114,8 +114,8 @@ function ShopHouse({ building, time }: { building: Building; time: TimeOfDay }) 
     <mesh position={[0, 1.45, depth / 2 + 0.19]}><boxGeometry args={[width - 0.6, 0.1, 0.1]} /><meshStandardMaterial color="#d5c9ae" roughness={0.8} /></mesh>
     <mesh position={[0, 3.3, depth / 2 + 0.17]}><planeGeometry args={[width - 0.25, 1.12]} /><meshBasicMaterial map={signMap} side={THREE.DoubleSide} /></mesh>
     <mesh position={[0, 3.87, depth / 2 + 0.26]} castShadow><boxGeometry args={[width + 0.45, 0.12, 0.55]} /><meshStandardMaterial color="#6f5142" roughness={0.84} /></mesh>
+    <mesh position={[0, 2.18, depth / 2 + 1.18]} rotation={[0.16, 0, 0]} castShadow><boxGeometry args={[width + 0.45, 0.09, 2.1]} /><meshStandardMaterial color={sign[1]} roughness={0.78} /></mesh>
     {detailed && <group ref={detailedFacade}>
-      <mesh position={[0, 2.18, depth / 2 + 1.18]} rotation={[0.16, 0, 0]} castShadow><boxGeometry args={[width + 0.45, 0.09, 2.1]} /><meshStandardMaterial color={sign[1]} roughness={0.78} /></mesh>
       {Array.from({ length: floors - 1 }, (_, floor) => <group key={floor} position={[0, 4.05 + floor * 3.25, depth / 2 + 0.11]}>
         {[-width * 0.23, width * 0.23].map((wx) => <group key={wx} position={[wx, 0, 0]}>
           <mesh position={[0, 0, 0.03]}><boxGeometry args={[width * 0.3, 2.2, 0.1]} /><meshStandardMaterial color={glass} metalness={0.26} roughness={0.22} emissive={time === 'night' && (floor + index) % 3 === 0 ? '#ab7245' : '#000000'} emissiveIntensity={0.55} /></mesh>
@@ -137,7 +137,13 @@ function ShopHouse({ building, time }: { building: Building; time: TimeOfDay }) 
     <group ref={simpleFacade}>
       {Array.from({ length: floors - 1 }, (_, floor) => <group key={floor} position={[0, 5 + floor * 3.2, depth / 2 + 0.08]}>
         <mesh><boxGeometry args={[width - 1.5, 1.8, 0.08]} /><meshStandardMaterial color={glass} roughness={0.28} metalness={0.2} /></mesh>
+        <mesh position={[0, 0, 0.09]}><boxGeometry args={[0.12, 1.85, 0.1]} /><meshStandardMaterial color="#ddd4c2" roughness={0.85} /></mesh>
+        <mesh position={[0, 0.95, 0.09]}><boxGeometry args={[width - 1.35, 0.14, 0.15]} /><meshStandardMaterial color={variant % 2 ? '#8c705b' : '#e5d8c3'} roughness={0.85} /></mesh>
         <mesh position={[0, -1.07, 0.22]}><boxGeometry args={[width - 0.6, 0.14, 0.45]} /><meshStandardMaterial color="#a29c8d" roughness={0.9} /></mesh>
+        {variant % 3 === 1 && <>
+          <mesh position={[0, -1.06, 0.58]} castShadow><boxGeometry args={[width - 0.45, 0.17, 0.98]} /><meshStandardMaterial color="#938d7d" roughness={0.9} /></mesh>
+          <mesh position={[0, -0.66, 1.03]}><boxGeometry args={[width - 0.7, 0.75, 0.07]} /><meshStandardMaterial color="#58615b" roughness={0.75} metalness={0.15} wireframe /></mesh>
+        </>}
       </group>)}
     </group>
   </group>;

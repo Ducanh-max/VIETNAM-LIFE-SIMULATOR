@@ -1,0 +1,6 @@
+/** Set a path only after a licensed GLB has been optimized and checked at game scale. */
+export const landmarkAssets: Record<'turtleTower' | 'theHucBridge' | 'ngocSonTemple', string | null> = {
+  turtleTower: null,
+  theHucBridge: null,
+  ngocSonTemple: null,
+};

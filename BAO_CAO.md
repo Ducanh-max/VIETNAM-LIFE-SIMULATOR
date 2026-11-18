@@ -1,12 +1,28 @@
 # Báo cáo nâng cấp Hồ Hoàn Kiếm — ĐỜI VIỆT
 
+## Kiểm tra production ngày 18/11/2026
+
+- GitHub `main` trước lần sửa này ở commit `1fb6a117633ce3b72ab8a954328392bb5d0a7d3b`; GitHub báo trạng thái Vercel thành công cho project `vietnam-life-simulator` ở commit đó.
+- URL production phục vụ `index-DRDs_Mrv.js`. SHA-256 của file JavaScript tải từ production **trùng hoàn toàn** SHA-256 của bản build local từ mã commit trên (`7AE73F09…C7EB71F55C`). Điều này xác nhận mã mới đã đến website ở mức file phục vụ, dù không xác nhận được cấu hình nhánh production từ Vercel dashboard.
+- HTML trả `Cache-Control: public, max-age=0, must-revalidate`; mã nguồn không có service worker. Không tìm thấy bằng chứng cache đang giữ JavaScript cũ.
+- Kiểm tra WebGL trực tiếp cho thấy điểm xuất phát/camera bị tán cây che lớn, cầu và đền nằm lệch khỏi khung hình. Đây là lý do chính cảnh nhìn gần như không đổi mặc dù bundle mới đã chạy. Console không có lỗi hoặc cảnh báo ở lần mở đó; HUD ghi 56–58 FPS trong cửa sổ trình duyệt nhỏ, **không phải** kết quả 1080p.
+- Vercel connector đang kết nối không liệt kê hoặc mở được project `vietnam-life-simulator`; vì vậy không thể đọc cấu hình production branch/deployment metadata qua Vercel API. GitHub commit status và nội dung website là hai nguồn xác minh thay thế có giới hạn như nêu trên.
+
+## Sửa lỗi lần này
+
+- Chuyển điểm xuất phát ra khỏi tán cây; camera nhìn dọc cầu và hướng tới đền. Tạo khoảng trống cây trước đầu cầu.
+- Bổ sung texture đá cũ và gờ tầng cho Tháp Rùa; mái đền có viền ngói và xà gỗ; thêm biển chữ cho điện chính/cổng; cầu có dầm cong hai bên.
+- Nhà phố xa có thêm mái che cửa hàng, khung cửa, bậu và một số ban công; gợn nước phối hợp hai hướng sóng để giảm nhịp lặp.
+- Mục Giới thiệu và HUD hiển thị mã commit build. `src/world/landmarkAssets.ts` là điểm tích hợp GLB riêng từng công trình; hiện chưa có GLB phù hợp. Xem `docs/ASSETS.md`.
+
 ## File đã sửa
 
 - `src/world/Historic.tsx`: dựng lại hình khối Tháp Rùa, mái/hiên khu đền và Cầu Thê Húc.
+- `src/world/Explorer.tsx`: điểm xuất phát và góc nhìn mặc định hướng dọc cầu.
 - `src/world/Landscape.tsx`: mặt nước, mép kè, bờ đảo, dải cây và tán cây nhiều biến thể.
 - `src/world/Urban.tsx`: bảy biến thể nhà phố, chi tiết cửa hàng và mức chi tiết theo khoảng cách.
-- `src/world/geo.ts`: làm mềm đường bờ từ dữ liệu OSM và khớp độ cao đi bộ trên cầu.
-- `src/App.tsx`: cân lại ánh sáng, bóng và tone mapping.
+- `src/world/landmarkAssets.ts`, `src/world/LandmarkModel.tsx`, `docs/ASSETS.md`: cấu hình/loader GLB và quy tắc tích hợp; chưa có GLB để bật.
+- `src/App.tsx`: hiển thị mã commit trong HUD và Giới thiệu.
 - `README.md`, `BAO_CAO.md`: cập nhật trạng thái và giới hạn.
 
 ## Cải thiện hình ảnh
@@ -21,12 +37,12 @@ Tháp Rùa có ba tầng thu nhỏ dần, cửa vòm xuyên tường, gờ tần
 | --- | --- |
 | TypeScript `tsc -b` | Đạt, không có lỗi kiểu |
 | `scripts/check-map.mjs` | Đạt: hồ 634 × 249 m, cầu 46,3 m |
-| Vite production build | Đạt; 596 module; JS khoảng 1,19 MB (336 kB gzip), CSS khoảng 16,3 kB (4,6 kB gzip) |
-| Trình duyệt/WebGL runtime | Chưa kiểm tra được: quyền truy cập trình duyệt của tác nhân vẫn chặn `http://127.0.0.1:5173/` |
-| FPS ở 1080p | Chưa đo được; HUD sẽ hiển thị FPS khi chạy trên trình duyệt |
-| Ảnh gameplay | Chưa có ảnh chụp runtime đã xác thực |
+| Vite production build | Đạt; 598 module; JS chính 1,198 MB (339 kB gzip), loader GLB tách riêng 77 kB (23 kB gzip) |
+| Trình duyệt/WebGL runtime | Đã xác minh production trước sửa: render hoạt động, không thấy lỗi console; bản mới cần kiểm tra lại sau khi Vercel triển khai |
+| FPS ở 1080p | Chưa đo được; cửa sổ production nhỏ trước sửa ghi 56–58 FPS |
+| Ảnh gameplay | Đã chụp cảnh production trước sửa; bản sau cần chụp/đối chiếu khi triển khai |
 
-Vite cảnh báo JS chunk lớn hơn 500 kB. Build vẫn thành công. Chưa thể xác nhận không có lỗi WebGL/console cho đến khi xem trong trình duyệt. Không tuyên bố đạt 50–60 FPS khi chưa đo.
+Vite cảnh báo JS chunk chính lớn hơn 500 kB. Build vẫn thành công. Chưa thể xác nhận bản sau sửa không có lỗi WebGL/console cho đến khi Vercel phục vụ bundle mới. Không tuyên bố đạt 50–60 FPS ở 1080p khi chưa đo.
 
 ## Còn đơn giản
 

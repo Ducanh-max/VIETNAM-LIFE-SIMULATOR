@@ -112,8 +112,10 @@ const waterFragment = `
     vec2 flow = vWorld * 0.027 + vec2(uTime * 0.018, -uTime * 0.013);
     float broad = noise2(flow);
     float fine = noise2(vWorld * 0.13 + vec2(-uTime * 0.065, uTime * 0.04));
-    float ripple = sin(vWorld.x * 0.29 + vWorld.y * 0.16 + uTime * 1.1 + broad * 5.0);
-    float wave = broad * 0.6 + fine * 0.28 + ripple * 0.12;
+    float rippleA = sin(vWorld.x * 0.29 + vWorld.y * 0.16 + uTime * 1.1 + broad * 5.0);
+    float rippleB = sin(vWorld.x * 0.115 - vWorld.y * 0.235 - uTime * 0.79 + fine * 4.2);
+    float ripple = mix(rippleA, rippleB, 0.43);
+    float wave = broad * 0.56 + fine * 0.27 + ripple * 0.17;
     vec3 normal = normalize(vec3((fine - 0.5) * 0.15, 1.0, (broad - 0.5) * 0.17));
     vec3 viewDir = normalize(cameraPosition - vPosition);
     float fresnel = pow(1.0 - max(dot(viewDir, normal), 0.0), 3.0);
@@ -179,7 +181,7 @@ function sampleRing(points: Point[], spacing: number): { point: Point; outward: 
 }
 
 export function StreetFurniture({ time }: { time: TimeOfDay }) {
-  const samples = useMemo(() => sampleRing(shore, 13).filter(({ point }) => Math.hypot(point[0] - bridgeEnds[0][0], point[1] - bridgeEnds[0][1]) > 9), []);
+  const samples = useMemo(() => sampleRing(shore, 13).filter(({ point }) => Math.hypot(point[0] - bridgeEnds[0][0], point[1] - bridgeEnds[0][1]) > 27), []);
   const treeTrunks = useRef<THREE.InstancedMesh>(null);
   const treeCrowns = useRef<THREE.InstancedMesh>(null);
   const treeCrowns2 = useRef<THREE.InstancedMesh>(null);

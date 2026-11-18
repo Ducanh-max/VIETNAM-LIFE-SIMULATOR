@@ -41,12 +41,12 @@ export function Explorer({ mode, paused, freeCamera, onFps, onPosition }: {
   onPosition: (position: Point) => void;
 }) {
   const { camera, gl } = useThree();
-  const position = useRef(new THREE.Vector3(bridgeEnds[0][0] + 6, 0.35, bridgeEnds[0][1] + 4));
+  const position = useRef(new THREE.Vector3(bridgeEnds[0][0] + 9, 0.35, bridgeEnds[0][1]));
   const freePosition = useRef(new THREE.Vector3(bridgeEnds[0][0] + 28, 13, bridgeEnds[0][1] + 35));
   const avatar = useRef<THREE.Group>(null);
   const keys = useRef(new Set<string>());
-  const yaw = useRef(Math.PI / 2);
-  const pitch = useRef(0.38);
+  const yaw = useRef(Math.atan2(bridgeEnds[0][0] - bridgeEnds[1][0], bridgeEnds[0][1] - bridgeEnds[1][1]));
+  const pitch = useRef(0.2);
   const walking = useRef(false);
   const running = useRef(false);
   const sampleTime = useRef(0);
@@ -144,11 +144,11 @@ export function Explorer({ mode, paused, freeCamera, onFps, onPosition }: {
       avatar.current.position.copy(current);
       if (walking.current) avatar.current.rotation.y = THREE.MathUtils.damp(avatar.current.rotation.y, Math.atan2(-step.x, -step.z), 12, dt);
     }
-    const distance = 9.5;
+    const distance = 10.5;
     const desired = current.clone().addScaledVector(forward, -Math.cos(pitch.current) * distance);
     desired.y += 2.2 + Math.sin(pitch.current) * distance;
     camera.position.lerp(desired, 1 - Math.exp(-6 * dt));
-    camera.lookAt(current.x, current.y + 1.5, current.z);
+    camera.lookAt(current.x + forward.x * 5, current.y + 1.7, current.z + forward.z * 5);
   });
 
   return <group ref={avatar} position={position.current.toArray()}><Person walking={walking} running={running} /></group>;

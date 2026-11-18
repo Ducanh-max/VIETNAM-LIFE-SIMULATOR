@@ -5,6 +5,7 @@ Bản đang phát triển của game web 3D tại khu Hồ Hoàn Kiếm. Dự á
 ## Trạng thái hiện tại
 
 - Có trang chủ và trang game toàn màn hình.
+- HUD và mục Giới thiệu hiển thị mã commit rút gọn do Vercel cung cấp tại lúc build, để phân biệt phiên bản đang xem. Nếu môi trường build không cung cấp SHA, giao diện ghi rõ `chưa có SHA`.
 - Có thể đi bằng WASD, chạy bằng Shift, xoay camera bằng **các phím mũi tên** hoặc chuột và qua Cầu Thê Húc đến đảo Ngọc Sơn. Nhấp vào cảnh để khóa con trỏ; nhấn Esc để thả con trỏ. Nhấn **V** để bật/tắt drone; drone bay bằng WASD, lên/xuống bằng Space/Ctrl và tăng tốc bằng Shift.
 - Có va chạm đơn giản với mép hồ, nhà phố và hai tòa đền chính. Drone có thể bay qua các công trình và mặt hồ.
 - Có ánh sáng ban ngày, hoàng hôn và ban đêm; bốn cấu hình Low / Medium / High / Ultra; HUD FPS đọc từ vòng lặp render thực tế.
@@ -12,6 +13,8 @@ Bản đang phát triển của game web 3D tại khu Hồ Hoàn Kiếm. Dự á
 - Tháp Rùa có ba tầng thu nhỏ dần, tường đục cửa vòm và chân đế; khu đền có mái ngói cong, hiên cột, cổng hai tầng và đình nhỏ; cầu đỏ có mặt cầu cong liền mạch, lan can và 15 nhịp. Nhà phố có bảy biến thể mặt tiền, mái, ban công và cửa hàng.
 
 **Mức độ mô hình:** Tháp Rùa, Cầu Thê Húc và khu Đền Ngọc Sơn là mô hình hình học tự dựng theo các đặc điểm nhận diện chính. Bản nâng cấp này cải thiện silhouette và cảnh quan rõ rệt so với blockout, nhưng **chưa phải** mô hình khảo cứu kiến trúc chính xác hoặc asset hoàn thiện để nghiệm thu đồ họa cuối cùng. Chưa tích hợp GLB/GLTF bên ngoài. Phản chiếu mặt nước hiện là giả lập sắc trời và góc nhìn, chưa phản chiếu hình học thật.
+
+Điểm xuất phát được đặt trước cầu, ngoài vùng tán cây; camera nhìn dọc cầu để người chơi thấy đền ngay khi vào game. Hướng dẫn chuẩn bị và thay thế từng công trình bằng GLB nằm tại [`docs/ASSETS.md`](docs/ASSETS.md). Các URL mô hình trong `src/world/landmarkAssets.ts` hiện đều là `null`; chưa có GLB nào được tích hợp.
 
 ## Chạy local
 
@@ -81,3 +84,5 @@ Cây và cột đèn dùng `InstancedMesh`; mặt tiền nhà gần camera dùng
 ## Triển khai Vercel
 
 Import repository `Ducanh-max/VIETNAM-LIFE-SIMULATOR` trong Vercel. Framework là **Vite**; lệnh build `pnpm build`; thư mục output `dist`. File `vercel.json` đã khai báo các giá trị này. Vì ứng dụng hiện là SPA tĩnh dùng hash `#play`, không cần backend hoặc biến môi trường. Tên package nội bộ vẫn là `doi-viet-3d`.
+
+Để mã commit xuất hiện trên website, bật **Automatically expose System Environment Variables** trong Vercel nếu project chưa bật. Vercel cung cấp `VITE_VERCEL_GIT_COMMIT_SHA` cho build Vite. Khi chạy local, có thể đặt `VITE_BUILD_COMMIT` trước lệnh build để hiện một mã kiểm thử. HTML production cần tái kiểm tra khi tải lại; các file JavaScript/CSS của Vite có tên chứa hash nên mỗi build mới nhận URL mới. Dự án không đăng ký service worker.
