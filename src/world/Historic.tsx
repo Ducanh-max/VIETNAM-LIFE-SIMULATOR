@@ -374,8 +374,10 @@ function LandmarkSlot({ url, position, rotationY, fallback }: { url: string | nu
 
 export function Landmarks({ time }: { time: TimeOfDay }) {
   const [bridgeStart, bridgeEnd] = bridgeEnds;
+  const reviewTower = new URLSearchParams(window.location.search).get('heritagePreview') === 'tower';
   return <>
-    <LandmarkSlot url={landmarkAssets.turtleTower} position={[turtleCenter[0], 0.28, turtleCenter[1]]} fallback={<TurtleTower time={time} />} />
+    <LandmarkSlot url={reviewTower ? '/models/review/thap-rua-game-review.glb' : landmarkAssets.turtleTower}
+      position={[turtleCenter[0], 0.28, turtleCenter[1]]} fallback={<TurtleTower time={time} />} />
     <LandmarkSlot url={landmarkAssets.theHucBridge} position={[bridgeStart[0], 0, bridgeStart[1]]}
       rotationY={Math.atan2(bridgeEnd[1] - bridgeStart[1], bridgeStart[0] - bridgeEnd[0])} fallback={<TheHucBridge />} />
     <LandmarkSlot url={landmarkAssets.ngocSonTemple} position={[templeCenter[0], 0.28, templeCenter[1]]} fallback={<NgocSonTemple time={time} />} />

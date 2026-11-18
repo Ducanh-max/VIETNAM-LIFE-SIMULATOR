@@ -12,6 +12,7 @@ type Quality = 'low' | 'medium' | 'high' | 'ultra';
 type Panel = 'settings' | 'about' | 'help' | null;
 const buildSha = import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA || import.meta.env.VITE_BUILD_COMMIT;
 const buildLabel = buildSha ? buildSha.slice(0, 7) : 'chưa có SHA';
+const heritagePreview = new URLSearchParams(window.location.search).get('heritagePreview') === 'tower';
 const qualityConfig: Record<Quality, { dpr: number; shadow: number; antialias: boolean }> = {
   low: { dpr: 1, shadow: 0, antialias: false },
   medium: { dpr: 1.2, shadow: 1024, antialias: true },
@@ -149,6 +150,7 @@ function App() {
         <div className="game-actions"><button title="Trợ giúp" aria-label="Trợ giúp" onClick={() => openPanel('help')}>?</button><button title="Cài đặt" aria-label="Cài đặt" onClick={() => openPanel('settings')}><Icon name="settings" /></button><button title={paused ? 'Tiếp tục' : 'Tạm dừng'} aria-label={paused ? 'Tiếp tục' : 'Tạm dừng'} onClick={() => { if (document.pointerLockElement) document.exitPointerLock(); setPaused(!paused); }}><Icon name={paused ? 'play' : 'pause'} /></button></div>
       </header>
       <div className="area-tag"><Icon name="compass" /><span>{freeCamera ? 'CHẾ ĐỘ DRONE' : 'ĐANG KHÁM PHÁ'}<strong>Hồ Hoàn Kiếm, Hà Nội</strong><small>Commit {buildLabel}</small></span></div>
+      {heritagePreview && <div className="heritage-preview-banner">XEM THỬ THÁP RÙA · chưa duyệt <a href="/#play">Tắt xem thử</a></div>}
       {freeCamera && <div className="drone-reticle" aria-hidden="true">+</div>}
       <div className="game-bottom"><span>W A S D <b>{freeCamera ? 'Bay ngang' : 'Di chuyển'}</b></span><span>← ↑ ↓ → <b>Xoay góc nhìn</b></span><span>{freeCamera ? 'SPACE / CTRL' : 'SHIFT'} <b>{freeCamera ? 'Lên / xuống' : 'Chạy'}</b></span><span>V <b>{freeCamera ? 'Về nhân vật' : 'Bật drone'}</b></span><span className="fps-pill">{position[0].toFixed(0)} : {position[1].toFixed(0)} · {fps || '—'} FPS</span></div>
       {!panel && !paused && <button className="capture-tip" onClick={lockPointer}>Nhấp vào cảnh để điều khiển camera</button>}
