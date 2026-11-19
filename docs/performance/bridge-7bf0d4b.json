@@ -1,0 +1,172 @@
+{
+  "schema": 1,
+  "source": "Local instrumented Vite production bundle",
+  "commit": "7bf0d4b",
+  "samples": [
+    {
+      "step": "low",
+      "run": "after",
+      "viewport": [
+        1258,
+        709
+      ],
+      "dpr": 1,
+      "renderDpr": 1,
+      "buffer": [
+        1258,
+        709
+      ],
+      "seconds": 30.015200000047685,
+      "frames": 1801,
+      "fps": 60.00293184776842,
+      "submitMs": 9.714714047777726,
+      "gpuMs": 7.989211867256637,
+      "gpuSamples": 113,
+      "calls": 486,
+      "triangles": 727837,
+      "materials": 2941,
+      "textures": 44,
+      "geometries": 1093,
+      "visible": true,
+      "camera": [
+        64.34169078259825,
+        4.636027973348145,
+        -211.90915390846132
+      ],
+      "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A7A8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36"
+    },
+    {
+      "step": "medium",
+      "run": "after",
+      "viewport": [
+        1258,
+        709
+      ],
+      "dpr": 1,
+      "renderDpr": 1,
+      "buffer": [
+        1258,
+        709
+      ],
+      "seconds": 30.0155,
+      "frames": 1801,
+      "fps": 60.002332128400326,
+      "submitMs": 11.154969462151662,
+      "gpuMs": 6.490611176991151,
+      "gpuSamples": 113,
+      "calls": 491.247084952804,
+      "triangles": 770708.4658523042,
+      "materials": 2941,
+      "textures": 45,
+      "geometries": 1283,
+      "visible": true,
+      "camera": [
+        64.34169078259825,
+        4.636027973348145,
+        -211.90915390846132
+      ],
+      "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A7A8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36"
+    },
+    {
+      "step": "high",
+      "run": "after",
+      "viewport": [
+        1258,
+        709
+      ],
+      "dpr": 1,
+      "renderDpr": 1,
+      "buffer": [
+        1258,
+        709
+      ],
+      "seconds": 30.015399999976157,
+      "frames": 1801,
+      "fps": 60.00253203360377,
+      "submitMs": 10.639922265143344,
+      "gpuMs": 7.594468566371679,
+      "gpuSamples": 113,
+      "calls": 491.247084952804,
+      "triangles": 770708.4658523042,
+      "materials": 2941,
+      "textures": 45,
+      "geometries": 1283,
+      "visible": true,
+      "camera": [
+        64.34169078259825,
+        4.636027973348145,
+        -211.90915390846132
+      ],
+      "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A7A8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36"
+    },
+    {
+      "step": "high/motion",
+      "run": "after",
+      "viewport": [
+        1258,
+        709
+      ],
+      "dpr": 1,
+      "renderDpr": 1,
+      "buffer": [
+        1258,
+        709
+      ],
+      "seconds": 30.012599999964237,
+      "frames": 1783,
+      "fps": 59.40838181304267,
+      "submitMs": 13.478182838361583,
+      "gpuMs": 10.158956008928572,
+      "gpuSamples": 112,
+      "calls": 790.6259113853057,
+      "triangles": 3301116.4520471115,
+      "materials": 2941,
+      "textures": 45,
+      "geometries": 1294,
+      "visible": true,
+      "camera": [
+        62.10962399217418,
+        5.022143961965995,
+        -216.922496133119
+      ],
+      "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A7A8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36"
+    },
+    {
+      "step": "high",
+      "run": "hd",
+      "viewport": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "renderDpr": 1,
+      "buffer": [
+        1920,
+        1080
+      ],
+      "seconds": 30.01530000001192,
+      "frames": 1801,
+      "fps": 60.00273194002008,
+      "submitMs": 11.10122154399066,
+      "gpuMs": 9.569271283185834,
+      "gpuSamples": 113,
+      "calls": 492.247084952804,
+      "triangles": 770720.4658523042,
+      "materials": 2941,
+      "textures": 45,
+      "geometries": 1284,
+      "visible": true,
+      "camera": [
+        64.34169078259825,
+        4.636027973348145,
+        -211.90915390846132
+      ],
+      "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A7A8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "quality": "LOW",
+    "oldDetached": true,
+    "contextLost": true,
+    "canvasCount": 1,
+    "size": [
+      300,
+      150
+    ]
+  },
+  {
+    "quality": "MEDIUM",
+    "oldDetached": true,
+    "contextLost": true,
+    "canvasCount": 1,
+    "size": [
+      300,
+      150
+    ]
+  },
+  {
+    "quality": "HIGH",
+    "oldDetached": true,
+    "contextLost": true,
+    "canvasCount": 1,
+    "size": [
+      300,
+      150
+    ]
+  }
+]

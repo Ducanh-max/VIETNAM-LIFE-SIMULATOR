@@ -1,57 +1,50 @@
-# Cầu Thê Húc / Đền Ngọc Sơn — kiểm tra nhánh Preview
+# Cầu Thê Húc · PR #4
 
-**Trạng thái:** Đang chờ kiểm duyệt hình ảnh, chưa được merge vào `main`. Cầu lấy từ Blender do chủ dự án cung cấp và chỉnh mesh trên nhánh PR #4. Render dưới đây là Blender, **không phải ảnh gameplay WebGL**. Preview Vercel yêu cầu đăng nhập trong trình duyệt của tác nhân; kiểm tra WebGL dưới đây được thực hiện với production build local và chưa xác nhận trên URL Preview đã triển khai.
+**Bản game để đối chiếu: `7bf0d4b`**. Điểm xuất phát là `32c3512`. PR vẫn chờ duyệt. [Lịch sử thử nghiệm và ảnh tham chiếu cầu thật](BRIDGE_INTEGRATION_HISTORY.md).
 
-## Kiểm tra chồng mô hình
+## Những gì thay đổi từ 32c3512
 
-- `Landmarks` tạo đúng một `LandmarkSlot` cho đền và một cho cầu. Khi GLB tải thành công, fallback procedural không được mount. `Suspense` không còn vẽ bản cũ trong thời gian tải; fallback chỉ xuất hiện nếu GLB lỗi.
-- `den-ngoc-son-heritage.glb` có **sáu mesh theo vật liệu**: diềm mái, gỗ, sân gạch, đá bậc, ngói, vữa tường. Không có mesh cầu đỏ hoặc mesh kiến trúc procedural bên trong GLB; không phát hiện hai bản chính điện/cổng trùng nhau trong scene graph. Giữ sân gạch và công trình phụ, không xóa nhầm. Kiểm tra này chưa thay thế việc quan sát WebGL.
-- `Landscape.tsx` tạo mặt đảo cỏ phẳng và mép đảo; đây là địa hình nền, không phải một bản đền khác. GLB sân gạch có cao độ local 1,275–1,900 m. Hạ transform đền từ Y=0,28 xuống **Y=-1,55 m** làm mặt sân cao khoảng 0,35 m trong game, ngang đầu cầu; phần chân đá thấp được nền đảo che. GLB và texture không bị sửa.
-- Dải đá từ bờ phía đông trong `Landscape.tsx` là lối tiếp cận cầu dài 22 m; mép của nó chỉ phủ khoảng 1 m đầu cầu, không phải một cầu thứ hai.
-- `thap-rua-heritage.glb` vẫn cùng một mesh, bounds 7,01 × 5,79 × 8,80 m và không đổi byte. Đảo Tháp Rùa rộng khoảng 22,2 × 26,4 m; nền cỏ trong `Landscape.tsx` ở Y=0,28 m, đúng với chân GLB (local Y=0). Vì vậy có diện tích cỏ lộ ra quanh chân tháp theo hình học, nhưng màu thực tế WebGL chưa được xác nhận bằng ảnh.
+- **Đầu bờ:** dò từ trên xuống mesh cũ ở cách đầu nhịp 5 cm không gặp ván trên dải đi bộ 2,5 m. Cách đầu nhịp 35 cm, mặt ván thấp hơn mốc model khoảng 21 cm và bị đường dẫn che. Script Blender cắt thẳng 60 cm cuối mặt ván, bổ sung ngưỡng gỗ kín hai đầu và hai dải ván mép rộng 22 cm.
+- **Lan can và sàn:** giữ lưới thanh chéo và thân cầu từ Blender nguồn. Hạ tay vịn giữa nhịp từ khoảng 2,4–2,5 m xuống 1,0–1,05 m trên sàn, thu bề dày phần nổi của lan can. Gờ nối ván cách nhau khoảng 22 cm thể hiện bằng màu và normal map trên mặt đi liên tục. Bề rộng sàn 3,00 m, lối đi 2,50 m, hai mốc đầu cầu cách nhau 46,256 m.
+- **Kiểm tra GLB đã xuất:** 104.971 tam giác, 3 vật liệu PBR, 2.022.224 byte. Khi nhập lại GLB, cả 13.485 tia đều gặp mặt ván. Sai số cao độ lớn nhất trong dải đi bộ là 5,13 cm. Đường viền vài thanh chéo còn gồ ghề từ mesh nguồn.
+- **Cổng đền:** tâm cửa cũ lệch trục cầu 2,40 m và nằm lùi trên nhịp 3,13 m. Dịch nguyên GLB và giữ hướng cũ để toàn bộ đền vẫn nằm trên đảo. Tâm cửa nay cách đầu cầu phía đảo 1,55 m. Nhân vật đi thẳng qua cầu rồi rẽ trái khoảng 42° qua cửa vào sân. Va chạm của bản dự phòng giữ quy tắc riêng.
+- **Sân gạch:** kiểm tra mesh cho thấy ở điểm sân bên trong cửa, gạch cũ ở Y=-0,242 m, dưới cỏ 0,522 m. Nâng riêng mesh vật liệu gạch của bản sao dùng trong gameplay thêm 0,594 m. Sau sửa, mặt gạch ở điểm đó cao 0,352 m, mặt đi là 0,350 m. Có thể đối chiếu [ảnh sân bị cỏ che · local dea8192](heritage-images/webgl-7bf0d4b/before-yard-local-dea8192.jpg) với ảnh đền từ cùng camera dưới đây.
+- **Tháp Rùa và đền:** blob Git của hai GLB lần lượt là `d4e28093c9ca9ca558f8828d32412c4acdd25219` và `d979610c990b498bbcae34c977eb4c77dd8ac285`, bằng phiên bản `32c3512`. Transform Tháp Rùa và địa hình đảo được giữ nguyên.
 
-## Mesh cầu nguồn và phép căn
+## Đường đi và va chạm
 
-Script `scripts/heritage/export-game-bridge.py` lấy ba nhóm từ `heritage-optimized-working.blend`: cầu sơn son, ván gỗ, và các trụ gỗ dọc nhịp. Phiên bản PR #4 đầu tiên rộng quá mức. Bản sửa thu mặt ván và các dải lan can/trụ **riêng theo vùng mặt cắt trong mesh Blender**, đồng thời loại hai mảnh gỗ không thuộc hàng trụ và tấm chắn thấp không thuộc mặt đi bộ ở đầu đảo; giữ nguyên tọa độ dọc và cao độ vòm. File Blender gốc không bị ghi đè. GLB mới **107.731 tam giác**, **3 vật liệu PBR**, **2.048.452 byte**; texture WebP và Draco.
+| Mốc | X | Y | Z |
+| --- | ---: | ---: | ---: |
+| Bờ | 48,63 | 0,35 | -213,47 |
+| Giữa nhịp | 25,61 | 2,75 | -215,75 |
+| Đầu đảo | 2,60 | 0,35 | -218,03 |
+| Trước cửa | 1,06 | 0,35 | -218,18 |
+| Sau cửa | -1,43 | 0,35 | -216,35 |
+| Sân | -3,32 | 0,35 | -214,96 |
 
-| Chỉ số | PR #4 trước sửa | Sau sửa | Mốc đối chiếu |
-| --- | ---: | ---: | --- |
-| Chiều dài | 46,73 m gồm gờ thừa | **46,26 m** từ đầu tới cuối mặt ván | Hai đầu OSM cách 46,26 m |
-| Mặt ván rộng | khoảng 7,2 m | **3,00 m** | Ước lượng hình ảnh, chưa có số đo thực độc lập |
-| Bề rộng gồm lan can | khoảng 11,6 m | **4,24 m** | Cổng đền nay rộng hơn đầu cầu trong render từ trên |
-| Gờ cong mặt ván | khoảng 2,4 m | khoảng **2,4 m** | Giữ profile dọc, collision dùng đường cong sin |
+`node scripts/check-bridge-walk.mjs` kiểm tra đi và chạy theo các mốc trên ở bước mô phỏng 50 ms, gồm kiểm tra chắn hai bên lan can và trụ cổng. `scripts/heritage/check-gate-clearance.py` kiểm tra lối qua GLB đền thật bằng Blender: 18 tia qua được khoảng mở; hai tia đối chứng bị chặn bởi hai trụ. Collision của các gian đền là hộp đơn giản.
 
-GLB cầu có gốc tại đầu bờ đông, trục local `-X` chỉ về đảo. `Landmarks` đặt tại `bridgeStart`, Y=0,35 m, xoay khoảng **-0,099 rad** theo đường OSM. Đền vẫn đặt tại `[templeCenter.x + 4, -1.55, templeCenter.z - 12]`, xoay khoảng **+0,635 rad**. Ảnh từ trên cho thấy cầu mới chạm lối vào thay vì phủ rộng cả cổng. Đây là chỉnh hình học trong mesh Blender, không phải scale object không đồng nhất lúc render.
+## Cách mở lại cùng góc máy
 
-## Sửa lỗi cầu chìm dưới nước trong WebGL
+Trên bản local hoặc Preview, mở `/?assetDebug=1#play` để xem cầu từ bờ. Dùng `/?assetDebug=1&view=temple#play`, `view=tower` hoặc `view=lake` để mở góc nhìn từ cầu, đảo Tháp Rùa hoặc toàn cảnh hồ. HUD hiển thị SHA và trạng thái tải mô hình cầu. Drone vẫn cho phép di chuyển sau khi mở góc cố định.
 
-Kiểm tra bản build local ngày 2026-11-19 với `?assetDebug=1#play` xác nhận **GLB đã tải**, nhưng từ bờ hồ chỉ thấy hai dải lan can đỏ, không thấy mặt ván. Vì Blender render không có mặt nước, ảnh so sánh cũ đã không bộc lộ lỗi cao độ. Phân tích GLB sau khi import lại: mặt ván ở đầu bờ có cao độ trung vị local khoảng **-3,27 m**, đầu đảo **-2,93 m**, trong khi transform đặt cầu ở Y=0,35 m. Phần lớn mặt ván bị nước hồ che. Đây là nguyên nhân cụ thể khiến Preview `d2bb862` trông như cầu cũ từ góc nhìn gameplay, dù file GLB thực ra đã tải.
+## Bằng chứng WebGL
 
-Trong `export-game-bridge.py`, các đỉnh của cả ba nhóm mesh được nâng theo trục đứng **3,27 m ở bờ** và **2,93 m ở đảo**, nội suy dọc nhịp. Phép dịch giữ nguyên bề rộng 3,00 m, chiều dài 46,26 m và độ cong; mặt đi bộ nay ở gần cao độ collision (hai đầu khoảng 0,35 m trong game, giữa cầu khoảng 2,75 m). GLB mới có **107.731 tam giác, 3 vật liệu, 2.050.600 byte**. Các trụ dưới mặt ván vẫn kéo xuống nước; cần duyệt hình thức lan can và chân trụ trên Preview.
+Hai ảnh từ bờ dùng cùng FOV và hướng nhìn. Điểm xuất phát dịch ngang 0,54 m để nhân vật đứng trên trục cầu. Bản trước chụp trên Vercel ở 1280 × 720, bản sau chụp local ở 1920 × 1080.
 
-Khi tải lại production build local bằng WebGL, HUD báo `Cầu Thê Húc: GLB đã tải`; từ bờ thấy toàn bộ sàn đỏ, không còn chỉ hai dải lan can. Bấm `W` khoảng 3 giây đưa nhân vật từ tọa độ HUD `(54, -213)` tới `(38, -215)`, đi vào đầu cầu mà không rơi xuống nước. Console không ghi lỗi mức `error` trong lần kiểm tra này. HUD báo khoảng **43–60 FPS tức thời** ở cửa sổ **902 × 603 px**, không phải phép đo 1080p trên máy tầm trung. Các kết quả này chứng minh lỗi hiển thị local đã được sửa; cần xác nhận lại bằng Preview cùng mã commit và hình chụp ở góc bờ hồ, drone trước khi merge.
-
-## Đối chiếu bằng ảnh
-
-Ảnh thật chỉ dùng làm tham chiếu, nhúng từ Wikimedia Commons, không lưu trong repo. Các góc render gần tương ứng nhưng không khớp chính xác tiêu cự và vị trí máy ảnh; vì vậy đây là bằng chứng để duyệt, chưa phải chứng nhận đạt kiến trúc.
-
-| Ảnh thật | Render GLB từ Blender |
+| Trước · Vercel Preview · 32c3512 | Sau · local · 7bf0d4b |
 | --- | --- |
-| **Mặt bên** — [Myrabella, 2007, CC BY-SA 4.0](https://commons.wikimedia.org/wiki/File:The_Huc_Bridge.jpg). ![Cầu Thê Húc thật từ bên](https://commons.wikimedia.org/wiki/Special:FilePath/The_Huc_Bridge.jpg?width=640) | ![Cầu GLB từ bên](heritage-images/bridge-after-side.png) |
-| **Góc chéo nhìn cổng** — [Jakub Hałun, 2024, CC BY 4.0](https://commons.wikimedia.org/wiki/File:Huc_Bridge_in_Hanoi,_Vietnam,_20240204_1301_5726.jpg). ![Cầu thật và cổng đền](https://commons.wikimedia.org/wiki/Special:FilePath/Huc_Bridge_in_Hanoi,_Vietnam,_20240204_1301_5726.jpg?width=640) | ![Cầu GLB chéo 45 độ](heritage-images/bridge-after-oblique.png) |
-| **Toàn nhịp từ bờ hồ** — [David Stanley, 2025, CC BY 2.0](https://commons.wikimedia.org/wiki/File:Huc_Bridge.jpg). ![Cầu thật từ bờ hồ](https://commons.wikimedia.org/wiki/Special:FilePath/Huc_Bridge.jpg?width=640) | ![Cầu GLB hướng vào đền](heritage-images/bridge-after-shore.png) |
+| ![Lan can cũ và mép đầu cầu](heritage-images/webgl-7bf0d4b/before-vercel-32c3512.jpg) | ![Ngưỡng gỗ liền mặt ván và trụ đỏ](heritage-images/webgl-7bf0d4b/shore.jpg) |
 
-### Trước / sau ở đúng camera Blender
+| Local · 7bf0d4b | Local · 7bf0d4b |
+| --- | --- |
+| **Tháp Rùa và cỏ.** ![Tháp Rùa](heritage-images/webgl-7bf0d4b/tower.jpg) | **Đền từ cầu.** ![Đền từ cầu](heritage-images/webgl-7bf0d4b/temple.jpg) |
+| **Toàn cảnh ba công trình.** ![Drone](heritage-images/webgl-7bf0d4b/lake.jpg) | **Sau khi nhân vật qua cổng.** ![Nhân vật phía sân](heritage-images/webgl-7bf0d4b/walk-end.jpg) |
 
-| Camera | PR #4 trước sửa | Sau sửa |
-| --- | --- | --- |
-| Từ trên, cổng đền | ![Trước từ trên](heritage-images/bridge-candidate-top.png) | ![Sau từ trên](heritage-images/bridge-after-top.png) |
-| Từ bờ nhìn vào cổng | ![Trước từ bờ](heritage-images/bridge-candidate-shore.png) | ![Sau từ bờ](heritage-images/bridge-after-shore.png) |
-| Mặt bên | ![Trước mặt bên](heritage-images/bridge-candidate-side.png) | ![Sau mặt bên](heritage-images/bridge-after-side.png) |
-| Góc chéo | ![Trước góc chéo](heritage-images/bridge-candidate-oblique.png) | ![Sau góc chéo](heritage-images/bridge-after-oblique.png) |
+**Kết quả local.** Cỏ xanh nhìn thấy quanh chân tháp. Đỉnh thấp nhất của model tiếp xúc mặt cỏ ở Y=0,28 m; không có đỉnh xuyên xuống bên dưới hoặc tam giác đáy đồng phẳng với cỏ ở dung sai 0,1 mm. Khoảng cách nhỏ nhất từ bốn góc bao chân tháp tới mép đảo là 5,83 m. Qua ảnh đền còn thấy đường viền gồ ghề và mảnh tường sáng ở sát nền. Lan can nguồn còn vài thanh chéo không đều.
 
-**Sai khác còn lại:** lan can và cột đỡ vẫn có họa tiết dày hơn ảnh thật, nguồn đền còn vài mép mesh đá gồ ghề. Render Blender mặt bên vẫn cho thấy một số mesh thấp dưới mép đảo; cần xem chúng bị nước che hay lộ ra trong WebGL. Ảnh đối chiếu chưa khớp chính xác tiêu cự. Chưa có ảnh gameplay WebGL hay góc drone đầy đủ ba công trình, nên không đánh dấu QA hình ảnh là PASS.
+Trong bản build production local, bộ thử phát sự kiện W và mũi tên trái vào bộ điều khiển bàn phím của game. HUD đi từ (54, -213), qua (24, -216), tới cửa (1, -218) rồi qua vòm và dừng trong sân tại (-4, -214). Khi nhân vật vừa qua cửa, mái cổng che một phần nhân vật trong camera góc ba. [Tọa độ quan sát trên HUD](heritage-images/webgl-7bf0d4b/walk.json).
 
-## Kiểm tra gameplay còn cần làm
+Kiểm tra TypeScript, production build, bản đồ và va chạm đều đạt. Vite còn cảnh báo bundle chính khoảng 1,20 MB trước gzip. [Console JS local](heritage-images/webgl-7bf0d4b/console-errors.json) không có lỗi trong lần thử. Khi đổi High → Low → Medium → High, mỗi canvas cũ được gỡ và phát sự kiện mất WebGL context, trong scene còn một canvas. Kích thước trong [log chuyển cấu hình](heritage-images/webgl-7bf0d4b/quality-switch.json) được lấy ngay lúc thay canvas, trước khi render ổn định. Xem [báo cáo hiệu năng](BRIDGE_PERFORMANCE.md) để biết drawing buffer thực, thời gian CPU/GPU và FPS theo từng chế độ.
 
-Va chạm cầu trên nhánh Preview cho đi trong phạm vi **1,25 m** hai bên tâm của mặt ván rộng 3,00 m, và đưa chân nhân vật từ 0,35 m ở hai đầu lên khoảng 2,75 m giữa cầu. Lần thử local mới đi vào đầu cầu, chưa đi hết nhịp. Phải đi thử toàn bộ nhịp trong WebGL Preview, xem console và đo FPS 1920×1080 trên GPU thật trước khi merge. GLB đền, cầu và nền cỏ Tháp Rùa cần chụp từ camera bờ hồ và drone. Build thành công không thay thế các bước này.
+**Vercel Preview.** GitHub ghi nhận deployment `vietnam-life-simulator` thành công cho `7bf0d4b`. Trong phiên thử này, URL nhánh trả HTTP 302 tới trang SSO của Vercel. Bốn góc bản mới và hành trình qua cổng bên trên là ảnh local của đúng mã nguồn đó. Chưa đo được FPS hay xác nhận hình ảnh bản mới trong phiên Vercel đã đăng nhập.
