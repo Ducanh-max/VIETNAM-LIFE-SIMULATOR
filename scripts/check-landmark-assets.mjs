@@ -31,7 +31,7 @@ const required = [
 ];
 
 for (const [key, file] of required) {
-  const line = mapping.split('\\n').find(line => line.includes(key + ':'));
+  const line = mapping.split(String.fromCharCode(10)).find(line => line.includes(key + ':'));
   assert(line && line.includes(file), 'Expected approved GLB mapping for ' + key + ': ' + file);
   const path = join(root, 'public', 'models', file);
   assert(existsSync(path), 'Required GLB is missing: ' + path);
