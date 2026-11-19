@@ -1,5 +1,23 @@
 # Hiệu năng WebGL tại đầu Cầu Thê Húc
 
+## Pipeline Blender · cc224d7 / df35a4f
+
+Bản đo cc224d7 dùng cùng GLB, vị trí và vật liệu với bản chụp df35a4f. Bản sau chỉ sửa giải mã lười của bộ audit, tài liệu và dấu báo đã mount GLB. Mỗi lượt 30 giây trở lên trên Intel UHD, Chrome Headless, DPR thiết bị và renderer 1, viewport và drawing buffer 1920 × 1080. Đứng từ bờ cầu ban ngày, thêm một lượt camera chuyển động. Low không shadow/AA, Medium dùng shadow 1024², High 2048². Đo sau khi cả ba GLB mount và chờ 5,5 giây.
+
+| Chế độ | FPS TB | FPS tại frame P99 | Frame thấp nhất, FPS | CPU submit ms | GPU ms | Draw | Tam giác | Texture | Material |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| low | 51.01 | 35.59 | 21.05 | 18.17 | 12.11 | 487 | 666665 | 44 | 2941 |
+| medium | 44.00 | 29.67 | 25.13 | 21.53 | 15.01 | 494 | 723769 | 45 | 2941 |
+| high | 41.85 | 29.50 | 22.68 | 22.68 | 14.76 | 495 | 726679 | 45 | 2941 |
+| high/motion | 35.85 | 29.67 | 27.40 | 26.80 | 19.99 | 791 | 3178807 | 45 | 2941 |
+
+FPS tại frame P99 là 1000 chia thời gian frame ở phân vị 99%, không phải trung bình nhóm 1% khung hình chậm nhất. CPU submit là thời gian gl.render trả về. GPU là query WebGL2 hợp lệ. Số tam giác gồm shadow pass. Máy người dùng đang hoạt động, các ứng dụng khác vẫn mở. Những số này chưa cho thấy đạt 60 FPS. Các lượt cũ ở phiên khác có tải máy khác nên không dùng chênh lệch để quy hết cho GLB.
+
+Ước lượng ảnh RGBA8 có mip của ba GLB lần lượt 64 / 96 / 33,33 MiB, suy ra từ kích thước texture nhập lại. Đây là ước lượng lưu ảnh, WebGL không cung cấp VRAM driver thực. Số material gồm cả các mesh khác trong toàn scene. Thời gian request/giải mã GLB và mức tăng heap qua nhiều lần tải chưa đo độc lập.
+
+[Dữ liệu từng lượt](performance/heritage-cc224d7.json)
+
+
 ## Đo lại phiên bản `04a6d7a`
 
 Năm lần đo trên bản build local của commit này, cùng bộ đo, Intel UHD, D3D11, Chrome Headless, DPR 1 và điểm nhìn như bản `7bf0d4b`. Mỗi lượt bắt đầu sau khi cả ba GLB đã mount và có thêm 5,5 giây khởi động. Trong bảng, hai số FPS và GPU ms thể hiện bản `7bf0d4b` → bản đang xét. Các cột khác thuộc bản đang xét. Draw và tam giác gồm cả shadow pass.

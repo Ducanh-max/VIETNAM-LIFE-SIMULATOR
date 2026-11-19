@@ -1,5 +1,20 @@
 # Cầu Thê Húc · PR #4
 
+## Kiểm tra Blender và sáu góc WebGL · `df35a4f`
+
+[Báo cáo pipeline và những vùng đền còn lỗi](HERITAGE_PIPELINE_QA.md). Các sửa chân cổng và cao độ sân đã được ghi vào GLB xuất từ Blender, bộ lọc runtime đã được gỡ. Đường đi W/mũi tên từ bờ qua cầu và cổng đến sân đạt tại x/z (−4, −214). Console local ghi 0 lỗi.
+
+| Góc · local 1920 × 1080 DPR 1 | Ảnh |
+| --- | --- |
+| Toàn cảnh hồ | [WebGL](heritage-images/webgl-df35a4f/lake.jpg) |
+| Tháp Rùa và cỏ | [WebGL](heritage-images/webgl-df35a4f/tower.jpg) |
+| Đền từ cầu | [WebGL](heritage-images/webgl-df35a4f/temple.jpg) |
+| Cầu từ bờ | [WebGL](heritage-images/webgl-df35a4f/shore.jpg) |
+| Cổng đền | [WebGL](heritage-images/webgl-df35a4f/gate.jpg) |
+| Drone từ trên | [WebGL](heritage-images/webgl-df35a4f/overhead.jpg) |
+
+Ảnh đền còn thể hiện các mảng vữa vỡ nối với tường gốc. Nhánh tiếp tục chờ sửa và kiểm duyệt hình ảnh. Vercel báo deployment thành công qua GitHub cho `df35a4f`; kết nối Vercel hiện trả 404 cho dự án và URL Preview, nên chưa kiểm thử trực quan trên Preview.
+
 ## Sửa lan can và chân cổng · bản game `04a6d7a`
 
 Hai ảnh dưới đây lấy từ production build chạy local, cùng camera drone nhìn từ cầu về đền, cùng khung hình gốc 1920 × 1080, DPR 1. Ảnh ghép cắt cùng một vùng trên hai khung hình để nhìn rõ từng thanh gỗ. Bên trái là `7bf0d4b`, bên phải là `04a6d7a`.
