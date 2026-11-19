@@ -11,8 +11,13 @@ import json
 import math
 from pathlib import Path
 from mathutils import Matrix, Vector
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from temple_finish import finish_temple
 
 root = Path(__file__).resolve().parents[2]
+if Path(bpy.data.filepath).name != 'heritage-optimized-working.blend':
+    raise RuntimeError('Use the untransformed, material-split heritage-optimized-working.blend')
 output = root / 'public' / 'models' / 'den-ngoc-son-heritage.glb'
 names = {
     'Di sản v2 | Bờ nóc và diềm mái, gốm phong hoá',
@@ -55,6 +60,10 @@ for obj in selected:
     obj.matrix_world = Matrix.Identity(4)
     obj.data.update()
 
+repairs = finish_temple(selected)
+# Save a separate repair source, retaining packed images and original materials.
+bpy.context.preferences.filepaths.file_preview_type = 'NONE'
+bpy.ops.wm.save_as_mainfile(filepath=str(root / 'heritage-work' / 'temple-repaired.blend'))
 bpy.ops.object.select_all(action='DESELECT')
 for obj in selected:
     obj.select_set(True)
@@ -73,9 +82,13 @@ bpy.ops.export_scene.gltf(
     export_draco_texcoord_quantization=12,
 )
 coordinates = [obj.matrix_world @ vert.co for obj in selected for vert in obj.data.vertices]
-print('GAME_TEMPLE=' + json.dumps({
+report = {
     'file': str(output), 'bytes': output.stat().st_size,
     'triangles': sum(len(obj.data.polygons) for obj in selected),
     'bounds_blender': [[min(v[i] for v in coordinates), max(v[i] for v in coordinates)] for i in range(3)],
     'materials': [obj.data.materials[obj.data.polygons[0].material_index].name for obj in selected],
-}, ensure_ascii=False))
+    'repairs': repairs,
+}
+(root / 'heritage-work' / 'temple-export.json').write_text(
+    json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+print('GAME_TEMPLE=' + json.dumps(report, ensure_ascii=False))

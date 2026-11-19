@@ -5,4 +5,5 @@ dist
 .DS_Store
 *.local
 heritage-work/
+assets-source/
 __pycache__/

@@ -35,6 +35,7 @@ export function ProfileScene() {
   const state = useRef({
     ready: 0, start: 0, done: false, frames: 0, submission: 0, calls: 0,
     triangles: 0, gpu: [] as number[], pending: null as WebGLQuery | null, visible: true,
+    lastFrame: 0, frameTimes: [] as number[],
   });
   useFrame(({ gl, scene, camera }) => {
     const s = state.current;
@@ -71,6 +72,8 @@ export function ProfileScene() {
     if (!sample) return;
     if (!s.start) { s.start = now; return; }
     s.frames++;
+    if (s.lastFrame) s.frameTimes.push(now - s.lastFrame);
+    s.lastFrame = now;
     s.submission += submission;
     s.calls += gl.info.render.calls;
     s.triangles += gl.info.render.triangles;
@@ -84,10 +87,14 @@ export function ProfileScene() {
       if (m) (Array.isArray(m) ? m : [m]).forEach((entry) => materials.add(entry));
     });
     const debug = ctx.getExtension('WEBGL_debug_renderer_info');
+    const sortedTimes = [...s.frameTimes].sort((a, b) => a - b);
+    const slowFrameMs = sortedTimes[Math.floor(sortedTimes.length * 0.99)];
     const result = {
       step: trials[index], viewport: [innerWidth, innerHeight], dpr: devicePixelRatio,
       renderDpr: gl.getPixelRatio(), buffer: [ctx.drawingBufferWidth, ctx.drawingBufferHeight],
       seconds, frames: s.frames, fps: s.frames / seconds, submitMs: s.submission / s.frames,
+      fpsAtP99FrameTime: slowFrameMs ? 1000 / slowFrameMs : null,
+      lowestFrameFps: sortedTimes.length ? 1000 / sortedTimes[sortedTimes.length - 1] : null,
       gpuMs: s.gpu.length ? s.gpu.reduce((a, b) => a + b, 0) / s.gpu.length : null,
       gpuSamples: s.gpu.length, calls: s.calls / s.frames, triangles: s.triangles / s.frames,
       materials: materials.size, textures: gl.info.memory.textures, geometries: gl.info.memory.geometries,

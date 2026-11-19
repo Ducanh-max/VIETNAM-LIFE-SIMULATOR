@@ -6,6 +6,7 @@
  * silently replaced by an obsolete model.
  */
 import { Component, Suspense, lazy, useCallback, useEffect, type ReactNode } from 'react';
+import { Html } from '@react-three/drei';
 import {
   bridgeEnds,
   templeCenter,
@@ -20,7 +21,7 @@ import { landmarkAssets } from './landmarkAssets';
 const LandmarkModel = lazy(() => import('./LandmarkModel'));
 
 class LandmarkErrorBoundary extends Component<
-  { children: ReactNode; onFailure?: (error: Error) => void },
+  { children: ReactNode; name: string; onFailure?: (error: Error) => void },
   { failed: boolean }
 > {
   state = { failed: false };
@@ -34,7 +35,9 @@ class LandmarkErrorBoundary extends Component<
   }
 
   render() {
-    return this.state.failed ? null : this.props.children;
+    return this.state.failed
+      ? <Html center><div role="alert" className="heritage-review-message">Không tải được {this.props.name}. Hãy tải lại trang.</div></Html>
+      : this.props.children;
   }
 }
 
@@ -52,10 +55,10 @@ function LandmarkSlot({
     if (!url) onFailure?.(new Error(`Thiếu asset GLB: ${name}`));
   }, [url, name, onFailure]);
 
-  if (!url) return null;
+  if (!url) return <Html center><div role="alert">Thiếu mô hình {name}.</div></Html>;
 
   return (
-    <LandmarkErrorBoundary key={url} onFailure={onFailure}>
+    <LandmarkErrorBoundary key={url} name={name} onFailure={onFailure}>
       <Suspense fallback={null}>
         <LandmarkModel url={url} position={position} rotationY={rotationY} onLoaded={onLoaded} />
       </Suspense>
