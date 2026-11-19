@@ -161,7 +161,7 @@ function App() {
       </header>
       <div className="area-tag"><Icon name="compass" /><span>{freeCamera ? 'CHẾ ĐỘ DRONE' : 'ĐANG KHÁM PHÁ'}<strong>Hồ Hoàn Kiếm, Hà Nội</strong><small>Commit {buildLabel}</small></span></div>
       {showAssetDebug && <div className={`asset-debug asset-debug-${bridgeAssetStatus.state}`} role="status">
-        Cầu Thê Húc: {bridgeAssetStatus.state === 'glb' ? 'GLB đã tải' : bridgeAssetStatus.state === 'fallback' ? 'Đang dùng cầu cũ (fallback)' : 'Đang tải GLB'}
+        Cầu Thê Húc: {bridgeAssetStatus.state === 'glb' ? 'GLB đã tải' : bridgeAssetStatus.state === 'fallback' ? 'LỖI tải GLB — KHÔNG hiển thị cầu cũ' : 'Đang tải GLB'}
         {bridgeAssetStatus.detail && <small>{bridgeAssetStatus.detail}</small>}
       </div>}
       {freeCamera && <div className="drone-reticle" aria-hidden="true">+</div>}
