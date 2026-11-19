@@ -1,5 +1,6 @@
 """Verified repairs in Blender game metres, Z up. Preserve UVs and materials."""
 import bmesh
+import numpy as np
 from mathutils import Vector
 
 
@@ -69,6 +70,21 @@ def remove_ground_chips(mesh):
     return count
 
 
+def paving_uv_projection(mesh):
+    """Recover the painted source's affine XY-to-UV map before cutting it."""
+    uv = mesh.loops.layers.uv.active
+    if uv is None:
+        raise RuntimeError('Source paving has no UV map')
+    loops = [loop for face in mesh.faces for loop in face.loops]
+    positions = np.array([(loop.vert.co.x, loop.vert.co.y, 1) for loop in loops])
+    painted = np.array([tuple(loop[uv].uv) for loop in loops])
+    projection, _, rank, _ = np.linalg.lstsq(positions, painted, rcond=None)
+    error = float(np.max(np.abs(positions @ projection - painted)))
+    if rank != 3 or error > .0001:
+        raise RuntimeError(f'Source paving UV needs manual seam matching, error {error}')
+    return projection, error
+
+
 def finish_temple(objects):
     changes = []
     for obj in objects:
@@ -76,7 +92,9 @@ def finish_temple(objects):
         before = len(obj.data.polygons)
         mesh = bmesh.new()
         mesh.from_mesh(obj.data)
+        paving_repair = None
         if material == 'Di sản v2 | Gạch đỏ đất và mạch':
+            projection, error = paving_uv_projection(mesh)
             # Match the existing 0.35 m walking surface after temple placement.
             # Retain the source brick material and UVs, regularize its torn
             # perimeter, then extend the paving through the existing arch.
@@ -96,7 +114,10 @@ def finish_temple(objects):
             path = mesh.faces.new(verts)
             uv = mesh.loops.layers.uv.active
             for loop in path.loops:
-                loop[uv].uv = (loop.vert.co.x * .2, loop.vert.co.y * .2)
+                loop[uv].uv = np.array((loop.vert.co.x, loop.vert.co.y, 1)) @ projection
+            paving_repair = {'source_uv_projection': projection.tolist(),
+                             'max_fit_error': error,
+                             'new_surface_height': 1.9}
         if material in ('Di sản v2 | Gờ bậc và đá chạm',
                         'Di sản v2 | Vữa vôi của cổng và tường'):
             # The matched WebGL camera and raycasts identify these thin sheets
@@ -128,5 +149,6 @@ def finish_temple(objects):
         mesh.free()
         obj.data.update()
         changes.append({'material': material, 'faces_before': before,
-                        'faces_after': len(obj.data.polygons), 'side_wall': wall_repair})
+                        'faces_after': len(obj.data.polygons), 'side_wall': wall_repair,
+                        'paving_uv': paving_repair})
     return changes

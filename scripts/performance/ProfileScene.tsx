@@ -87,10 +87,16 @@ export function ProfileScene() {
       if (m) (Array.isArray(m) ? m : [m]).forEach((entry) => materials.add(entry));
     });
     const debug = ctx.getExtension('WEBGL_debug_renderer_info');
+    const landmarkInstances: Record<string, number> = {};
+    scene.traverse(node => {
+      const url = node.userData.qaLoadedUrl;
+      if (url) landmarkInstances[url] = (landmarkInstances[url] || 0) + 1;
+    });
     const sortedTimes = [...s.frameTimes].sort((a, b) => a - b);
     const slowFrameMs = sortedTimes[Math.floor(sortedTimes.length * 0.99)];
     const result = {
       step: trials[index], viewport: [innerWidth, innerHeight], dpr: devicePixelRatio,
+      landmarkInstances,
       renderDpr: gl.getPixelRatio(), buffer: [ctx.drawingBufferWidth, ctx.drawingBufferHeight],
       seconds, frames: s.frames, fps: s.frames / seconds, submitMs: s.submission / s.frames,
       fpsAtP99FrameTime: slowFrameMs ? 1000 / slowFrameMs : null,

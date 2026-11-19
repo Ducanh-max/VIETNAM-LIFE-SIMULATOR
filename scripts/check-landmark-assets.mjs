@@ -4,7 +4,7 @@
  * may silently return as a loading/error fallback.
  */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const root = process.cwd();
@@ -19,6 +19,20 @@ for (const name of oldComponents) {
   assert(!new RegExp('\\b' + name + '\\b').test(review),
     'Review page still depends on a rejected procedural model: ' + name);
 }
+for (const relative of readdirSync(join(root, 'src'), { recursive: true })) {
+  if (!/\.(ts|tsx)$/.test(relative)) continue;
+  const source = readFileSync(join(root, 'src', relative), 'utf8');
+  for (const name of oldComponents) {
+    assert(!new RegExp('\\b' + name + '\\b').test(source),
+      'Legacy landmark referenced in ' + relative + ': ' + name);
+  }
+  assert(!source.includes('/models/thap-rua.glb')
+    && !source.includes('/models/review/ngoc-son-the-huc-review.glb'),
+    'Legacy GLB referenced in ' + relative);
+}
+assert(!existsSync(join(root, 'public/models/thap-rua.glb'))
+  && !existsSync(join(root, 'public/models/review/ngoc-son-the-huc-review.glb')),
+  'Legacy GLB is still published in public/models');
 assert(!gameplay.includes('fallback={<TurtleTower')
   && !gameplay.includes('fallback={<NgocSonTemple')
   && !gameplay.includes('fallback={<TheHucBridge'),
