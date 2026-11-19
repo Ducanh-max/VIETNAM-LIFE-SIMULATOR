@@ -1,0 +1,40 @@
+{
+  "commit": "38e307fe479e9a07d9f9d20d219f65c13e3f4d29",
+  "step": "high",
+  "viewport": [
+    1920,
+    1080
+  ],
+  "dpr": 1,
+  "landmarkInstances": {
+    "/models/thap-rua-heritage.glb": 1,
+    "/models/cau-the-huc-heritage.glb?v=38e307fe479e": 1,
+    "/models/den-ngoc-son-heritage.glb?v=38e307fe479e": 1
+  },
+  "renderDpr": 1,
+  "buffer": [
+    1920,
+    1080
+  ],
+  "seconds": 30.014599999964236,
+  "frames": 1412,
+  "fps": 47.043772031001,
+  "submitMs": 20.01650141563699,
+  "fpsAtP99FrameTime": 33.78378375657202,
+  "lowestFrameFps": 25.380710636860787,
+  "gpuMs": 11.524029887640447,
+  "gpuSamples": 89,
+  "calls": 493.6926345609065,
+  "triangles": 707047.1373937677,
+  "materials": 2941,
+  "textures": 45,
+  "geometries": 1284,
+  "visible": true,
+  "camera": [
+    64.34169078259823,
+    4.636027973348144,
+    -211.90915390846135
+  ],
+  "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A7A8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36"
+}

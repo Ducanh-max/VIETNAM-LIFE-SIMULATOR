@@ -37,6 +37,23 @@ export function centerOf(points: Point[]): Point {
 export const turtleCenter = centerOf(turtleIsland);
 export const templeCenter = centerOf(templeIsland);
 
+const [shoreEnd, islandEnd] = bridgeEnds;
+const spanX = islandEnd[0] - shoreEnd[0];
+const spanZ = islandEnd[1] - shoreEnd[1];
+const spanLength = Math.hypot(spanX, spanZ);
+export const bridgeDirection: Point = [spanX / spanLength, spanZ / spanLength];
+
+// The Blender gate faces local +X. Its surveyed clear opening is centred
+// on Z=7.60; the city-facing jamb face is at X=12.93 (one unit = one metre).
+export const templeYaw = Math.atan2(templeCenter[1] - islandEnd[1], islandEnd[0] - templeCenter[0]);
+const tc = Math.cos(templeYaw);
+const ts = Math.sin(templeYaw);
+const gateFront: Point = [islandEnd[0] + bridgeDirection[0] * 1.55, islandEnd[1] + bridgeDirection[1] * 1.55];
+export const templePlacement: [number, number, number] = [
+  gateFront[0] - tc * 12.93 - ts * 7.6, -1.55,
+  gateFront[1] + ts * 12.93 - tc * 7.6,
+];
+
 export function offsetPolygon(points: Point[], meters: number): Point[] {
   const center = centerOf(points);
   return points.map(([x, z]) => {
@@ -64,16 +81,33 @@ export function distanceToSegment(point: Point, start: Point, end: Point): numbe
   return Math.hypot(point[0] - start[0] - t * dx, point[1] - start[1] - t * dz);
 }
 
-export function canWalk(point: Point): boolean {
+function insideHeritageBuilding([x, z]: Point): boolean {
+  const dx = x - templePlacement[0];
+  const dz = z - templePlacement[2];
+  const localX = dx * tc - dz * ts;
+  const localZ = dx * ts + dz * tc;
+  // Leave 0.52 m on either side of the axis for the avatar centre, with
+  // shoulder clearance inside the ~1.7 m clear opening through the jambs.
+  if (localX > 9.54 && localX < 13.23 && localZ > 3.1 && localZ < 12.1) {
+    return Math.abs(localZ - 7.6) > 0.52;
+  }
+  // Rectangular collision for the halls in the coordinate frame of the GLB.
+  const mainHall = localX > -16 && localX < -4.4 && localZ > -4.9 && localZ < 8.1;
+  const rearHall = localX > -9.2 && localX < -3.5 && localZ > -11.1 && localZ < -8.1;
+  return mainHall || rearHall;
+}
+
+export function canWalk(point: Point, heritageTempleLoaded = false): boolean {
   if (Math.abs(point[0]) > 205 || Math.abs(point[1]) > 390) return false;
   if (!insidePolygon(point, shore)) return true;
   if (insidePolygon(point, templeIsland)) {
+    if (heritageTempleLoaded) return !insideHeritageBuilding(point);
     const [cx, cz] = templeCenter;
     const inMainHall = Math.abs(point[0] - (cx - 10)) < 6.5 && Math.abs(point[1] - (cz + 0.5)) < 7.5;
     const inSideHall = Math.abs(point[0] - (cx + 2.2)) < 5.1 && Math.abs(point[1] - (cz - 0.2)) < 6.0;
     return !inMainHall && !inSideHall;
   }
-  if (distanceToSegment(point, bridgeEnds[0], bridgeEnds[1]) < 2.1) return true;
+  if (distanceToSegment(point, bridgeEnds[0], bridgeEnds[1]) < 1.25) return true;
   return false;
 }
 
@@ -82,7 +116,7 @@ export function positionOnBridge(point: Point): number {
   const dx = b[0] - a[0];
   const dz = b[1] - a[1];
   const t = Math.max(0, Math.min(1, ((point[0] - a[0]) * dx + (point[1] - a[1]) * dz) / (dx * dx + dz * dz)));
-  return distanceToSegment(point, a, b) < 2.5 ? 0.56 + Math.sin(Math.PI * t) * 1.45 : 0.35;
+  return distanceToSegment(point, a, b) < 1.55 ? 0.35 + Math.sin(Math.PI * t) * 2.4 : 0.35;
 }
 
 export const mapAttribution = map.source;

@@ -39,7 +39,7 @@ Reference photo URLs and their use are for research/comparison only. For any ima
 
 - [ ] After silhouette approval, apply aged stone, discoloration, masonry wear, roof and openings consistent with photographic evidence. Avoid regular fake noise that makes historic surfaces look newly manufactured.
 - [ ] Confirm expected orientation/origin and scale with `docs/ASSETS.md`; 1 game unit = 1 m.
-- [ ] Export GLB; verify measured bounds, missing textures, mesh normals, materials, polycount/file size, and actual WebGL render. Preserve procedural fallback.
+- [ ] Export GLB; verify measured bounds, missing textures, mesh normals, materials, polycount/file size, and actual WebGL render. Preserve earlier models only in version control for reversible review; do not automatically display rejected procedural models as fallback.
 - [ ] Test in-game long/side/3/4/shore views at **1920x1080** when environment supports it, on Low/High; record FPS honestly with viewport, DPR, GPU and measurement length.
 - [ ] Run TypeScript, map checks and production build; document warnings.
 

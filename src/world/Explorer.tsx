@@ -1,8 +1,9 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { bridgeEnds, canWalk, positionOnBridge, type Point } from './geo';
+import { bridgeDirection, bridgeEnds, canWalk, positionOnBridge, type Point } from './geo';
 import { isBuildingCollision } from './Urban';
+import { reviewPose } from './reviewViews';
 
 export type ExplorerMode = 'home' | 'game';
 
@@ -33,15 +34,16 @@ function Person({ walking, running }: { walking: { current: boolean }; running: 
   </group>;
 }
 
-export function Explorer({ mode, paused, freeCamera, onFps, onPosition }: {
+export function Explorer({ mode, paused, freeCamera, onFps, onPosition, heritageTempleLoaded }: {
   mode: ExplorerMode;
   paused: boolean;
   freeCamera: boolean;
   onFps: (fps: number) => void;
   onPosition: (position: Point) => void;
+  heritageTempleLoaded: boolean;
 }) {
   const { camera, gl } = useThree();
-  const position = useRef(new THREE.Vector3(bridgeEnds[0][0] + 5.5, 0.35, bridgeEnds[0][1]));
+  const position = useRef(new THREE.Vector3(bridgeEnds[0][0] - bridgeDirection[0] * 5.5, 0.35, bridgeEnds[0][1] - bridgeDirection[1] * 5.5));
   const freePosition = useRef(new THREE.Vector3(bridgeEnds[0][0] + 28, 13, bridgeEnds[0][1] + 35));
   const avatar = useRef<THREE.Group>(null);
   const keys = useRef(new Set<string>());
@@ -53,10 +55,20 @@ export function Explorer({ mode, paused, freeCamera, onFps, onPosition }: {
   const frames = useRef(0);
   const homeTime = useRef(0);
   const cameraTarget = useRef(new THREE.Vector3());
+  const initialReviewPose = useRef(reviewPose);
   useEffect(() => {
     if (freeCamera && mode === 'game') {
       freePosition.current.copy(camera.position);
       freePosition.current.y = Math.max(4, freePosition.current.y);
+      const pose = initialReviewPose.current;
+      if (pose) {
+        freePosition.current.set(...pose.eye);
+        camera.position.copy(freePosition.current);
+        const [dx, dy, dz] = new THREE.Vector3(...pose.target).sub(camera.position).toArray();
+        yaw.current = Math.atan2(-dx, -dz);
+        pitch.current = Math.atan2(-dy, Math.hypot(dx, dz));
+        initialReviewPose.current = undefined;
+      }
       keys.current.clear();
     }
   }, [freeCamera, mode, camera]);
@@ -86,7 +98,7 @@ export function Explorer({ mode, paused, freeCamera, onFps, onPosition }: {
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
-    sampleTime.current += dt;
+    sampleTime.current += delta;
     frames.current++;
     if (sampleTime.current >= 1) {
       onFps(Math.round(frames.current / sampleTime.current));
@@ -136,10 +148,12 @@ export function Explorer({ mode, paused, freeCamera, onFps, onPosition }: {
     const step = direction.multiplyScalar((running.current ? 9 : 5.2) * dt);
     const current = position.current;
     const nextX: Point = [current.x + step.x, current.z];
-    if (canWalk(nextX) && !isBuildingCollision(nextX)) current.x = nextX[0];
+    if (canWalk(nextX, heritageTempleLoaded) && !isBuildingCollision(nextX)) current.x = nextX[0];
     const nextZ: Point = [current.x, current.z + step.z];
-    if (canWalk(nextZ) && !isBuildingCollision(nextZ)) current.z = nextZ[1];
-    current.y = THREE.MathUtils.damp(current.y, positionOnBridge([current.x, current.z]), 9, dt);
+    if (canWalk(nextZ, heritageTempleLoaded) && !isBuildingCollision(nextZ)) current.z = nextZ[1];
+    // The camera already damps its motion. Feet must follow the deck directly
+    // or uphill motion sinks the character into the planks, especially at a run.
+    current.y = positionOnBridge([current.x, current.z]);
     if (avatar.current) {
       avatar.current.position.copy(current);
       if (walking.current) avatar.current.rotation.y = THREE.MathUtils.damp(avatar.current.rotation.y, Math.atan2(-step.x, -step.z), 12, dt);

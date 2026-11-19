@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber';
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { bridgeEnds, centerOf, islands, offsetPolygon, shore, templeIsland, turtleIsland, type Point } from './geo';
 
@@ -153,10 +153,16 @@ function LakeWater({ time }: { time: TimeOfDay }) {
     fragmentShader: waterFragment,
     side: THREE.DoubleSide,
   }), []);
-  useFrame((_, delta) => {
-    material.uniforms.uTime.value += delta;
+  useEffect(() => () => {
+    geometry.dispose();
+    material.dispose();
+  }, [geometry, material]);
+  useEffect(() => {
     material.uniforms.uWater.value.set(time === 'night' ? '#102c36' : time === 'sunset' ? '#405d66' : '#205e5b');
     material.uniforms.uSky.value.set(time === 'night' ? '#5d7d8a' : time === 'sunset' ? '#e79a78' : '#9cc7be');
+  }, [material, time]);
+  useFrame((_, delta) => {
+    material.uniforms.uTime.value += delta;
   });
   return <mesh geometry={geometry} material={material} position={[0, 0.06, 0]} />;
 }
@@ -249,6 +255,9 @@ export function Landscape({ time }: { time: TimeOfDay }) {
   const [stoneMap, stoneNormal, stoneRough] = useMemo(() => surfaceMaps('stone'), []);
   const [roadMap, roadNormal, roadRough] = useMemo(() => surfaceMaps('asphalt'), []);
   const [grassMap, grassNormal, grassRough] = useMemo(() => surfaceMaps('grass'), []);
+  useEffect(() => () => {
+    for (const map of [stoneMap, stoneNormal, stoneRough, roadMap, roadNormal, roadRough, grassMap, grassNormal, grassRough]) map.dispose();
+  }, [stoneMap, stoneNormal, stoneRough, roadMap, roadNormal, roadRough, grassMap, grassNormal, grassRough]);
   const sidewalk = useMemo(() => ringGeometry(offsetPolygon(shore, 11), shore), []);
   const road = useMemo(() => ringGeometry(offsetPolygon(shore, 28), offsetPolygon(shore, 11)), []);
   const curb = useMemo(() => ringGeometry(offsetPolygon(shore, 1.2), shore), []);
@@ -256,7 +265,15 @@ export function Landscape({ time }: { time: TimeOfDay }) {
   const shoreBody = useMemo(() => bodyGeometry(offsetPolygon(shore, 1.05), shore, 0.34), []);
   const planting = useMemo(() => ringGeometry(offsetPolygon(shore, 7.25), offsetPolygon(shore, 4.75)), []);
   const islandGeometries = useMemo(() => [fillGeometry(templeIsland), fillGeometry(turtleIsland)], []);
-  const islandBodies = useMemo(() => [bodyGeometry(templeIsland), bodyGeometry(turtleIsland)], []);
+  // Only draw the vertical island revetments; the top surface is the grass mesh.
+  // Both extruded caps previously overlapped the grass at Y=0.28, causing
+  // flickering/bright stripes (especially on Tháp Rùa's island).
+  const islandBodies = useMemo(() => [templeIsland, turtleIsland].map(island => {
+    const body = bodyGeometry(island);
+    const sideFaces = body.groups.find(group => group.materialIndex === 1);
+    if (sideFaces) body.setDrawRange(sideFaces.start, sideFaces.count);
+    return body;
+  }), []);
   const laneMarks = useMemo(() => sampleRing(offsetPolygon(shore, 20), 9).filter((_, i) => i % 2 === 0), []);
   const [bridgeStart, bridgeEnd] = bridgeEnds;
   const approachX = bridgeStart[0] - bridgeEnd[0];
@@ -269,6 +286,9 @@ export function Landscape({ time }: { time: TimeOfDay }) {
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 22, uv.getY(i) * 7.2);
     return geometry;
   }, []);
+  useEffect(() => () => {
+    for (const geometry of [sidewalk, road, curb, revetment, shoreBody, planting, approachGeometry, ...islandGeometries, ...islandBodies]) geometry.dispose();
+  }, [sidewalk, road, curb, revetment, shoreBody, planting, approachGeometry, islandGeometries, islandBodies]);
   return <>
     <mesh receiveShadow position={[0, -0.3, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[1300, 1300]} /><meshStandardMaterial map={grassMap} normalMap={grassNormal} roughnessMap={grassRough} roughness={1} /></mesh>
     <LakeWater time={time} />
@@ -282,8 +302,8 @@ export function Landscape({ time }: { time: TimeOfDay }) {
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.31, 0]} geometry={approachGeometry} receiveShadow><meshStandardMaterial map={stoneMap} normalMap={stoneNormal} roughnessMap={stoneRough} roughness={0.9} side={THREE.DoubleSide} /></mesh>
       {[-1, 1].map((sign) => <mesh key={sign} position={[0, 0.29, sign * 3.65]} receiveShadow><boxGeometry args={[22, 0.14, 0.24]} /><meshStandardMaterial color="#aaa18c" roughness={0.95} /></mesh>)}
     </group>
-    {islandBodies.map((geometry, index) => <mesh key={`body-${index}`} geometry={geometry} receiveShadow position={[0, -0.12, 0]}><meshStandardMaterial color={index ? '#8d8c74' : '#7f8970'} roughness={1} /></mesh>)}
-    {islandGeometries.map((geometry, index) => <mesh key={index} geometry={geometry} receiveShadow position={[0, 0.28, 0]}><meshStandardMaterial map={index ? stoneMap : grassMap} roughness={1} /></mesh>)}
+    {islandBodies.map((geometry, index) => <mesh key={`body-${index}`} geometry={geometry} receiveShadow position={[0, -0.12, 0]}><meshStandardMaterial color={index ? '#657a60' : '#7f8970'} roughness={1} /></mesh>)}
+    {islandGeometries.map((geometry, index) => <mesh key={index} geometry={geometry} receiveShadow position={[0, 0.28, 0]}><meshStandardMaterial map={grassMap} normalMap={grassNormal} roughnessMap={grassRough} color={index ? '#b7c4a7' : '#ffffff'} roughness={1} /></mesh>)}
     {laneMarks.map(({ point, tangent }, index) => <mesh key={index} position={[point[0], 0.095, point[1]]} rotation={[-Math.PI / 2, 0, Math.atan2(tangent[1], tangent[0])]}><planeGeometry args={[4.2, 0.2]} /><meshBasicMaterial color="#e7dca8" /></mesh>)}
     <StreetFurniture time={time} />
   </>;
