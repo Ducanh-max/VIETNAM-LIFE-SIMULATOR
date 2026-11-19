@@ -157,7 +157,7 @@ function App() {
     </> : <>
       <header className="game-header">
         <div className="game-brand" onClick={returnHome} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') returnHome(); }}>ĐỜI VIỆT<span> / HÀ NỘI 3D</span></div>
-        <div className="game-actions"><a className="game-review-link" href="/#heritage-review">So sánh mô hình ↗</a><button title="Trợ giúp" aria-label="Trợ giúp" onClick={() => openPanel('help')}>?</button><button title="Cài đặt" aria-label="Cài đặt" onClick={() => openPanel('settings')}><Icon name="settings" /></button><button title={paused ? 'Tiếp tục' : 'Tạm dừng'} aria-label={paused ? 'Tiếp tục' : 'Tạm dừng'} onClick={() => { if (document.pointerLockElement) document.exitPointerLock(); setPaused(!paused); }}><Icon name={paused ? 'play' : 'pause'} /></button></div>
+        <div className="game-actions"><a className="game-review-link" href="/#heritage-review">Xem mô hình GLB ↗</a><button title="Trợ giúp" aria-label="Trợ giúp" onClick={() => openPanel('help')}>?</button><button title="Cài đặt" aria-label="Cài đặt" onClick={() => openPanel('settings')}><Icon name="settings" /></button><button title={paused ? 'Tiếp tục' : 'Tạm dừng'} aria-label={paused ? 'Tiếp tục' : 'Tạm dừng'} onClick={() => { if (document.pointerLockElement) document.exitPointerLock(); setPaused(!paused); }}><Icon name={paused ? 'play' : 'pause'} /></button></div>
       </header>
       <div className="area-tag"><Icon name="compass" /><span>{freeCamera ? 'CHẾ ĐỘ DRONE' : 'ĐANG KHÁM PHÁ'}<strong>Hồ Hoàn Kiếm, Hà Nội</strong><small>Commit {buildLabel}</small></span></div>
       {showAssetDebug && <div className={`asset-debug asset-debug-${bridgeAssetStatus.state}`} role="status">
