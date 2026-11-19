@@ -282,8 +282,8 @@ export function Landscape({ time }: { time: TimeOfDay }) {
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.31, 0]} geometry={approachGeometry} receiveShadow><meshStandardMaterial map={stoneMap} normalMap={stoneNormal} roughnessMap={stoneRough} roughness={0.9} side={THREE.DoubleSide} /></mesh>
       {[-1, 1].map((sign) => <mesh key={sign} position={[0, 0.29, sign * 3.65]} receiveShadow><boxGeometry args={[22, 0.14, 0.24]} /><meshStandardMaterial color="#aaa18c" roughness={0.95} /></mesh>)}
     </group>
-    {islandBodies.map((geometry, index) => <mesh key={`body-${index}`} geometry={geometry} receiveShadow position={[0, -0.12, 0]}><meshStandardMaterial color={index ? '#8d8c74' : '#7f8970'} roughness={1} /></mesh>)}
-    {islandGeometries.map((geometry, index) => <mesh key={index} geometry={geometry} receiveShadow position={[0, 0.28, 0]}><meshStandardMaterial map={index ? stoneMap : grassMap} roughness={1} /></mesh>)}
+    {islandBodies.map((geometry, index) => <mesh key={`body-${index}`} geometry={geometry} receiveShadow position={[0, -0.12, 0]}><meshStandardMaterial color={index ? '#657a60' : '#7f8970'} roughness={1} /></mesh>)}
+    {islandGeometries.map((geometry, index) => <mesh key={index} geometry={geometry} receiveShadow position={[0, 0.28, 0]}><meshStandardMaterial map={grassMap} normalMap={grassNormal} roughnessMap={grassRough} color={index ? '#b7c4a7' : '#ffffff'} roughness={1} /></mesh>)}
     {laneMarks.map(({ point, tangent }, index) => <mesh key={index} position={[point[0], 0.095, point[1]]} rotation={[-Math.PI / 2, 0, Math.atan2(tangent[1], tangent[0])]}><planeGeometry args={[4.2, 0.2]} /><meshBasicMaterial color="#e7dca8" /></mesh>)}
     <StreetFurniture time={time} />
   </>;

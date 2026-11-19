@@ -369,7 +369,7 @@ class LandmarkLoadBoundary extends Component<{ fallback: ReactNode; children: Re
 }
 
 function LandmarkSlot({ url, position, rotationY, fallback }: { url: string | null; position: [number, number, number]; rotationY?: number; fallback: ReactNode }) {
-  return url ? <LandmarkLoadBoundary fallback={fallback}><Suspense fallback={fallback}><LandmarkModel url={url} position={position} rotationY={rotationY} /></Suspense></LandmarkLoadBoundary> : fallback;
+  return url ? <LandmarkLoadBoundary fallback={fallback}><Suspense fallback={null}><LandmarkModel url={url} position={position} rotationY={rotationY} /></Suspense></LandmarkLoadBoundary> : fallback;
 }
 
 export function Landmarks({ time }: { time: TimeOfDay }) {
@@ -380,9 +380,9 @@ export function Landmarks({ time }: { time: TimeOfDay }) {
   return <>
     <LandmarkSlot url={landmarkAssets.turtleTower}
       position={[turtleCenter[0], 0.28, turtleCenter[1]]} fallback={<TurtleTower time={time} />} />
-    <LandmarkSlot url={landmarkAssets.theHucBridge} position={[bridgeStart[0], 0, bridgeStart[1]]}
+    <LandmarkSlot url={landmarkAssets.theHucBridge} position={[bridgeStart[0], 0.35, bridgeStart[1]]}
       rotationY={Math.atan2(bridgeEnd[1] - bridgeStart[1], bridgeStart[0] - bridgeEnd[0])} fallback={<TheHucBridge />} />
-    <LandmarkSlot url={landmarkAssets.ngocSonTemple} position={[templeCenter[0] + 4, 0.28, templeCenter[1] - 12]}
+    <LandmarkSlot url={landmarkAssets.ngocSonTemple} position={[templeCenter[0] + 4, -1.55, templeCenter[1] - 12]}
       rotationY={templeHeading} fallback={<NgocSonTemple time={time} />} />
   </>;
 }
