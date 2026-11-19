@@ -1,5 +1,21 @@
 # Cầu Thê Húc · PR #4
 
+## Sửa UV gạch sân và kiểm mô hình cũ · gameplay `38e307f`
+
+Ảnh local WebGL cùng camera ở 1920 × 1080 DPR 1, trái `39bf8ff`, phải `38e307f`.
+
+![Gạch qua cổng trước và sau sửa UV](heritage-images/webgl-38e307f/before-after.jpg)
+
+- UV đoạn nối trước dùng tỷ lệ 0,2 trên mét, trong khi mặt sân nguồn dùng phép chiếu có tỷ lệ khoảng 0,783699 trên mét. Script nay khôi phục đầy đủ phép chiếu từ tọa độ và UV gốc, gồm hướng và độ dịch, rồi áp dụng lên đoạn nối. Sai số khớp nguồn tối đa 0,000001154 UV. Nếu nguồn đổi sang cách trải UV khác, export dừng để tránh tự gán mapping sai.
+- Sau khi xuất Draco và nhập lại, kiểm 4.746 loop UV, gồm hai tam giác qua cổng. Sai số tối đa so với phép chiếu nguồn là 0,001967 UV. Cả 18 ảnh nhúng của GLB có cùng SHA256 với bản `b9cd89e`. GLB đền có 460.923 tam giác, sáu vật liệu và 8.792.352 byte.
+- Build kiểm toàn bộ tệp TS/TSX trong src và thư mục public để chặn tham chiếu component/asset công trình cũ. Trong scene của bản production local có instrument phục vụ QA, đếm được đúng một group cho mỗi URL GLB tháp, cầu và đền. [Dữ liệu scene và hiệu năng](performance/paving-38e307f.json).
+- TypeScript, production build, map, kiểm asset và hành trình đi bộ mô phỏng đều đạt. Đi bộ bằng phím thực tế vào được sân tại x/z (−4, −215). Console local ghi 0 lỗi.
+- Đo High tại 1920 × 1080, DPR 1 trong 30,015 giây trên Intel UHD đạt 47,04 FPS, GPU 11,52 ms, trung bình 494 draw calls. Máy vẫn có các ứng dụng khác hoạt động. Đây là phép đo ở góc từ bờ, không xác nhận đạt 60 FPS.
+
+[Cổng cận cảnh](heritage-images/webgl-38e307f/gate.jpg) · [Đền từ cầu](heritage-images/webgl-38e307f/temple.jpg) · [Cầu từ bờ](heritage-images/webgl-38e307f/shore.jpg) · [Kiểm UV nhập lại](heritage-images/webgl-38e307f/paving-uv-check.json).
+
+Phạm vi kiểm chứng là bản local của nhánh PR #4. Các vùng mái và chân tường còn thô từ những đợt trước vẫn cần đánh giá riêng. PR chưa merge và bằng chứng này không xác nhận trạng thái mô hình trên production.
+
 ## Sửa mảng tường và sân · gameplay `39bf8ff`
 
 Hai ảnh cùng camera, local WebGL, 1920 × 1080, DPR 1. Trái `df35a4f`, phải `39bf8ff`. Ảnh cắt cùng vùng để nhìn phần vữa nhô bên hông và lối gạch qua cổng.

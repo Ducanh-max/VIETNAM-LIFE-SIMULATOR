@@ -20,6 +20,13 @@ The loader applies no additional repair or paving offset. The exporter saves
 `heritage-work/temple-repaired.blend` separately for inspection. Start each
 export from the untransformed working file, avoiding double transforms.
 
+The paving extension inherits the affine XY-to-UV projection fitted to the
+owner's original paving loops. Export stops if residuals exceed 0.0001 UV.
+Run `check-paving-uv.py` in background Blender after export to reimport the GLB
+and compare every paving UV, including the gateway extension, to that source
+projection. Its report is `heritage-work/paving-uv-check.json`. Draco introduces
+small position and UV quantization errors, checked separately from fit error.
+
 The original `optimize.py` below is the historical full-scene preparation
 tool. It also exports the tower, so use the guarded single-landmark exporter
 for subsequent changes where the tower has already been approved.
