@@ -17,7 +17,9 @@ for filename in ('thap-rua-heritage.glb', 'den-ngoc-son-heritage.glb', 'cau-the-
     materials = {slot.material for obj in objects for slot in obj.material_slots if slot.material}
     textures = {node.image for material in materials if material.node_tree
                 for node in material.node_tree.nodes if node.type == 'TEX_IMAGE' and node.image}
-    assert all(image.has_data for image in textures), 'Missing decoded texture in ' + filename
+    # Packed glTF images decode lazily in background Blender.
+    for image in textures:
+        assert image.size[0] and image.size[1] and len(image.pixels), 'Missing texture in ' + filename
     for obj in objects:
         assert obj.data.uv_layers, 'Missing UV on ' + obj.name
         copy = obj.data.copy()

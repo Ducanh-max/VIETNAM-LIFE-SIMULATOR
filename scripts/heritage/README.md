@@ -1,5 +1,30 @@
 # Rebuild user-supplied heritage review assets
 
+## Guarded pipeline
+
+Run from the repository in PowerShell. `pipeline.ps1` accepts `-Source` with
+the original blend path, `-Blender` with the executable and `-Stage Inspect`,
+`Temple` or `Bridge`. The default stage audits the source and reimports the
+three current GLBs. Export stages require the separate material-split
+`heritage-work/heritage-optimized-working.blend`, configurable with `-Working`.
+Original blend files can be stored in the ignored `assets-source/` directory.
+
+The runner compares SHA256 for the original source and approved tower before
+and after each invocation. Inventory, import validation, source hashes and
+export logs are written into ignored `heritage-work/`. A failed Blender
+command stops the runner. A passing audit still requires WebGL screenshots
+and visual review before merging the branch.
+
+`temple_finish.py` repairs only the verified thin sheets at the outside gate
+pier and raises the existing paving 0.594 m. These changes are baked into GLB.
+The loader applies no additional repair or paving offset. The exporter saves
+`heritage-work/temple-repaired.blend` separately for inspection. Start each
+export from the untransformed working file, avoiding double transforms.
+
+The original `optimize.py` below is the historical full-scene preparation
+tool. It also exports the tower, so use the guarded single-landmark exporter
+for subsequent changes where the tower has already been approved.
+
 Use Blender 5.3 and the original `HoGuom_NgocSon_Heritage_v2_DaTo.blend` as input. Keep that file outside Git. Both scripts disable auto-execution and never save over the source.
 
 ```powershell
