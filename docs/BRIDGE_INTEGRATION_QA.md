@@ -1,5 +1,23 @@
 # Cầu Thê Húc · PR #4
 
+## Sửa mảng tường và sân · gameplay `39bf8ff`
+
+Hai ảnh cùng camera, local WebGL, 1920 × 1080, DPR 1. Trái `df35a4f`, phải `39bf8ff`. Ảnh cắt cùng vùng để nhìn phần vữa nhô bên hông và lối gạch qua cổng.
+
+![So sánh trước và sau](heritage-images/webgl-39bf8ff/before-after.jpg)
+
+- Khảo sát bề mặt hông chính điện cho thấy hai lớp tường lớn tại Blender local Y khoảng −9,5 / −9,2 m, diện tích tương ứng khoảng 11,66 / 11,29 m². Những mặt rách nhô ra tới −10,63 m. Script xác định riêng component tường theo vị trí và kiểm bounds, cắt ở −9,55 m rồi khép mép cắt. Các mảnh rời cùng vùng ngoài tường được loại tiếp.
+- Loại 953 mặt vữa mỏng rời dưới cao độ local Z=2,5 m, dày dưới 0,35 m, diện tích dưới 1 m² và nằm ngoài vùng cổng. Điều kiện áp dụng cho vữa, giữ vật liệu đá bậc và mái. Các mảng vữa còn nối với chân cột chính vẫn hiện trong ảnh.
+- Chỉnh phẳng sân theo mặt đi bộ local Z=1,9 m, tương ứng Y=0,35 m trong game. Mép gạch được cắt gọn và nối qua cổng bằng cùng vật liệu gạch gốc. Đoạn nối dài 5,6 m, rộng 2,2 m, là kích thước tích hợp theo cầu/cổng trong game. Không khẳng định đây là số đo sân thật.
+- GLB đền có 460.923 tam giác, 8.792.376 byte, sáu vật liệu và 18 ảnh. Trước đợt sửa là 473.664 tam giác / 9.029.724 byte. UV nguồn giữ ở các mặt còn lại; mặt khép và đoạn gạch nối dùng UV chiếu phẳng. Tháp Rùa và cầu có cùng byte với `41f7796`.
+- Blender nhập lại GLB hợp lệ, có UV và ảnh giải mã. Build production và kiểm asset đạt. Map và kiểm đi bộ mô phỏng đạt. Hành trình phím W/mũi tên trong WebGL vào được sân tại x/z (−4, −214), console ghi 0 lỗi.
+
+[Đền từ cầu](heritage-images/webgl-39bf8ff/temple.jpg) · [Cổng cận cảnh](heritage-images/webgl-39bf8ff/gate.jpg) · [Cầu từ bờ](heritage-images/webgl-39bf8ff/shore.jpg) · [Tháp](heritage-images/webgl-39bf8ff/tower.jpg) · [Hồ](heritage-images/webgl-39bf8ff/lake.jpg) · [Drone](heritage-images/webgl-39bf8ff/overhead.jpg).
+
+**Còn thô trong ảnh.** Mép mái, phần trang trí cổng và các chân tường nối với cột còn nham nhở từ nguồn. Các ảnh trên chứng minh riêng vùng tường nhô và đường sân đã thay đổi. Kiểm duyệt hình ảnh toàn đền tiếp tục ở trạng thái chưa đạt.
+
+Đo local 1080p, DPR 1, ít nhất 30 giây mỗi lượt ở cùng góc từ bờ. Low 60,00 FPS, Medium 59,94, High 59,44 và High camera chuyển động 56,43. Đây là lượt đo mới trên máy đang được sử dụng. Không quy chênh lệch so với phiên đo trước thành mức tăng FPS chỉ do sửa mesh. [Số liệu CPU/GPU và các mức thấp](BRIDGE_PERFORMANCE.md).
+
 ## Kiểm tra Blender và sáu góc WebGL · `df35a4f`
 
 [Báo cáo pipeline và những vùng đền còn lỗi](HERITAGE_PIPELINE_QA.md). Các sửa chân cổng và cao độ sân đã được ghi vào GLB xuất từ Blender, bộ lọc runtime đã được gỡ. Đường đi W/mũi tên từ bờ qua cầu và cổng đến sân đạt tại x/z (−4, −214). Console local ghi 0 lỗi.

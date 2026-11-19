@@ -1,0 +1,147 @@
+{
+  "commit": "39bf8ff",
+  "equivalentScene": "39bf8ff",
+  "source": "Local instrumented production build",
+  "samples": [
+    {
+      "commit": "39bf8ffa5b411bd3308a5207f0451eb7f5caf997",
+      "step": "low",
+      "viewport": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "renderDpr": 1,
+      "buffer": [
+        1920,
+        1080
+      ],
+      "seconds": 30.01530000001192,
+      "frames": 1801,
+      "fps": 60.002731940020084,
+      "submitMs": 10.223098279005418,
+      "fpsAtP99FrameTime": 56.179775243274435,
+      "lowestFrameFps": 39.21568627450981,
+      "gpuMs": 9.435470539823008,
+      "gpuSamples": 113,
+      "calls": 487,
+      "triangles": 653924,
+      "materials": 2941,
+      "textures": 44,
+      "geometries": 1093,
+      "visible": true,
+      "camera": [
+        64.34169078259825,
+        4.636027973348145,
+        -211.90915390846132
+      ],
+      "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A7A8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36"
+    },
+    {
+      "commit": "39bf8ffa5b411bd3308a5207f0451eb7f5caf997",
+      "step": "medium",
+      "viewport": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "renderDpr": 1,
+      "buffer": [
+        1920,
+        1080
+      ],
+      "seconds": 30.01560000002384,
+      "frames": 1799,
+      "fps": 59.93550020651165,
+      "submitMs": 11.049972207099614,
+      "fpsAtP99FrameTime": 47.61904761904762,
+      "lowestFrameFps": 37.87878791299624,
+      "gpuMs": 9.719617893805312,
+      "gpuSamples": 113,
+      "calls": 492.25291828793775,
+      "triangles": 695619.3140633685,
+      "materials": 2941,
+      "textures": 45,
+      "geometries": 1284,
+      "visible": true,
+      "camera": [
+        64.34169078259825,
+        4.636027973348145,
+        -211.90915390846132
+      ],
+      "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A7A8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36"
+    },
+    {
+      "commit": "39bf8ffa5b411bd3308a5207f0451eb7f5caf997",
+      "step": "high",
+      "viewport": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "renderDpr": 1,
+      "buffer": [
+        1920,
+        1080
+      ],
+      "seconds": 30.0155,
+      "frames": 1784,
+      "fps": 59.43595808832104,
+      "submitMs": 11.923822870068753,
+      "fpsAtP99FrameTime": 40.48582988135568,
+      "lowestFrameFps": 33.898305084745765,
+      "gpuMs": 8.940871473214285,
+      "gpuSamples": 112,
+      "calls": 492.2970852017937,
+      "triangles": 695969.8912556054,
+      "materials": 2941,
+      "textures": 45,
+      "geometries": 1284,
+      "visible": true,
+      "camera": [
+        64.34169078259825,
+        4.636027973348145,
+        -211.90915390846132
+      ],
+      "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A7A8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36"
+    },
+    {
+      "commit": "39bf8ffa5b411bd3308a5207f0451eb7f5caf997",
+      "step": "high/motion",
+      "viewport": [
+        1920,
+        1080
+      ],
+      "dpr": 1,
+      "renderDpr": 1,
+      "buffer": [
+        1920,
+        1080
+      ],
+      "seconds": 30.00239999997616,
+      "frames": 1693,
+      "fps": 56.42881902785595,
+      "submitMs": 15.579976372513205,
+      "fpsAtP99FrameTime": 35.84229393743895,
+      "lowestFrameFps": 26.178010479373462,
+      "gpuMs": 11.116596962264145,
+      "gpuSamples": 106,
+      "calls": 790.8865918487892,
+      "triangles": 3153800.072652097,
+      "materials": 2941,
+      "textures": 45,
+      "geometries": 1296,
+      "visible": true,
+      "camera": [
+        62.19325412613506,
+        5.018161316829414,
+        -216.93643539109706
+      ],
+      "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A7A8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36"
+    }
+  ]
+}

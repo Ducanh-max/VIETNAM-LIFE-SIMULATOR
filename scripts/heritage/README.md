@@ -15,8 +15,7 @@ export logs are written into ignored `heritage-work/`. A failed Blender
 command stops the runner. A passing audit still requires WebGL screenshots
 and visual review before merging the branch.
 
-`temple_finish.py` repairs only the verified thin sheets at the outside gate
-pier and raises the existing paving 0.594 m. These changes are baked into GLB.
+`temple_finish.py` repairs verified gate sheets and the surveyed hall facade. It removes shallow detached plaster fragments, levels paving at 1.9 m local Z and joins it through the arch. These changes are baked into GLB.
 The loader applies no additional repair or paving offset. The exporter saves
 `heritage-work/temple-repaired.blend` separately for inspection. Start each
 export from the untransformed working file, avoiding double transforms.

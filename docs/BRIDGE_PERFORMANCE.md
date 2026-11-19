@@ -1,5 +1,23 @@
 # Hiệu năng WebGL tại đầu Cầu Thê Húc
 
+## Sửa tường và sân · 39bf8ff
+
+Bản đo và ảnh gameplay dùng cùng commit 39bf8ff. Mỗi lượt 30 giây trở lên trên Intel UHD, Chrome Headless, DPR thiết bị và renderer 1, viewport và drawing buffer 1920 × 1080. Đứng từ bờ cầu ban ngày, thêm một lượt camera chuyển động. Low không shadow/AA, Medium dùng shadow 1024², High 2048². Đo sau khi cả ba GLB mount và chờ 5,5 giây.
+
+| Chế độ | FPS TB | FPS tại frame P99 | Frame thấp nhất, FPS | CPU submit ms | GPU ms | Draw | Tam giác | Texture | Material |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| low | 60.00 | 56.18 | 39.22 | 10.22 | 9.44 | 487 | 653924 | 44 | 2941 |
+| medium | 59.94 | 47.62 | 37.88 | 11.05 | 9.72 | 492 | 695619 | 45 | 2941 |
+| high | 59.44 | 40.49 | 33.90 | 11.92 | 8.94 | 492 | 695970 | 45 | 2941 |
+| high/motion | 56.43 | 35.84 | 26.18 | 15.58 | 11.12 | 791 | 3153800 | 45 | 2941 |
+
+FPS tại frame P99 là 1000 chia thời gian frame ở phân vị 99%, không phải trung bình nhóm 1% khung hình chậm nhất. CPU submit là thời gian gl.render trả về. GPU là query WebGL2 hợp lệ. Số tam giác gồm shadow pass. Máy người dùng đang hoạt động, các ứng dụng khác vẫn mở. Những số này chưa cho thấy đạt 60 FPS. Các lượt cũ ở phiên khác có tải máy khác nên không dùng chênh lệch để quy hết cho GLB.
+
+Ước lượng ảnh RGBA8 có mip của ba GLB lần lượt 64 / 96 / 33,33 MiB, suy ra từ kích thước texture nhập lại. Đây là ước lượng lưu ảnh, WebGL không cung cấp VRAM driver thực. Số material gồm cả các mesh khác trong toàn scene. Thời gian request/giải mã GLB và mức tăng heap qua nhiều lần tải chưa đo độc lập.
+
+[Dữ liệu từng lượt](performance/temple-39bf8ff.json)
+
+
 ## Pipeline Blender · cc224d7 / df35a4f
 
 Bản đo cc224d7 dùng cùng GLB, vị trí và vật liệu với bản chụp df35a4f. Bản sau chỉ sửa giải mã lười của bộ audit, tài liệu và dấu báo đã mount GLB. Mỗi lượt 30 giây trở lên trên Intel UHD, Chrome Headless, DPR thiết bị và renderer 1, viewport và drawing buffer 1920 × 1080. Đứng từ bờ cầu ban ngày, thêm một lượt camera chuyển động. Low không shadow/AA, Medium dùng shadow 1024², High 2048². Đo sau khi cả ba GLB mount và chờ 5,5 giây.
