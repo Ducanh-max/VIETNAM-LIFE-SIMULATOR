@@ -73,7 +73,7 @@ export function canWalk(point: Point): boolean {
     const inSideHall = Math.abs(point[0] - (cx + 2.2)) < 5.1 && Math.abs(point[1] - (cz - 0.2)) < 6.0;
     return !inMainHall && !inSideHall;
   }
-  if (distanceToSegment(point, bridgeEnds[0], bridgeEnds[1]) < 3.35) return true;
+  if (distanceToSegment(point, bridgeEnds[0], bridgeEnds[1]) < 1.25) return true;
   return false;
 }
 
@@ -82,7 +82,7 @@ export function positionOnBridge(point: Point): number {
   const dx = b[0] - a[0];
   const dz = b[1] - a[1];
   const t = Math.max(0, Math.min(1, ((point[0] - a[0]) * dx + (point[1] - a[1]) * dz) / (dx * dx + dz * dz)));
-  return distanceToSegment(point, a, b) < 3.6 ? 0.35 + Math.sin(Math.PI * t) * 2.4 : 0.35;
+  return distanceToSegment(point, a, b) < 1.55 ? 0.35 + Math.sin(Math.PI * t) * 2.4 : 0.35;
 }
 
 export const mapAttribution = map.source;

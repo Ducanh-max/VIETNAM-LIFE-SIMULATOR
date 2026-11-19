@@ -7,9 +7,9 @@
 | Asset | Gốc mô hình | Hướng |
 | --- | --- | --- |
 | `thap-rua-heritage.glb` | tâm đảo Tháp Rùa, tại mặt đất | giữ hướng trong file Blender do chủ dự án cung cấp; cao 8,8 m sau khi căn tỉ lệ |
-| `cau-the-huc-heritage.glb` | đầu cầu bờ đông, mặt đi bộ cao khoảng 0,35 m | chiều dài dọc -X; xoay -0,099 rad theo trục cầu OSM; dài khoảng 46,7 m cả gờ cuối |
+| `cau-the-huc-heritage.glb` | đầu cầu bờ đông, mặt đi bộ cao khoảng 0,35 m | chiều dài dọc -X; xoay -0,099 rad theo trục cầu OSM; mặt ván dài khoảng 46,26 m |
 | `den-ngoc-son-heritage.glb` | gần tâm đảo Ngọc Sơn | +X từ chính điện qua cổng; trong game xoay khoảng +0,635 rad, dịch +4 m X, -12 m Z và hạ Y xuống -1,55 m để sân gạch chạm mặt đảo; chỉ chứa kiến trúc đền, không chứa cầu |
 
 Giữ va chạm riêng trong `geo.ts`; GLB chỉ thay phần hiển thị. GLB đền có sáu mesh theo vật liệu và không chứa cầu; sân gạch là thành phần kiến trúc, còn đảo cỏ trong `Landscape.tsx` chỉ là địa hình nền. Không có component đền procedural nào render đồng thời với GLB sau khi tải thành công. Trong khi tải, `Suspense` không vẽ fallback; fallback chỉ hiện nếu GLB lỗi.
 
-Đền được xuất bằng `scripts/heritage/export-game-temple.py` và cầu bằng `scripts/heritage/export-game-bridge.py` từ `heritage-work/heritage-optimized-working.blend`. Cầu xuất bằng tỉ lệ **đồng nhất** 0,397764 để chạm hai đầu OSM, không bóp méo mesh. Mặt cầu sau đó rộng khoảng 7,1 m; mẫu cầu cũ chỉ rộng khoảng 2,7 m. Đây là sai khác đáng kể về tỉ lệ thẩm mỹ, cần duyệt ảnh Preview trước khi merge. Đường đi và va chạm đền vẫn là bản đơn giản theo bản đồ. Cần kiểm tra WebGL ở Low/High 1080p và đo FPS trên máy có GPU; build không chứng minh chất lượng hình ảnh.
+Đền được xuất bằng `scripts/heritage/export-game-temple.py` và cầu bằng `scripts/heritage/export-game-bridge.py` từ `heritage-work/heritage-optimized-working.blend`. Script cầu chỉnh riêng mặt ván và dải lan can/trụ trong mesh Blender: mặt ván khoảng **3,0 m**, tổng bề rộng khoảng **4,24 m** trong game; tọa độ dọc và cao độ vòm giữ nguyên. Sau đó áp dụng tỉ lệ đồng nhất 0,399896 để nối hai đầu OSM. Không chỉnh GLB Tháp Rùa. Đường đi trên cầu được giới hạn còn 1,25 m mỗi bên tâm; va chạm đền vẫn là bản đơn giản theo bản đồ. Các render Blender đối chiếu nằm trong `docs/BRIDGE_INTEGRATION_QA.md`; cần duyệt ảnh Preview WebGL ở Low/High 1080p và đo FPS trên máy có GPU trước khi merge.
