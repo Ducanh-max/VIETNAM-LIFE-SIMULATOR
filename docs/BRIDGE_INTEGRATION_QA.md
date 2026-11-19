@@ -1,6 +1,28 @@
 # Cầu Thê Húc · PR #4
 
-**Bản game để đối chiếu: `7bf0d4b`**. Điểm xuất phát là `32c3512`. PR vẫn chờ duyệt. [Lịch sử thử nghiệm và ảnh tham chiếu cầu thật](BRIDGE_INTEGRATION_HISTORY.md).
+## Sửa lan can và chân cổng · bản game `04a6d7a`
+
+Hai ảnh dưới đây lấy từ production build chạy local, cùng camera drone nhìn từ cầu về đền, cùng khung hình gốc 1920 × 1080, DPR 1. Ảnh ghép cắt cùng một vùng trên hai khung hình để nhìn rõ từng thanh gỗ. Bên trái là `7bf0d4b`, bên phải là `04a6d7a`.
+
+![So sánh cổng đền, nền cỏ và lan can](heritage-images/webgl-04a6d7a/before-after.jpg)
+
+- **Cầu.** Trên bản cũ, mép các thanh chéo bị xé thành các mảnh đỏ. Script Blender dựng lại phần gỗ phía trên sàn theo tâm cột của mô hình nguồn, có tay vịn và các thanh chéo nối kín. Một vị trí cột tại 37,55 m được nội suy do thiếu dấu vết trên cả hai bên. Sàn và trụ chịu lực lấy từ cùng mô hình. GLB giảm từ 104.971 xuống 46.460 tam giác, còn 900.296 byte. Sau khi nhập lại GLB, 13.485 tia kiểm tra đều gặp sàn.
+- **Đền.** Lớp cỏ và mặt trên của khối đảo ở cùng cao độ 0,28 m gây sọc. Bản sửa dùng lớp cỏ làm mặt trên và giữ mặt kè xung quanh. Ở bản sao đền dùng trong gameplay, lọc 2.609 tam giác đá/vữa nhô ra phía ngoài chân trụ cổng. Tệp GLB đền và Tháp Rùa giữ cùng nội dung với `7bf0d4b`. Trong ảnh sau, phía hậu điện vẫn còn viền tường vỡ và mảnh sáng gần sát nền. Các mặt này kết nối với tường gốc. Chất lượng hình học của hậu điện vẫn cần chỉnh trong nguồn Blender.
+- **Kiểm tra local.** TypeScript, build production, kiểm tra bản đồ và va chạm đều đạt. Gửi phím đi bộ vào bộ điều khiển thực tế, nhân vật từ bờ đi hết cầu, qua vòm và tới sân ở x/z xấp xỉ (−4, −214). Console JS ghi 0 lỗi. [Tọa độ hành trình](heritage-images/webgl-04a6d7a/walk.json) · [console](heritage-images/webgl-04a6d7a/console-errors.json) · [hiệu năng](BRIDGE_PERFORMANCE.md).
+- **Vercel Preview.** GitHub ghi trạng thái thành công cho deployment của dự án `vietnam-life-simulator` tại commit `04a6d7a`. Kết nối Vercel của phiên QA không mở được URL có bảo vệ. Công cụ điều khiển Chrome dừng khi không xác định được URL đủ tin cậy để mở tab Preview. Ảnh chụp và kiểm tra đi bộ ở đây sử dụng bản local. [Deployment](https://vercel.com/ducanhda3011-9281/vietnam-life-simulator/8gp5WDNnmwV5XTuuqLrn1ZyE7jgL).
+
+Cuối nhịp cầu còn một đoạn cỏ ngắn trước vòm. Sân gạch bắt đầu phía sau cổng. Mép ngoài chân trụ còn một mẩu sáng nhỏ và camera góc ba che một phần nhân vật khi vừa qua vòm. Ảnh Tháp Rùa cho thấy sọc sáng cũ ở nửa trái nền cỏ đảo riêng của tháp. Đợt sửa này chỉ xử lý mặt đảo Ngọc Sơn.
+
+| Góc máy | Ảnh WebGL đầy đủ · local · `04a6d7a` |
+| --- | --- |
+| Tháp Rùa và nền cỏ | [Mở ảnh](heritage-images/webgl-04a6d7a/tower.jpg) |
+| Đền Ngọc Sơn từ cầu | [Mở ảnh](heritage-images/webgl-04a6d7a/temple.jpg) |
+| Cầu Thê Húc từ bờ | [Mở ảnh](heritage-images/webgl-04a6d7a/shore.jpg) |
+| Drone trên hồ | [Mở ảnh](heritage-images/webgl-04a6d7a/lake.jpg) |
+
+## Đợt kiểm tra trước · `7bf0d4b`
+
+Điểm xuất phát là `32c3512`. [Lịch sử thử nghiệm và ảnh tham chiếu cầu thật](BRIDGE_INTEGRATION_HISTORY.md).
 
 ## Những gì thay đổi từ 32c3512
 

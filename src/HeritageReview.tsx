@@ -62,13 +62,17 @@ export default function HeritageReview() {
       <nav aria-label="Chọn mô hình xem thử">
         <button className={asset === 'tower' ? 'active' : ''} onClick={() => chooseAsset('tower')}>Tháp Rùa</button>
         <button className={asset === 'complex' ? 'active' : ''} onClick={() => chooseAsset('complex')}>Đền + cầu</button>
-        <a href="/#play">Trở về game</a>
+        <a href={asset === 'complex' ? '/?assetDebug=1&view=temple#play' : '/#play'}>
+          {asset === 'complex' ? 'Xem đền và cầu trong game' : 'Trở về game'}
+        </a>
       </nav>
     </header>
     <div className="heritage-review-versions" role="group" aria-label="Chọn phiên bản mô hình">
       <button className={version === 'current' ? 'active' : ''} onClick={() => chooseVersion('current')}>Bản trước</button>
-      <button className={version === 'candidate' ? 'active' : ''} onClick={() => chooseVersion('candidate')}>GLB mới từ Blender</button>
-      <span>{version === 'candidate' ? loadedUrl ? `Đã tải: ${loadedUrl}` : 'Đang tải GLB mới…' : asset === 'tower' ? loadedUrl ? `Đã tải: ${loadedUrl}` : 'Đang tải GLB cũ…' : 'Mô hình procedural trước đây'}</span>
+      <button className={version === 'candidate' ? 'active' : ''} onClick={() => chooseVersion('candidate')}>
+        {asset === 'complex' ? 'Cụm Blender gốc' : 'GLB từ Blender'}
+      </button>
+      <span>{asset === 'complex' && version === 'current' ? 'Mô hình procedural trước đây' : loadedUrl ? `Đã tải: ${loadedUrl}` : 'Đang tải GLB…'}</span>
     </div>
     <div className="heritage-review-canvas">
       <Canvas key={`${asset}-${version}`} camera={{ position: asset === 'tower' ? [13, 10, 14] : [48, 29, 68], fov: 50, near: 0.05, far: 300 }}
@@ -80,7 +84,7 @@ export default function HeritageReview() {
     <aside className="heritage-review-note">
       {asset === 'tower'
         ? 'Tháp Rùa: mô hình và màu từ file Blender bạn cung cấp, cao 8,8 m. Kéo chuột để xoay, cuộn để phóng to. Bản trước là GLB cũ.'
-        : 'Đền + cầu trong trang so sánh là cụm GLB nguyên bản từ Blender. Trong game, phần đền được tách và căn vào đảo; cầu vẫn là mô hình procedural vì nhịp cầu nguồn không khớp bản đồ.'}
+        : 'Trang này lưu cụm đền và cầu từ file Blender gốc. Chọn “Xem đền và cầu trong game” để nhìn lan can đã sửa và chân cổng trên đảo từ cùng một góc máy.'}
     </aside>
   </main>;
 }

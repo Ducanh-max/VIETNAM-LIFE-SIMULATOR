@@ -1,5 +1,24 @@
 # Hiệu năng WebGL tại đầu Cầu Thê Húc
 
+## Đo lại phiên bản `04a6d7a`
+
+Năm lần đo trên bản build local của commit này, cùng bộ đo, Intel UHD, D3D11, Chrome Headless, DPR 1 và điểm nhìn như bản `7bf0d4b`. Mỗi lượt bắt đầu sau khi cả ba GLB đã mount và có thêm 5,5 giây khởi động. Trong bảng, hai số FPS và GPU ms thể hiện bản `7bf0d4b` → bản đang xét. Các cột khác thuộc bản đang xét. Draw và tam giác gồm cả shadow pass.
+
+| Cấu hình · buffer | FPS | Thời lượng, s | CPU submit ms | GPU ms | Draw | Tam giác | Texture | Material | Geometry |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| low · 1258 × 709 | 60,00 → 59,60 | 30,02 | 11,87 | 7,99 → 8,63 | 486 | 666.653 | 44 | 2941 | 1069 |
+| medium · 1258 × 709 | 60,00 → 58,96 | 30,00 | 13,72 | 6,49 → 9,41 | 491 | 707.843 | 45 | 2941 | 1283 |
+| high · 1258 × 709 | 60,00 → 58,54 | 30,02 | 14,11 | 7,59 → 8,97 | 491 | 709.554 | 45 | 2941 | 1283 |
+| high/motion · 1258 × 709 | 59,41 → 51,15 | 30,01 | 18,39 | 10,16 → 11,06 | 789 | 3.178.773 | 45 | 2941 | 1294 |
+| high · 1920 × 1080 | 60,00 → 56,43 | 30,00 | 14,67 | 9,57 → 14,60 | 492 | 709.704 | 45 | 2941 | 1284 |
+
+Bản mới ghi nhận 709.554 tam giác/frame khi đứng yên ở High, so với 770.708 ở bản trước (-7.9%). Tính từ accessor GLB, bộ đệm vertex và index giải mã của riêng cầu giảm từ 10,66 MiB xuống 4,43 MiB. Ước tính texture RGBA8 có mip vẫn khoảng 33,33 MiB cho cầu. WebGL không cung cấp số VRAM thực của driver. Thiết bị là máy người dùng đang hoạt động; phiên đo không đóng hoặc giám sát các tab khác. Biến động CPU/GPU vì công việc khác và vsync có thể ảnh hưởng chênh lệch FPS nhỏ.
+
+Để kiểm tra chênh lệch khi camera di chuyển, chạy lại bản cũ `7bf0d4b` ngay sau bản mới, cùng Chrome headless, GPU, DPR 1, quỹ đạo và viewport 1258 × 709. Bản cũ đạt **54,00 FPS** trong 30,001 giây (mức đã ghi ở lần trước là 59,41), CPU submit 17,37 ms, GPU 10,76 ms. Bản mới đạt **51,15 FPS**, CPU submit 18,39 ms, GPU 11,06 ms. Đối chứng trong cùng phiên thu hẹp chênh lệch còn **2,85 FPS**, khoảng 5,3%. Một cặp phép đo chưa đủ để quy nguyên nhân cho thay đổi hình học hoặc cho tab nền.
+
+[Kết quả gốc từng lượt và mẫu đối chứng trong cùng phiên, gồm tọa độ camera, thiết bị và số mẫu GPU](performance/bridge-04a6d7a.json)
+
+
 ## Bản cuối đã căn cao độ sân đền — `7bf0d4b`
 
 Đo lại các cấu hình sau khi cập nhật riêng phép biến đổi mặt sân. Cùng máy, trình duyệt, vị trí xuất phát, ánh sáng, DPR 1, viewport và drawing buffer 1258 × 709 như phép đo bản ứng viên bên dưới. Hai số FPS trong mỗi ô là bản gốc `32c3512` và bản cuối `7bf0d4b`; những cột còn lại là số đo của bản cuối.
