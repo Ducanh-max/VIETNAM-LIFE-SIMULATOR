@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber';
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { bridgeEnds, centerOf, islands, offsetPolygon, shore, templeIsland, turtleIsland, type Point } from './geo';
 
@@ -153,10 +153,16 @@ function LakeWater({ time }: { time: TimeOfDay }) {
     fragmentShader: waterFragment,
     side: THREE.DoubleSide,
   }), []);
-  useFrame((_, delta) => {
-    material.uniforms.uTime.value += delta;
+  useEffect(() => () => {
+    geometry.dispose();
+    material.dispose();
+  }, [geometry, material]);
+  useEffect(() => {
     material.uniforms.uWater.value.set(time === 'night' ? '#102c36' : time === 'sunset' ? '#405d66' : '#205e5b');
     material.uniforms.uSky.value.set(time === 'night' ? '#5d7d8a' : time === 'sunset' ? '#e79a78' : '#9cc7be');
+  }, [material, time]);
+  useFrame((_, delta) => {
+    material.uniforms.uTime.value += delta;
   });
   return <mesh geometry={geometry} material={material} position={[0, 0.06, 0]} />;
 }
@@ -249,6 +255,9 @@ export function Landscape({ time }: { time: TimeOfDay }) {
   const [stoneMap, stoneNormal, stoneRough] = useMemo(() => surfaceMaps('stone'), []);
   const [roadMap, roadNormal, roadRough] = useMemo(() => surfaceMaps('asphalt'), []);
   const [grassMap, grassNormal, grassRough] = useMemo(() => surfaceMaps('grass'), []);
+  useEffect(() => () => {
+    for (const map of [stoneMap, stoneNormal, stoneRough, roadMap, roadNormal, roadRough, grassMap, grassNormal, grassRough]) map.dispose();
+  }, [stoneMap, stoneNormal, stoneRough, roadMap, roadNormal, roadRough, grassMap, grassNormal, grassRough]);
   const sidewalk = useMemo(() => ringGeometry(offsetPolygon(shore, 11), shore), []);
   const road = useMemo(() => ringGeometry(offsetPolygon(shore, 28), offsetPolygon(shore, 11)), []);
   const curb = useMemo(() => ringGeometry(offsetPolygon(shore, 1.2), shore), []);
@@ -269,6 +278,9 @@ export function Landscape({ time }: { time: TimeOfDay }) {
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 22, uv.getY(i) * 7.2);
     return geometry;
   }, []);
+  useEffect(() => () => {
+    for (const geometry of [sidewalk, road, curb, revetment, shoreBody, planting, approachGeometry, ...islandGeometries, ...islandBodies]) geometry.dispose();
+  }, [sidewalk, road, curb, revetment, shoreBody, planting, approachGeometry, islandGeometries, islandBodies]);
   return <>
     <mesh receiveShadow position={[0, -0.3, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[1300, 1300]} /><meshStandardMaterial map={grassMap} normalMap={grassNormal} roughnessMap={grassRough} roughness={1} /></mesh>
     <LakeWater time={time} />

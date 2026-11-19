@@ -10,8 +10,12 @@ import bpy
 import bmesh
 import json
 import math
+import sys
 from pathlib import Path
 from mathutils import Matrix, Vector
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bridge_finish import finish_bridge
 
 root = Path(__file__).resolve().parents[2]
 output = root / 'public' / 'models' / 'cau-the-huc-heritage.glb'
@@ -106,6 +110,7 @@ for obj in selected:
         vertex.co.z += shore_lift * (1.0 - t) + island_lift * t
     obj.data.update()
 
+finish_bridge(selected, target_span)
 bpy.ops.object.select_all(action='DESELECT')
 for obj in selected:
     obj.select_set(True)
@@ -126,7 +131,7 @@ bpy.ops.export_scene.gltf(
 points = [obj.matrix_world @ v.co for obj in selected for v in obj.data.vertices]
 print('GAME_BRIDGE=' + json.dumps({
     'file': str(output), 'bytes': output.stat().st_size,
-    'triangles': sum(len(obj.data.polygons) for obj in selected),
+    'triangles': sum(len(p.vertices) - 2 for obj in selected for p in obj.data.polygons),
     'materials': [obj.data.materials[obj.data.polygons[0].material_index].name for obj in selected],
     'scale': scale,
     'deck_width_m': 2 * new_deck_half_width * scale,

@@ -124,6 +124,47 @@ function BuildingShells() {
   </>;
 }
 
+// Ground-floor windows and their mullions use identical box profiles on every
+// shop. Batch nearby shops together so they retain street-block culling.
+const streetBlocks = Array.from({ length: Math.ceil(buildings.length / 8) },
+  (_, i) => buildings.slice(i * 8, i * 8 + 8));
+
+function ShopWindows({ block, time }: { block: Building[]; time: TimeOfDay }) {
+  const windows = useRef<THREE.InstancedMesh>(null);
+  const mullions = useRef<THREE.InstancedMesh>(null);
+  useLayoutEffect(() => {
+    if (!windows.current || !mullions.current) return;
+    const local = new THREE.Object3D();
+    const world = new THREE.Matrix4();
+    block.forEach(({ x, z, yaw, width, depth }, i) => {
+      world.makeRotationY(yaw).setPosition(x, 0, z);
+      function place(mesh: THREE.InstancedMesh, instance: number, offset: number, w: number, h: number) {
+        local.position.set(0, 1.45, depth / 2 + offset);
+        local.scale.set(w, h, 0.11);
+        local.updateMatrix();
+        mesh.setMatrixAt(instance, local.matrix.premultiply(world));
+      }
+      place(windows.current!, i, 0.07, width - 0.5, 2.7);
+      place(mullions.current!, 2 * i, 0.17, 0.11, 2.7);
+      place(mullions.current!, 2 * i + 1, 0.19, width - 0.6, 0.1);
+    });
+    for (const mesh of [windows.current, mullions.current]) {
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+    }
+  }, [block]);
+  return <>
+    <instancedMesh ref={windows} args={[undefined, undefined, block.length]}>
+      <boxGeometry />
+      <meshStandardMaterial color={time === 'night' ? '#c8a375' : '#476267'} metalness={0.25} roughness={0.27}
+        emissive={time === 'night' ? '#6e4629' : '#000000'} emissiveIntensity={time === 'night' ? 0.5 : 0} />
+    </instancedMesh>
+    <instancedMesh ref={mullions} args={[undefined, undefined, block.length * 2]}>
+      <boxGeometry /><meshStandardMaterial color="#d5c9ae" roughness={0.8} />
+    </instancedMesh>
+  </>;
+}
+
 function ShopHouse({ building, time }: { building: Building; time: TimeOfDay }) {
   const { x, z, yaw, width, depth, floors, detailed, index } = building;
   const height = floors * 3.35 + 1;
@@ -144,9 +185,6 @@ function ShopHouse({ building, time }: { building: Building; time: TimeOfDay }) 
       <mesh position={[0, height + 0.63, depth / 2 - 0.25]} castShadow><boxGeometry args={[width + 0.4, 0.84, 0.35]} /><meshStandardMaterial color={wallColor} roughness={0.9} /></mesh>
       <mesh position={[0, height + 0.63, -depth / 2 + 0.25]} castShadow><boxGeometry args={[width + 0.4, 0.84, 0.35]} /><meshStandardMaterial color={wallColor} roughness={0.9} /></mesh>
     </> : <mesh position={[variant % 2 ? -width * 0.18 : width * 0.16, height + 0.71, -depth * 0.12]} castShadow><boxGeometry args={[width * 0.42, 1.15, depth * 0.38]} /><meshStandardMaterial color={wallColor} roughness={0.9} /></mesh>}
-    <mesh position={[0, 1.45, depth / 2 + 0.07]}><boxGeometry args={[width - 0.5, 2.7, 0.11]} /><meshStandardMaterial color={glass} metalness={0.25} roughness={0.27} emissive={time === 'night' ? '#6e4629' : '#000000'} emissiveIntensity={time === 'night' ? 0.5 : 0} /></mesh>
-    <mesh position={[0, 1.45, depth / 2 + 0.17]}><boxGeometry args={[0.11, 2.7, 0.11]} /><meshStandardMaterial color="#d5c9ae" roughness={0.8} /></mesh>
-    <mesh position={[0, 1.45, depth / 2 + 0.19]}><boxGeometry args={[width - 0.6, 0.1, 0.1]} /><meshStandardMaterial color="#d5c9ae" roughness={0.8} /></mesh>
     <mesh position={[0, 3.3, depth / 2 + 0.17]}><planeGeometry args={[width - 0.25, 1.12]} /><meshBasicMaterial map={signMap} side={THREE.DoubleSide} /></mesh>
     <mesh position={[0, 3.87, depth / 2 + 0.26]} castShadow><boxGeometry args={[width + 0.45, 0.12, 0.55]} /><meshStandardMaterial color="#6f5142" roughness={0.84} /></mesh>
     <mesh position={[0, 2.18, depth / 2 + 1.18]} rotation={[0.16, 0, 0]} castShadow><boxGeometry args={[width + 0.45, 0.09, 2.1]} /><meshStandardMaterial color={sign[1]} roughness={0.78} /></mesh>
@@ -211,6 +249,7 @@ export function Urban({ time }: { time: TimeOfDay }) {
   const shoreStart = bridgeEnds[0];
   return <>
     <BuildingShells />
+    {streetBlocks.map((block) => <ShopWindows key={block[0].index} block={block} time={time} />)}
     {buildings.map((building) => <ShopHouse key={building.index} building={building} time={time} />)}
     {Array.from({ length: 12 }, (_, i) => {
       const z = shoreStart[1] + (i - 5) * 13;

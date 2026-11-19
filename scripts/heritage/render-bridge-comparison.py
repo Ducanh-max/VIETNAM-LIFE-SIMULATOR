@@ -35,8 +35,16 @@ def import_asset(path, name, location, angle):
     parent.rotation_euler.z = angle
 
 heading = math.atan2((landing - centre).y, (landing - centre).x)
+span_axis = (landing - shore).normalized()
+gate_front = landing + span_axis * 1.55
+# The Blender gate front is local (12.93, -7.60). Apply the same placement
+# as world/geo.ts (Blender Y corresponds to negative game Z).
+local_x, local_y = 12.93, -7.60
+placed = gate_front - Vector((
+    math.cos(heading) * local_x - math.sin(heading) * local_y,
+    math.sin(heading) * local_x + math.cos(heading) * local_y, 0))
 import_asset(root / 'public/models/den-ngoc-son-heritage.glb', 'Temple',
-             centre + Vector((4, 12, -1.55)), heading)
+             placed + Vector((0, 0, -1.55)), heading)
 bridge_heading = math.atan2((landing - shore).y, (landing - shore).x) - math.pi
 import_asset(root / 'public/models/cau-the-huc-heritage.glb', 'Bridge',
              shore + Vector((0, 0, 0.35)), bridge_heading)

@@ -7,12 +7,17 @@ Use Blender 5.3 and the original `HoGuom_NgocSon_Heritage_v2_DaTo.blend` as inpu
 & 'C:\Program Files\Blender Foundation\Blender 5.3\blender.exe' --background --disable-autoexec 'PATH\TO\HoGuom_NgocSon_Heritage_v2_DaTo.blend' --python scripts\heritage\optimize.py
 ```
 
-Then export the temple architecture alone for the game:
+From the repository root, run the export for the landmark you are changing. For bridge work with an existing working blend, start at the bridge export command.
 
 ```powershell
 & 'C:\Program Files\Blender Foundation\Blender 5.3\blender.exe' --background --disable-autoexec heritage-work\heritage-optimized-working.blend --python scripts\heritage\export-game-temple.py
 & 'C:\Program Files\Blender Foundation\Blender 5.3\blender.exe' --background --disable-autoexec heritage-work\heritage-optimized-working.blend --python scripts\heritage\export-game-bridge.py
+& 'C:\Program Files\Blender Foundation\Blender 5.3\blender.exe' --background --disable-autoexec --python-exit-code 1 --python scripts\heritage\check-bridge-surface.py
 & 'C:\Program Files\Blender Foundation\Blender 5.3\blender.exe' --background --disable-autoexec --python scripts\heritage\render-bridge-comparison.py
 ```
 
-`analyze.py` writes `heritage-work/heritage-inventory.json`. `optimize.py` writes `heritage-work/heritage-optimized-working.blend`, `heritage-work/summary.json`, `public/models/thap-rua-heritage.glb` and `public/models/review/ngoc-son-the-huc-review.glb`. `export-game-temple.py` writes `public/models/den-ngoc-son-heritage.glb`, excluding the source bridge and rotating/scaling the source architecture for the island. `export-game-bridge.py` writes `public/models/cau-the-huc-heritage.glb`: it selects the red structure, planks and bridge-only wood faces, edits the source Blender mesh cross section in separate deck and railing bands, discards two unrelated timber fragments at the landings, and keeps the bridge arch and length. `heritage-work/` is Git-ignored. Rebuilding uses no external asset source. The original file and its companion 891 MB GLB are not committed.
+`analyze.py` writes `heritage-work/heritage-inventory.json`. `optimize.py` writes `heritage-work/heritage-optimized-working.blend`, `heritage-work/summary.json`, `public/models/thap-rua-heritage.glb` and `public/models/review/ngoc-son-the-huc-review.glb`. `export-game-temple.py` writes `public/models/den-ngoc-son-heritage.glb` and aligns the architecture with the island.
+
+`export-game-bridge.py` selects the source red lattice, planks and timber supports and strips unrelated landing fragments. Its helper `bridge_finish.py` fits the original deck and rail elevations, closes the irregular ends with short thresholds, finishes the side boards and embeds grain and seam textures. The output is `public/models/cau-the-huc-heritage.glb`. The original and working Blender files stay on disk outside the repository history.
+
+`check-bridge-surface.py` reimports the exported GLB and casts 13,485 vertical rays through the deck, including both landings. It checks coverage and compares surface heights in the walkable strip with the 2.4 m collision arch. The final export measured a maximum difference of 0.0513 m. This check complements the in-game walk over the bridge. See [bridge QA](../../docs/BRIDGE_INTEGRATION_QA.md) for gameplay results.

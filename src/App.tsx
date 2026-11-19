@@ -6,7 +6,9 @@ import { Explorer, type ExplorerMode } from './world/Explorer';
 import { Landmarks } from './world/Historic';
 import { Landscape, type TimeOfDay } from './world/Landscape';
 import { Urban } from './world/Urban';
+import { ShadowUpdates } from './world/ShadowUpdates';
 import { mapAttribution, type Point } from './world/geo';
+import { reviewPose } from './world/reviewViews';
 
 type Quality = 'low' | 'medium' | 'high' | 'ultra';
 type Panel = 'settings' | 'about' | 'help' | null;
@@ -26,6 +28,7 @@ function World({ mode, paused, time, quality, freeCamera, onFps, onPosition, onB
   onFps: (fps: number) => void; onPosition: (point: Point) => void;
   onBridgeAssetStatus: (status: 'glb' | 'fallback', detail?: string) => void;
 }) {
+  const [heritageTempleLoaded, setHeritageTempleLoaded] = useState(false);
   const sun = time === 'day' ? [120, 150, -45] : time === 'sunset' ? [-145, 48, 90] : [45, 75, -80];
   const light = time === 'day' ? '#fff3d5' : time === 'sunset' ? '#ffc08e' : '#a8bbd2';
   const ambient = time === 'day' ? 0.95 : time === 'sunset' ? 0.76 : 0.58;
@@ -43,9 +46,10 @@ function World({ mode, paused, time, quality, freeCamera, onFps, onPosition, onB
       shadow-mapSize={[shadows, shadows]} shadow-camera-left={-190} shadow-camera-right={190} shadow-camera-top={190} shadow-camera-bottom={-190}
       shadow-camera-near={1} shadow-camera-far={520} shadow-bias={-0.0003} shadow-normalBias={0.025} />
     <Landscape time={time} />
-    <Landmarks time={time} onBridgeAssetStatus={onBridgeAssetStatus} />
+    <ShadowUpdates lighting={time} />
+    <Landmarks time={time} onBridgeAssetStatus={onBridgeAssetStatus} onTempleLoaded={setHeritageTempleLoaded} />
     <Urban time={time} />
-    <Explorer mode={mode} paused={paused} freeCamera={freeCamera} onFps={onFps} onPosition={onPosition} />
+    <Explorer mode={mode} paused={paused} freeCamera={freeCamera} onFps={onFps} onPosition={onPosition} heritageTempleLoaded={heritageTempleLoaded} />
   </>;
 }
 
@@ -67,7 +71,7 @@ function App() {
   const [panel, setPanel] = useState<Panel>(null);
   const [time, setTime] = useState<TimeOfDay>('day');
   const [quality, setQuality] = useState<Quality>('high');
-  const [freeCamera, setFreeCamera] = useState(false);
+  const [freeCamera, setFreeCamera] = useState(Boolean(reviewPose));
   const [paused, setPaused] = useState(false);
   const [fps, setFps] = useState(0);
   const [position, setPosition] = useState<Point>([0, 0]);

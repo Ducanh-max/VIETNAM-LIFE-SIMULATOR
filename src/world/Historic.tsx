@@ -1,6 +1,6 @@
 import { Component, Suspense, lazy, useCallback, useMemo, type ReactNode } from 'react';
 import * as THREE from 'three';
-import { bridgeEnds, templeCenter, turtleCenter, type Point } from './geo';
+import { bridgeEnds, templeCenter, templePlacement, templeYaw, turtleCenter, type Point } from './geo';
 import type { TimeOfDay } from './Landscape';
 import { landmarkAssets } from './landmarkAssets';
 
@@ -376,21 +376,20 @@ function LandmarkSlot({ url, position, rotationY, fallback, onLoaded, onFailure 
   return url ? <LandmarkLoadBoundary fallback={fallback} onFailure={onFailure}><Suspense fallback={null}><LandmarkModel url={url} position={position} rotationY={rotationY} onLoaded={onLoaded} /></Suspense></LandmarkLoadBoundary> : fallback;
 }
 
-export function Landmarks({ time, onBridgeAssetStatus }: { time: TimeOfDay; onBridgeAssetStatus?: (status: 'glb' | 'fallback', detail?: string) => void }) {
+export function Landmarks({ time, onBridgeAssetStatus, onTempleLoaded }: { time: TimeOfDay; onBridgeAssetStatus?: (status: 'glb' | 'fallback', detail?: string) => void; onTempleLoaded: (loaded: boolean) => void }) {
+  const reportTempleLoaded = useCallback(() => onTempleLoaded(true), [onTempleLoaded]);
+  const reportTempleFailure = useCallback(() => onTempleLoaded(false), [onTempleLoaded]);
   const reportBridgeLoaded = useCallback(() => onBridgeAssetStatus?.('glb'), [onBridgeAssetStatus]);
   const reportBridgeFailure = useCallback((error: Error) => onBridgeAssetStatus?.('fallback', error.message), [onBridgeAssetStatus]);
   const [bridgeStart, bridgeEnd] = bridgeEnds;
-  const templeLanding = Math.hypot(bridgeStart[0] - templeCenter[0], bridgeStart[1] - templeCenter[1])
-    < Math.hypot(bridgeEnd[0] - templeCenter[0], bridgeEnd[1] - templeCenter[1]) ? bridgeStart : bridgeEnd;
-  const templeHeading = Math.atan2(templeCenter[1] - templeLanding[1], templeLanding[0] - templeCenter[0]);
   return <>
     <LandmarkSlot url={landmarkAssets.turtleTower}
       position={[turtleCenter[0], 0.28, turtleCenter[1]]} fallback={<TurtleTower time={time} />} />
     <LandmarkSlot url={landmarkAssets.theHucBridge} position={[bridgeStart[0], 0.35, bridgeStart[1]]}
       rotationY={Math.atan2(bridgeEnd[1] - bridgeStart[1], bridgeStart[0] - bridgeEnd[0])} fallback={<TheHucBridge />}
       onLoaded={reportBridgeLoaded} onFailure={reportBridgeFailure} />
-    <LandmarkSlot url={landmarkAssets.ngocSonTemple} position={[templeCenter[0] + 4, -1.55, templeCenter[1] - 12]}
-      rotationY={templeHeading} fallback={<NgocSonTemple time={time} />} />
+    <LandmarkSlot url={landmarkAssets.ngocSonTemple} position={templePlacement}
+      rotationY={templeYaw} fallback={<NgocSonTemple time={time} />} onLoaded={reportTempleLoaded} onFailure={reportTempleFailure} />
   </>;
 }
 

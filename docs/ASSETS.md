@@ -8,8 +8,12 @@
 | --- | --- | --- |
 | `thap-rua-heritage.glb` | tâm đảo Tháp Rùa, tại mặt đất | giữ hướng trong file Blender do chủ dự án cung cấp; cao 8,8 m sau khi căn tỉ lệ |
 | `cau-the-huc-heritage.glb` | đầu cầu bờ đông, mặt đi bộ cao khoảng 0,35 m | chiều dài dọc -X; xoay -0,099 rad theo trục cầu OSM; mặt ván dài khoảng 46,26 m |
-| `den-ngoc-son-heritage.glb` | gần tâm đảo Ngọc Sơn | +X từ chính điện qua cổng; trong game xoay khoảng +0,635 rad, dịch +4 m X, -12 m Z và hạ Y xuống -1,55 m để sân gạch chạm mặt đảo; chỉ chứa kiến trúc đền, không chứa cầu |
+| `den-ngoc-son-heritage.glb` | gần tâm đảo Ngọc Sơn | +X từ chính điện qua cổng; trong game xoay khoảng +0,635 rad, đặt theo templePlacement ở khoảng (-13,863; -1,55; -216,635) để tâm cửa nằm trên trục đường đi, cách đầu cầu phía đảo 1,55 m; chỉ chứa kiến trúc đền, không chứa cầu |
 
 Giữ va chạm riêng trong `geo.ts`; GLB chỉ thay phần hiển thị. GLB đền có sáu mesh theo vật liệu và không chứa cầu; sân gạch là thành phần kiến trúc, còn đảo cỏ trong `Landscape.tsx` chỉ là địa hình nền. Không có component đền procedural nào render đồng thời với GLB sau khi tải thành công. Trong khi tải, `Suspense` không vẽ fallback; fallback chỉ hiện nếu GLB lỗi.
 
-Đền được xuất bằng `scripts/heritage/export-game-temple.py` và cầu bằng `scripts/heritage/export-game-bridge.py` từ `heritage-work/heritage-optimized-working.blend`. Script cầu chỉnh riêng mặt ván và dải lan can/trụ trong mesh Blender: mặt ván khoảng **3,0 m**, tổng bề rộng khoảng **4,24 m** trong game; chiều dài và độ cong giữ nguyên. Sau khi áp dụng tỉ lệ đồng nhất 0,399896 để nối hai đầu OSM, mesh được nâng cao theo chiều dọc nhịp (3,27 m ở bờ, 2,93 m ở đảo) vì mặt ván từ file nguồn bị chìm dưới nước khi hiển thị trong WebGL. Không chỉnh GLB Tháp Rùa. Đường đi trên cầu được giới hạn còn 1,25 m mỗi bên tâm; va chạm đền vẫn là bản đơn giản theo bản đồ. Các render Blender đối chiếu và kết quả kiểm tra WebGL local nằm trong `docs/BRIDGE_INTEGRATION_QA.md`; cần duyệt ảnh Preview WebGL ở Low/High 1080p và đo FPS trên máy có GPU trước khi merge.
+Hai script `export-game-temple.py` và `export-game-bridge.py` trong `scripts/heritage/` xuất từng công trình từ `heritage-work/heritage-optimized-working.blend`. Nhịp cầu theo hai mốc OSM dài 46,256 m. Hai ngưỡng gỗ chìa thêm 6 cm để tiếp giáp đường đi. Mặt ván rộng 3,00 m. Tính cả kết cấu bên dưới, bề rộng lớn nhất xấp xỉ 4,24 m. Lối đi cho nhân vật rộng 2,50 m.
+
+Sau khi căn nhịp cầu, `bridge_finish.py` lấy mẫu mặt ván thật từ mesh nguồn và căn cao độ theo đường đi cong trong game. Giữa nhịp, tay vịn cao khoảng 1,0–1,05 m so với sàn. Các ngưỡng gỗ và hai dải ván rộng 22 cm khép mép sàn. Hai texture tạo vân và độ nổi của mối ghép ván ngang. File GLB xuất ra có 104.971 tam giác, ba vật liệu PBR và dung lượng 2.022.224 byte.
+
+Xem [hướng dẫn xuất và kiểm tra lại GLB](../scripts/heritage/README.md) và [kết quả kiểm tra gameplay](BRIDGE_INTEGRATION_QA.md).
