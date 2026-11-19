@@ -84,7 +84,8 @@ bpy.ops.export_scene.gltf(
 coordinates = [obj.matrix_world @ vert.co for obj in selected for vert in obj.data.vertices]
 report = {
     'file': str(output), 'bytes': output.stat().st_size,
-    'triangles': sum(len(obj.data.polygons) for obj in selected),
+    'triangles': sum(sum(len(face.vertices) - 2 for face in obj.data.polygons)
+                     for obj in selected),
     'bounds_blender': [[min(v[i] for v in coordinates), max(v[i] for v in coordinates)] for i in range(3)],
     'materials': [obj.data.materials[obj.data.polygons[0].material_index].name for obj in selected],
     'repairs': repairs,

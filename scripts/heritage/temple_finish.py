@@ -39,6 +39,36 @@ def repair_side_wall(mesh):
             'component_bounds': [low, high], 'cut_edges': len(cut_edges)}
 
 
+def remove_ground_chips(mesh):
+    seen = set()
+    chips = []
+    for seed in mesh.faces:
+        if seed in seen:
+            continue
+        component = {seed}
+        seen.add(seed)
+        stack = [seed]
+        while stack:
+            face = stack.pop()
+            for vert in face.verts:
+                for neighbor in vert.link_faces:
+                    if neighbor not in seen:
+                        seen.add(neighbor)
+                        component.add(neighbor)
+                        stack.append(neighbor)
+        vertices = {v for face in component for v in face.verts}
+        low = [min(v.co[i] for v in vertices) for i in range(3)]
+        high = [max(v.co[i] for v in vertices) for i in range(3)]
+        # Detached, shallow plaster sheets beside the hall floor. The gate,
+        # upright walls, stone steps and every roof material are excluded.
+        if (high[0] < 8 and high[2] < 2.5 and high[2] - low[2] < .35
+                and sum(face.calc_area() for face in component) < 1):
+            chips.extend(component)
+    count = len(chips)
+    bmesh.ops.delete(mesh, geom=chips, context='FACES')
+    return count
+
+
 def finish_temple(objects):
     changes = []
     for obj in objects:
@@ -79,6 +109,7 @@ def finish_temple(objects):
         wall_repair = None
         if material == 'Di sản v2 | Vữa vôi của cổng và tường':
             wall_repair = repair_side_wall(mesh)
+            wall_repair['ground_chip_faces'] = remove_ground_chips(mesh)
         if material in ('Di sản v2 | Gờ bậc và đá chạm',
                         'Di sản v2 | Vữa vôi của cổng và tường'):
             # Disconnected scan fragments occupy the same rejected volume as
