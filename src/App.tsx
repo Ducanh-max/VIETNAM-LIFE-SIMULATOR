@@ -1,6 +1,6 @@
 import { Canvas } from '@react-three/fiber';
 import { Sky, Stars } from '@react-three/drei';
-import { memo, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { Explorer, type ExplorerMode } from './world/Explorer';
 import { Landmarks } from './world/Historic';
@@ -12,6 +12,8 @@ type Quality = 'low' | 'medium' | 'high' | 'ultra';
 type Panel = 'settings' | 'about' | 'help' | null;
 const buildSha = import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA || import.meta.env.VITE_BUILD_COMMIT;
 const buildLabel = buildSha ? buildSha.slice(0, 7) : 'chưa có SHA';
+const showAssetDebug = new URLSearchParams(window.location.search).get('assetDebug') === '1';
+type BridgeAssetStatus = { state: 'loading' | 'glb' | 'fallback'; detail?: string };
 const qualityConfig: Record<Quality, { dpr: number; shadow: number; antialias: boolean }> = {
   low: { dpr: 1, shadow: 0, antialias: false },
   medium: { dpr: 1.2, shadow: 1024, antialias: true },
@@ -19,9 +21,10 @@ const qualityConfig: Record<Quality, { dpr: number; shadow: number; antialias: b
   ultra: { dpr: 2, shadow: 4096, antialias: true },
 };
 
-function World({ mode, paused, time, quality, freeCamera, onFps, onPosition }: {
+function World({ mode, paused, time, quality, freeCamera, onFps, onPosition, onBridgeAssetStatus }: {
   mode: ExplorerMode; paused: boolean; time: TimeOfDay; quality: Quality; freeCamera: boolean;
   onFps: (fps: number) => void; onPosition: (point: Point) => void;
+  onBridgeAssetStatus: (status: 'glb' | 'fallback', detail?: string) => void;
 }) {
   const sun = time === 'day' ? [120, 150, -45] : time === 'sunset' ? [-145, 48, 90] : [45, 75, -80];
   const light = time === 'day' ? '#fff3d5' : time === 'sunset' ? '#ffc08e' : '#a8bbd2';
@@ -40,7 +43,7 @@ function World({ mode, paused, time, quality, freeCamera, onFps, onPosition }: {
       shadow-mapSize={[shadows, shadows]} shadow-camera-left={-190} shadow-camera-right={190} shadow-camera-top={190} shadow-camera-bottom={-190}
       shadow-camera-near={1} shadow-camera-far={520} shadow-bias={-0.0003} shadow-normalBias={0.025} />
     <Landscape time={time} />
-    <Landmarks time={time} />
+    <Landmarks time={time} onBridgeAssetStatus={onBridgeAssetStatus} />
     <Urban time={time} />
     <Explorer mode={mode} paused={paused} freeCamera={freeCamera} onFps={onFps} onPosition={onPosition} />
   </>;
@@ -68,6 +71,10 @@ function App() {
   const [paused, setPaused] = useState(false);
   const [fps, setFps] = useState(0);
   const [position, setPosition] = useState<Point>([0, 0]);
+  const [bridgeAssetStatus, setBridgeAssetStatus] = useState<BridgeAssetStatus>({ state: 'loading' });
+  const onBridgeAssetStatus = useCallback((state: 'glb' | 'fallback', detail?: string) => {
+    setBridgeAssetStatus((current) => current.state === state && current.detail === detail ? current : { state, detail });
+  }, []);
   const config = qualityConfig[quality];
   const controlsPaused = paused || panel !== null;
 
@@ -124,7 +131,7 @@ function App() {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = 1.08;
         }}>
-        <MemoWorld mode={mode} paused={controlsPaused} time={time} quality={quality} freeCamera={freeCamera} onFps={setFps} onPosition={setPosition} />
+        <MemoWorld mode={mode} paused={controlsPaused} time={time} quality={quality} freeCamera={freeCamera} onFps={setFps} onPosition={setPosition} onBridgeAssetStatus={onBridgeAssetStatus} />
       </Canvas>
     </div>
 
@@ -149,6 +156,10 @@ function App() {
         <div className="game-actions"><a className="game-review-link" href="/#heritage-review">So sánh mô hình ↗</a><button title="Trợ giúp" aria-label="Trợ giúp" onClick={() => openPanel('help')}>?</button><button title="Cài đặt" aria-label="Cài đặt" onClick={() => openPanel('settings')}><Icon name="settings" /></button><button title={paused ? 'Tiếp tục' : 'Tạm dừng'} aria-label={paused ? 'Tiếp tục' : 'Tạm dừng'} onClick={() => { if (document.pointerLockElement) document.exitPointerLock(); setPaused(!paused); }}><Icon name={paused ? 'play' : 'pause'} /></button></div>
       </header>
       <div className="area-tag"><Icon name="compass" /><span>{freeCamera ? 'CHẾ ĐỘ DRONE' : 'ĐANG KHÁM PHÁ'}<strong>Hồ Hoàn Kiếm, Hà Nội</strong><small>Commit {buildLabel}</small></span></div>
+      {showAssetDebug && <div className={`asset-debug asset-debug-${bridgeAssetStatus.state}`} role="status">
+        Cầu Thê Húc: {bridgeAssetStatus.state === 'glb' ? 'GLB đã tải' : bridgeAssetStatus.state === 'fallback' ? 'Đang dùng cầu cũ (fallback)' : 'Đang tải GLB'}
+        {bridgeAssetStatus.detail && <small>{bridgeAssetStatus.detail}</small>}
+      </div>}
       {freeCamera && <div className="drone-reticle" aria-hidden="true">+</div>}
       <div className="game-bottom"><span>W A S D <b>{freeCamera ? 'Bay ngang' : 'Di chuyển'}</b></span><span>← ↑ ↓ → <b>Xoay góc nhìn</b></span><span>{freeCamera ? 'SPACE / CTRL' : 'SHIFT'} <b>{freeCamera ? 'Lên / xuống' : 'Chạy'}</b></span><span>V <b>{freeCamera ? 'Về nhân vật' : 'Bật drone'}</b></span><span className="fps-pill">{position[0].toFixed(0)} : {position[1].toFixed(0)} · {fps || '—'} FPS</span></div>
       {!panel && !paused && <button className="capture-tip" onClick={lockPointer}>Nhấp vào cảnh để điều khiển camera</button>}

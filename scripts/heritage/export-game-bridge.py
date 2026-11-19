@@ -92,8 +92,18 @@ target_span = 46.256
 scale = target_span / source_span
 transform = (Matrix.Scale(scale, 4) @ Matrix.Rotation(math.pi / 2, 4, 'Z')
              @ Matrix.Translation(-source_origin))
+# The source bridge sits several metres below the lake datum. Blender's
+# comparison render has no water, so its planks appeared intact there while
+# they were submerged in WebGL. Align the complete bridge to the gameplay
+# deck curve without changing its span or arch. The end correction follows
+# the measured plank height at each landing (see bridge QA notes).
+shore_lift = 3.27
+island_lift = 2.93
 for obj in selected:
     obj.data.transform(transform)
+    for vertex in obj.data.vertices:
+        t = min(1.0, max(0.0, -vertex.co.x / target_span))
+        vertex.co.z += shore_lift * (1.0 - t) + island_lift * t
     obj.data.update()
 
 bpy.ops.object.select_all(action='DESELECT')
@@ -121,5 +131,7 @@ print('GAME_BRIDGE=' + json.dumps({
     'scale': scale,
     'deck_width_m': 2 * new_deck_half_width * scale,
     'outer_band_factor': outer_band_factor,
+    'shore_lift_m': shore_lift,
+    'island_lift_m': island_lift,
     'bounds_blender': [[min(p[i] for p in points), max(p[i] for p in points)] for i in range(3)],
 }, ensure_ascii=False))

@@ -1,6 +1,6 @@
 # Cầu Thê Húc / Đền Ngọc Sơn — kiểm tra nhánh Preview
 
-**Trạng thái:** Đang chờ kiểm duyệt hình ảnh, chưa được merge vào `main`. Cầu lấy từ Blender do chủ dự án cung cấp và chỉnh mesh trên nhánh PR #4. Render dưới đây là Blender, **không phải ảnh gameplay WebGL**. Preview Vercel yêu cầu đăng nhập trong trình duyệt kiểm thử, nên không có bằng chứng WebGL/FPS.
+**Trạng thái:** Đang chờ kiểm duyệt hình ảnh, chưa được merge vào `main`. Cầu lấy từ Blender do chủ dự án cung cấp và chỉnh mesh trên nhánh PR #4. Render dưới đây là Blender, **không phải ảnh gameplay WebGL**. Preview Vercel yêu cầu đăng nhập trong trình duyệt của tác nhân; kiểm tra WebGL dưới đây được thực hiện với production build local và chưa xác nhận trên URL Preview đã triển khai.
 
 ## Kiểm tra chồng mô hình
 
@@ -21,7 +21,15 @@ Script `scripts/heritage/export-game-bridge.py` lấy ba nhóm từ `heritage-op
 | Bề rộng gồm lan can | khoảng 11,6 m | **4,24 m** | Cổng đền nay rộng hơn đầu cầu trong render từ trên |
 | Gờ cong mặt ván | khoảng 2,4 m | khoảng **2,4 m** | Giữ profile dọc, collision dùng đường cong sin |
 
-GLB cầu có gốc tại đầu bờ đông, trục local `-X` chỉ về đảo. `Landmarks` đặt tại `bridgeStart`, Y=0,35 m, xoay khoảng **-0,099 rad** theo đường OSM. Đền vẫn đặt tại `[templeCenter.x + 4, -1.55, templeCenter.z - 12]`, xoay khoảng **+0,635 rad**. Ảnh từ trên cho thấy cầu mới chạm lối vào thay vì phủ rộng cả cổng. Đây là chỉnh hình học trong mesh Blender, không phải scale object không đồng nhất lúc render. Tuy vậy, khoảng tiếp giáp và cao độ chân người chơi phải được xác nhận trong WebGL trước khi merge.
+GLB cầu có gốc tại đầu bờ đông, trục local `-X` chỉ về đảo. `Landmarks` đặt tại `bridgeStart`, Y=0,35 m, xoay khoảng **-0,099 rad** theo đường OSM. Đền vẫn đặt tại `[templeCenter.x + 4, -1.55, templeCenter.z - 12]`, xoay khoảng **+0,635 rad**. Ảnh từ trên cho thấy cầu mới chạm lối vào thay vì phủ rộng cả cổng. Đây là chỉnh hình học trong mesh Blender, không phải scale object không đồng nhất lúc render.
+
+## Sửa lỗi cầu chìm dưới nước trong WebGL
+
+Kiểm tra bản build local ngày 2026-11-19 với `?assetDebug=1#play` xác nhận **GLB đã tải**, nhưng từ bờ hồ chỉ thấy hai dải lan can đỏ, không thấy mặt ván. Vì Blender render không có mặt nước, ảnh so sánh cũ đã không bộc lộ lỗi cao độ. Phân tích GLB sau khi import lại: mặt ván ở đầu bờ có cao độ trung vị local khoảng **-3,27 m**, đầu đảo **-2,93 m**, trong khi transform đặt cầu ở Y=0,35 m. Phần lớn mặt ván bị nước hồ che. Đây là nguyên nhân cụ thể khiến Preview `d2bb862` trông như cầu cũ từ góc nhìn gameplay, dù file GLB thực ra đã tải.
+
+Trong `export-game-bridge.py`, các đỉnh của cả ba nhóm mesh được nâng theo trục đứng **3,27 m ở bờ** và **2,93 m ở đảo**, nội suy dọc nhịp. Phép dịch giữ nguyên bề rộng 3,00 m, chiều dài 46,26 m và độ cong; mặt đi bộ nay ở gần cao độ collision (hai đầu khoảng 0,35 m trong game, giữa cầu khoảng 2,75 m). GLB mới có **107.731 tam giác, 3 vật liệu, 2.050.600 byte**. Các trụ dưới mặt ván vẫn kéo xuống nước; cần duyệt hình thức lan can và chân trụ trên Preview.
+
+Khi tải lại production build local bằng WebGL, HUD báo `Cầu Thê Húc: GLB đã tải`; từ bờ thấy toàn bộ sàn đỏ, không còn chỉ hai dải lan can. Bấm `W` khoảng 3 giây đưa nhân vật từ tọa độ HUD `(54, -213)` tới `(38, -215)`, đi vào đầu cầu mà không rơi xuống nước. Console không ghi lỗi mức `error` trong lần kiểm tra này. HUD báo khoảng **43–60 FPS tức thời** ở cửa sổ **902 × 603 px**, không phải phép đo 1080p trên máy tầm trung. Các kết quả này chứng minh lỗi hiển thị local đã được sửa; cần xác nhận lại bằng Preview cùng mã commit và hình chụp ở góc bờ hồ, drone trước khi merge.
 
 ## Đối chiếu bằng ảnh
 
@@ -46,4 +54,4 @@ GLB cầu có gốc tại đầu bờ đông, trục local `-X` chỉ về đả
 
 ## Kiểm tra gameplay còn cần làm
 
-Va chạm cầu trên nhánh Preview cho đi trong phạm vi **1,25 m** hai bên tâm của mặt ván rộng 3,00 m, và đưa chân nhân vật từ 0,35 m ở hai đầu lên khoảng 2,75 m giữa cầu. Phải đi thử toàn bộ nhịp trong WebGL Preview, xem console và đo FPS 1920×1080 trên GPU thật trước khi merge. GLB đền, cầu và nền cỏ Tháp Rùa cần chụp từ camera bờ hồ và drone. Build thành công không thay thế các bước này.
+Va chạm cầu trên nhánh Preview cho đi trong phạm vi **1,25 m** hai bên tâm của mặt ván rộng 3,00 m, và đưa chân nhân vật từ 0,35 m ở hai đầu lên khoảng 2,75 m giữa cầu. Lần thử local mới đi vào đầu cầu, chưa đi hết nhịp. Phải đi thử toàn bộ nhịp trong WebGL Preview, xem console và đo FPS 1920×1080 trên GPU thật trước khi merge. GLB đền, cầu và nền cỏ Tháp Rùa cần chụp từ camera bờ hồ và drone. Build thành công không thay thế các bước này.
