@@ -47,10 +47,26 @@ def finish_temple(objects):
         mesh = bmesh.new()
         mesh.from_mesh(obj.data)
         if material == 'Di sản v2 | Gạch đỏ đất và mạch':
-            # Previously applied to the gameplay clone. Bake it once so review,
-            # collision checks and gameplay all see the same paving height.
+            # Match the existing 0.35 m walking surface after temple placement.
+            # Retain the source brick material and UVs, regularize its torn
+            # perimeter, then extend the paving through the existing arch.
             for vert in mesh.verts:
-                vert.co.z += 0.594
+                vert.co.z = 1.9
+            for axis, limit, sign in ((0, -2.4, -1), (0, 8.9, 1),
+                                      (1, -10.0, -1), (1, .4, 1)):
+                point = [0, 0, 0]
+                normal = [0, 0, 0]
+                point[axis] = limit
+                normal[axis] = sign
+                bmesh.ops.bisect_plane(
+                    mesh, geom=list(mesh.faces) + list(mesh.edges) + list(mesh.verts),
+                    plane_co=point, plane_no=normal, clear_outer=True, dist=.00001)
+            verts = [mesh.verts.new((x, y, 1.9)) for x, y in
+                     ((8.9, -8.7), (14.5, -8.7), (14.5, -6.5), (8.9, -6.5))]
+            path = mesh.faces.new(verts)
+            uv = mesh.loops.layers.uv.active
+            for loop in path.loops:
+                loop[uv].uv = (loop.vert.co.x * .2, loop.vert.co.y * .2)
         if material in ('Di sản v2 | Gờ bậc và đá chạm',
                         'Di sản v2 | Vữa vôi của cổng và tường'):
             # The matched WebGL camera and raycasts identify these thin sheets
@@ -63,6 +79,14 @@ def finish_temple(objects):
         wall_repair = None
         if material == 'Di sản v2 | Vữa vôi của cổng và tường':
             wall_repair = repair_side_wall(mesh)
+        if material in ('Di sản v2 | Gờ bậc và đá chạm',
+                        'Di sản v2 | Vữa vôi của cổng và tường'):
+            # Disconnected scan fragments occupy the same rejected volume as
+            # the torn wall skin, but are not connected to that wall component.
+            outside_wall = [face for face in mesh.faces if all(
+                -14.5 < v.co.x < -8.7 and v.co.y < -9.56 and 1.8 < v.co.z < 5.2
+                for v in face.verts)]
+            bmesh.ops.delete(mesh, geom=outside_wall, context='FACES')
         # Remove only zero-area faces and unused vertices, without welding UV
         # seams or filling architectural openings.
         empty = [face for face in mesh.faces if face.calc_area() < 1e-12]
