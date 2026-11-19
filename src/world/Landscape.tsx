@@ -265,7 +265,14 @@ export function Landscape({ time }: { time: TimeOfDay }) {
   const shoreBody = useMemo(() => bodyGeometry(offsetPolygon(shore, 1.05), shore, 0.34), []);
   const planting = useMemo(() => ringGeometry(offsetPolygon(shore, 7.25), offsetPolygon(shore, 4.75)), []);
   const islandGeometries = useMemo(() => [fillGeometry(templeIsland), fillGeometry(turtleIsland)], []);
-  const islandBodies = useMemo(() => [bodyGeometry(templeIsland), bodyGeometry(turtleIsland)], []);
+  const islandBodies = useMemo(() => {
+    const templeBody = bodyGeometry(templeIsland);
+    // ExtrudeGeometry group 1 contains the side faces. Its cap was coplanar
+    // with the grass at -0.12 + 0.4 = 0.28 m and flickered at grazing angles.
+    const walls = templeBody.groups.find(group => group.materialIndex === 1)!;
+    templeBody.setDrawRange(walls.start, walls.count);
+    return [templeBody, bodyGeometry(turtleIsland)];
+  }, []);
   const laneMarks = useMemo(() => sampleRing(offsetPolygon(shore, 20), 9).filter((_, i) => i % 2 === 0), []);
   const [bridgeStart, bridgeEnd] = bridgeEnds;
   const approachX = bridgeStart[0] - bridgeEnd[0];

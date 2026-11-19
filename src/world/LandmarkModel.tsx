@@ -2,6 +2,7 @@ import { Clone, useGLTF } from '@react-three/drei';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { Group, Mesh } from 'three';
 import { landmarkAssets } from './landmarkAssets';
+import { trimGateBase } from './templeGate';
 
 export default function LandmarkModel({ url, position, rotationY = 0, onLoaded }: { url: string; position: [number, number, number]; rotationY?: number; onLoaded?: () => void }) {
   const { scene } = useGLTF(url, '/draco/');
@@ -17,7 +18,16 @@ export default function LandmarkModel({ url, position, rotationY = 0, onLoaded }
     if (!brick) return;
     const initialHeight = brick.position.y;
     brick.position.y = initialHeight + 0.594;
-    return () => { brick.position.y = initialHeight; };
+    const restore: (() => void)[] = [];
+    instance.current.traverse(node => {
+      if (!(node instanceof Mesh)) return;
+      const undo = trimGateBase(node);
+      if (undo) restore.push(undo);
+    });
+    return () => {
+      brick.position.y = initialHeight;
+      restore.forEach(undo => undo());
+    };
   }, [url, scene]);
   useEffect(() => { onLoaded?.(); }, [onLoaded]);
   return <group ref={instance} position={position} rotation={[0, rotationY, 0]}><Clone object={scene} castShadow receiveShadow /></group>;

@@ -14,6 +14,6 @@ Va chạm trong `geo.ts` dùng khung tọa độ cổng Blender khi GLB đền �
 
 Hai script `export-game-temple.py` và `export-game-bridge.py` trong `scripts/heritage/` xuất từng công trình từ `heritage-work/heritage-optimized-working.blend`. Nhịp cầu theo hai mốc OSM dài 46,256 m. Hai ngưỡng gỗ chìa thêm 6 cm để tiếp giáp đường đi. Mặt ván rộng 3,00 m. Tính cả kết cấu bên dưới, bề rộng lớn nhất xấp xỉ 4,24 m. Lối đi cho nhân vật rộng 2,50 m.
 
-Sau khi căn nhịp cầu, `bridge_finish.py` lấy mẫu mặt ván thật từ mesh nguồn và căn cao độ theo đường đi cong trong game. Giữa nhịp, tay vịn cao khoảng 1,0–1,05 m so với sàn. Các ngưỡng gỗ và hai dải ván rộng 22 cm khép mép sàn. Hai texture tạo vân và độ nổi của mối ghép ván ngang. File GLB xuất ra có 104.971 tam giác, ba vật liệu PBR và dung lượng 2.022.224 byte.
+`bridge_finish.py` lấy mẫu mặt ván của cầu từ Blender để căn cao độ. Tay vịn nằm cao khoảng 1,05 m so với sàn. Các thanh gỗ trên mặt cầu được dựng lại theo tâm cột lấy từ mesh nguồn. Ở đoạn mất dấu một cột, vị trí 37,55 m là trung điểm ước lượng giữa hai dấu cột còn lại. Các ngưỡng gỗ và hai dải ván rộng 22 cm khép mép sàn. Hai texture tạo vân và độ nổi của mối ghép ngang. GLB cầu có 46.460 tam giác, ba vật liệu PBR và dung lượng 900.296 byte.
 
 Xem [hướng dẫn xuất và kiểm tra lại GLB](../scripts/heritage/README.md) và [kết quả kiểm tra gameplay](BRIDGE_INTEGRATION_QA.md).

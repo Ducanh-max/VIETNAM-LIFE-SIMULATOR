@@ -32,12 +32,6 @@ def clip_ends(obj, shore_station, island_station):
     mesh.free()
 
 
-def add_box(mesh, center, dimensions):
-    vertices = bmesh.ops.create_cube(mesh, size=1.0)['verts']
-    for vertex in vertices:
-        vertex.co = Vector(center) + Vector([vertex.co[i] * dimensions[i] for i in range(3)])
-
-
 def fit_thresholds(deck, span, floor):
     # The irregular scanned plank boundary has no surface across the end.
     # Trim to a straight transverse cut, then stitch a closed sloped sill.
@@ -79,19 +73,61 @@ def fit_thresholds(deck, span, floor):
     mesh.free()
 
 
-def finish_rail_ends(rail, span, floor):
-    # Only the first and last 0.32 m of the scanned rail are trimmed. Square
-    # terminal posts mask the torn rail tips and preserve the source lattice.
+def rail_member(mesh, start, end, width, depth):
+    """Painted timber with a chamfer along each arris and a closed end grain."""
+    start, end = Vector(start), Vector(end)
+    axis = (end - start).normalized()
+    lateral = Vector((0, 1, 0))
+    height = axis.cross(lateral)
+    a, b = width/2, depth/2
+    c = min(0.014, a/3, b/3)
+    section = [(-a+c, -b), (a-c, -b), (a, -b+c), (a, b-c),
+               (a-c, b), (-a+c, b), (-a, b-c), (-a, -b+c)]
+    uv = mesh.loops.layers.uv.verify()
+    rings = [[mesh.verts.new(p + lateral*u + height*v) for u,v in section] for p in (start,end)]
+    faces = [mesh.faces.new(rings[0][::-1]), mesh.faces.new(rings[1])]
+    for i in range(8):
+        j = (i+1)%8
+        faces.append(mesh.faces.new((rings[0][i], rings[0][j], rings[1][j], rings[1][i])))
+    for face in faces:
+        for loop in face.loops:
+            q = loop.vert.co - start
+            loop[uv].uv = (q.dot(axis), q.dot(lateral) + q.dot(height))
+
+
+def repair_upper_rails(rail, span, floor):
+    # Retopologize the upper members where the two scans of the rail surfaces
+    # diverged into fins. Keep structural piers, beams and fascia below deck.
     inset = 0.32
     clip_ends(rail, inset, span - inset)
     mesh = bmesh.new()
     mesh.from_mesh(rail.data)
-    for station in (inset, span - inset):
-        for side in (-1, 1):
-            y = side * 1.50
-            base = floor(station) - 0.14
-            add_box(mesh, (-station, y, base + 0.76), (0.24, 0.28, 1.52))
-            add_box(mesh, (-station, y, base + 1.53), (0.28, 0.31, 0.06))
+    for vert in mesh.verts:
+        vert.co.z -= floor(-vert.co.x)
+    bmesh.ops.bisect_plane(mesh, geom=list(mesh.verts)+list(mesh.edges)+list(mesh.faces),
+                          plane_co=(0,0,-0.06), plane_no=(0,0,1), dist=0.00001, clear_outer=True)
+    for vert in mesh.verts:
+        vert.co.z += floor(-vert.co.x)
+
+    # Centres measured from cap clusters in the supplied scan on both sides.
+    # At 37.55 m the cap is missing on both scans; subdivide the 6.75 m gap.
+    stations = (inset,3.28,6.94,10.44,14.12,17.93,22.17,26.22,30.11,34.17,
+                37.55,40.92,span-inset)
+    for side in (-1, 1):
+        y = side * 1.50
+        def point(s, h, offset=0):
+            return (-s, y+side*offset, floor(s)+h)
+        for i,s in enumerate(stations):
+            terminal = i in (0,len(stations)-1)
+            width, cap = (0.24,1.37) if terminal else (0.17,1.20)
+            rail_member(mesh, point(s,-0.16), point(s,cap), width,width)
+            rail_member(mesh, point(s,cap-0.005), point(s,cap+0.045), width+0.035,width+0.035)
+        for left,right in zip(stations,stations[1:]):
+            rail_member(mesh, point(left,1.05), point(right,1.05), 0.135,0.115)
+            rail_member(mesh, point(left,0.19), point(right,0.19), 0.095,0.105)
+            rail_member(mesh, point(left,-0.055), point(right,-0.055), 0.16,0.16)
+            rail_member(mesh, point(left,0.22,-0.029), point(right,1.00,-0.029), 0.055,0.09)
+            rail_member(mesh, point(left,1.00,0.029), point(right,0.22,0.029), 0.055,0.09)
     mesh.to_mesh(rail.data)
     mesh.free()
 
@@ -165,7 +201,7 @@ def finish_bridge(objects, span):
             pos.z = floor(station) + h
         obj.data.update()
     fit_thresholds(deck, span, floor)
-    finish_rail_ends(rail, span, floor)
+    repair_upper_rails(rail, span, floor)
     finish_boards(deck)
     for obj in objects:
         obj.data.update()
