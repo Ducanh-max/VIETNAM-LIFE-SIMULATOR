@@ -306,7 +306,9 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
     const cf = camFocus.current.lerp(p, 1 - Math.exp(-14 * dt));
     camDist.current = dist < camDist.current ? THREE.MathUtils.damp(camDist.current, dist, 25, dt) : THREE.MathUtils.damp(camDist.current, dist, 4, dt);
     const cd = camDist.current;
-    camera.position.set(cf.x - forward.x * Math.cos(pitch.current) * cd, cf.y + 1.25 + Math.sin(pitch.current) * cd, cf.z - forward.z * Math.cos(pitch.current) * cd);
+    // when a wall pulls the camera in close, lift it so it looks down past the big chibi head
+    const lift = Math.max(0, 2.6 - cd) * 0.45;
+    camera.position.set(cf.x - forward.x * Math.cos(pitch.current) * cd, cf.y + 1.25 + lift + Math.sin(pitch.current) * cd, cf.z - forward.z * Math.cos(pitch.current) * cd);
     camera.position.y = Math.max(camera.position.y, cf.y + 0.4);
     camera.lookAt(cf.x, cf.y + 1.1, cf.z);
   });

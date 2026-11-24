@@ -9,7 +9,7 @@ import { game, player } from './state';
  * are cheap, pavements and squares cost more, buildings and the lake are blocked. A* over that grid
  * follows the real OSM streets, and the path is simplified into a polyline for the maps.
  */
-export const NAV = { min: -800, size: 1600, cell: 4 };
+export const NAV = { min: -1320, size: 2640, cell: 4 };
 const N = NAV.size / NAV.cell;
 let costs: Uint8Array | null = null; // 0 = blocked, otherwise step cost
 

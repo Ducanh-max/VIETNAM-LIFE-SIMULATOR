@@ -278,7 +278,7 @@ function hitsObstacle([px, pz]: Point) {
 /** True when a camera position would be inside a building, wall or other blocker. */
 export function cameraBlocked(p: Point) { return hitsObstacle(p); }
 
-export const WORLD_LIMIT = { x: 780, z: 780 };
+export const WORLD_LIMIT = { x: 1300, z: 1300 }; // the OSM extract covers about ±1.3 km around the lake
 
 const templeWalk = offsetRing(templeIsland, -0.6);
 const bridgeShore = offsetRing(shore, 1.5);

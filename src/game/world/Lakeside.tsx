@@ -115,7 +115,7 @@ function Ground() {
     };
   }, []);
   const outerGround = useMemo(() => {
-    const shape = new THREE.Shape([new THREE.Vector2(-700, -800), new THREE.Vector2(700, -800), new THREE.Vector2(700, 800), new THREE.Vector2(-700, 800)]);
+    const shape = new THREE.Shape([new THREE.Vector2(-1400, -1400), new THREE.Vector2(1400, -1400), new THREE.Vector2(1400, 1400), new THREE.Vector2(-1400, 1400)]);
     shape.holes.push(new THREE.Path(streetRing(12 - 0.3).map(([x, z]) => new THREE.Vector2(x, -z))));
     const g = new THREE.ShapeGeometry(shape, 1);
     g.rotateX(-Math.PI / 2);

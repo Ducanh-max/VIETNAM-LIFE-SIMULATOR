@@ -8,8 +8,10 @@ const { lat: cLat, lon: cLon } = lake.center;
 const mLon = 111_320 * Math.cos(cLat * Math.PI / 180);
 const toLocal = ({ lat, lon }) => [(lon - cLon) * mLon, -(lat - cLat) * 111_320];
 
-const bbox = '21.0215,105.8445,21.0362,105.8605';
-const query = `[out:json][timeout:120];(
+// Hồ Gươm, the whole old quarter up to Đồng Xuân market, the French quarter (Tràng Tiền, Nhà hát Lớn, Hai Bà Trưng,
+// Bà Triệu, Hàng Bài) and Nhà thờ Lớn / Lý Quốc Sư to the west: about ±1.3 km around the lake centre.
+const bbox = '21.0175,105.8405,21.0405,105.8645';
+const query = `[out:json][timeout:180];(
   way["highway"](${bbox});
   way["building"](${bbox});
   way["leisure"~"park|garden"](${bbox});

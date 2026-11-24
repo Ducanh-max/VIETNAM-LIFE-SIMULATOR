@@ -8,8 +8,8 @@ import { player, view } from '../game/state';
  * then blitted with pan / zoom / rotation by the minimap and the phone's map app, with the live route,
  * the destination, the shop and the player arrow drawn on top.
  */
-const MIN = -820;
-const SPAN = 1640;
+const MIN = -1340;
+const SPAN = 2680;
 const S = 1.25; // px per metre in the base image
 let base: HTMLCanvasElement | null = null;
 
