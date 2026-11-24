@@ -5,7 +5,7 @@ import { AnimMachine, GAIT, type AnimState } from './character/animState';
 import { BlobShadow } from './character/ChibiModel';
 import { FACE, surf } from './character/chibiGeometry';
 import { Phone3D } from './character/Phone3D';
-import { CAN_OFFSET, drinkLevels, firstDrink, GLASS_OFFSET, lerpN, lerpV, mealAt, SEAT_DROP, SET, setToBody, track } from './meal';
+import { CAN_OFFSET, drinkLevels, firstDrink, GLASS_OFFSET, lerpN, lerpV, mealAt, POUR, SEAT_DROP, SET, setToBody, track } from './meal';
 import { PLAYER_DIMENSIONS as PD, PlayerModel, type Expression, type HandPose, type PlayerRig } from './PlayerModel';
 import { taxi } from './ride';
 import { bike, game, player, useGame } from './state';
@@ -92,8 +92,9 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
   const clock = useRef({ t: 0, dialogAt: -1, interactAt: -10, gait: 0 });
   const [morselKind, setMorselKind] = useState<'noodle' | 'wrap' | 'dipped'>('noodle');
   const [glassLevel, setGlassLevel] = useState(0);
+  const [bottleOpen, setBottleOpen] = useState(false);
   const drinkId = useGame((s) => firstDrink(s.order) ?? 'lavie');
-  const streamMat = useMemo(() => new THREE.MeshStandardMaterial({ color: drinkId === 'lavie' || drinkId === 'sevenup' ? '#e8f4ff' : '#3a1a0c', transparent: true, opacity: 0.8, roughness: 0.1 }), [drinkId]);
+  const streamMat = useMemo(() => new THREE.MeshStandardMaterial({ color: drinkId === 'lavie' ? '#e8f4ff' : drinkId === 'sevenup' ? '#e6f5cf' : '#4a2210', transparent: true, opacity: drinkId === 'lavie' ? 0.55 : 0.8, roughness: 0.1 }), [drinkId]);
   const expression = useRef<Expression>('neutral');
   const mood = useRef<{ kind: Expression; until: number; toast: number }>({ kind: 'neutral', until: 0, toast: 0 });
 
@@ -194,6 +195,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
         const tableD = V(-0.05, -0.62, 0.78).normalize();
         const mouthD = V(0.2, 0.62, -0.75).normalize();
         let tip = restR.clone().addScaledVector(tableD, STICK);
+        let rightBusy = false;
         headPitch = 0.22;
         if (m.action?.kind === 'bite') {
           const u = m.u;
@@ -215,20 +217,37 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
           if (kind !== morselKind) setMorselKind(kind);
         } else if (m.action && firstDrink(s.order)) {
           const id = firstDrink(s.order)!;
-          const solo = !(s.order.buncha ?? 0);
-          const dx = solo ? 0 : SET.drink[0]; const dz = solo ? 0 : SET.drink[1];
+          const dx = SET.drink[0]; const dz = SET.drink[1];
           const C = setToBody(dx + CAN_OFFSET, 0, dz); const G = setToBody(dx + GLASS_OFFSET, 0, dz);
           const grip = id === 'lavie' ? 0.1 : 0.06;
           const u = m.u;
+          if (lv.opened !== bottleOpen) setBottleOpen(lv.opened);
           if (m.action.kind === 'pour') {
-            // grip the can, lift it over the glass, tip it, pour, put it back
-            const above = G.clone().add(V(-0.06, 0.2, 0));
-            handL = track(u, [[0, restL], [0.18, C.clone().add(V(0, grip, 0))], [0.22, C.clone().add(V(0, grip, 0))], [0.36, above], [0.78, above], [0.9, C.clone().add(V(0, grip, 0))], [0.93, C.clone().add(V(0, grip, 0))], [1, restL]], lerpV);
-            bottlePose = { tilt: track(u, [[0, 0], [0.38, 0], [0.48, -1.95], [0.7, -1.95], [0.8, 0], [1, 0]], lerpN), grip };
-            showBottle = u > 0.2 && u < 0.92;
-            if (showBottle) handPoseL = 'grip';
-            leanTarget = track(u, [[0, 0.06], [0.18, 0.34], [0.36, 0.3], [0.9, 0.34], [1, 0.06]], lerpN);
-            showStream = u > 0.47 && u < 0.72;
+            rightBusy = true;
+            // left hand steadies the glass; right hand picks up the bottle, opens it, tips it over the glass so
+            // the lip stays above the glass while it pours, stands it up and puts it back
+            const P = POUR;
+            const tilt = track(u, [[0, 0], [P.over, 0], [P.tip, -1.6], [P.stop, -2.05], [P.upright, 0], [1, 0]], lerpN);
+            const lipOff = V(0, bottleLip(id) - grip, 0).applyAxisAngle(V(0, 0, 1), tilt);
+            const BOFF = V(0.035, 0, 0); // bottle axis is this far from the palm, toward the glass
+            const pourAt = G.clone().add(V(0, 0.165, 0)).sub(lipOff).sub(BOFF); // hand such that the lip is 4 cm over the glass rim
+            const held = C.clone().add(V(0, grip, 0)).sub(BOFF); const lifted = held.clone().add(V(0, 0.08, 0.02));
+            const pop = id === 'lavie' ? 0 : Math.max(0, Math.sin(((u - P.lift) / (P.open + 0.03 - P.lift)) * Math.PI)) * (u > P.lift && u < P.open + 0.03 ? 1 : 0);
+            handR = track(u, [[0, restR], [P.grab, held], [P.lift, lifted], [P.open + 0.03, lifted.clone().add(V(0, pop * 0.01, 0))], [P.over, pourAt], [P.stop, pourAt], [P.upright, pourAt], [P.down, held], [1, restR]], lerpV);
+            if (P.over < u && u < P.upright) handR.copy(pourAt);
+            const atGlass = G.clone().add(V(0.04, 0.05, 0));
+            const capAt = lifted.clone().add(V(0.015, bottleLip(id) - grip + 0.01, 0));
+            const twist = id === 'lavie' && u > P.lift && u < P.open + 0.04;
+            handL = track(u, [[0, restL], [P.grab, atGlass], [1 - 0.08, atGlass], [1, restL]], lerpV);
+            if (twist) { handL = capAt.clone().add(V(Math.sin(c.t * 22) * 0.006, 0, Math.cos(c.t * 22) * 0.006)); handPoseL = 'pinch'; }
+            else if (u > P.grab * 0.8 && u < 0.95) handPoseL = 'cup';
+            bottlePose = { tilt, grip };
+            showBottle = u > P.grab && u < P.down;
+            if (showBottle) handPoseR = 'grip';
+            showSticks = false;
+            headPitch = 0.38;
+            leanTarget = track(u, [[0, 0.06], [P.grab, 0.28], [P.over, 0.24], [P.down, 0.28], [1, 0.06]], lerpN);
+            showStream = u > P.tip + 0.01 && u < P.stop - 0.01;
             streamSurface = G.clone().add(V(0, 0.012 + 0.1 * lv.glass, 0));
           } else {
             // grip the glass, bring it to the mouth, tip it and the head back, put it down
@@ -242,7 +261,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
             if (u > 0.44 && u < 0.76) mouthState = 'drinking';
           }
         }
-        handR = tip.clone().addScaledVector(tipDir, -STICK);
+        if (!rightBusy) handR = tip.clone().addScaledVector(tipDir, -STICK);
       }
       // blend the seated reach in as the avatar settles onto the stool
       const al = lean(leanTarget * k);
@@ -252,11 +271,12 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
       if (sticks.current) { sticks.current.position.copy(hr).addScaledVector(dirT, STICK - 0.12); sticks.current.quaternion.setFromUnitVectors(V(0, 0, 1), dirT); }
       if (morsel.current) morsel.current.position.copy(hr).addScaledVector(dirT, STICK).add(V(0, -0.008, 0));
       if (heldBottle.current && bottlePose) {
-        heldBottle.current.position.copy(hl);
+        // the bottle sits in the right hand's palm: its grip point at the palm, tilted toward the glass
+        heldBottle.current.position.copy(hr).add(V(0.035, 0, 0).applyAxisAngle(X, -al));
         heldBottle.current.rotation.set(-al, 0, bottlePose.tilt);
         heldBottle.current.children[0].position.set(0, -bottlePose.grip, 0);
         if (stream.current && showStream && streamSurface) {
-          const lip = V(0, bottleLip(drinkId) - bottlePose.grip, 0).applyAxisAngle(V(0, 0, 1), bottlePose.tilt).applyAxisAngle(X, -al).add(hl);
+          const lip = V(0, bottleLip(drinkId) - bottlePose.grip, 0).applyAxisAngle(V(0, 0, 1), bottlePose.tilt).applyAxisAngle(X, -al).add(heldBottle.current.position);
           const surface = toTorso(streamSurface, al);
           stream.current.position.copy(lip).add(surface).multiplyScalar(0.5);
           stream.current.scale.set(1, Math.max(0.01, lip.distanceTo(surface)), 1);
@@ -365,9 +385,9 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
       <group ref={propSpace} position={[0, SPINE, 0]}>
         <group ref={sticks} visible={false}><Chopsticks spread={0.008} /></group>
         <group ref={morsel} visible={false}><Morsel kind={morselKind} /></group>
-        <group ref={heldBottle} visible={false}><group><Bottle id={drinkId} /></group></group>
+        <group ref={heldBottle} visible={false}><group><Bottle id={drinkId} open={bottleOpen} /></group></group>
         <group ref={heldGlass} visible={false}><group><IceGlass id={drinkId} level={glassLevel} /></group></group>
-        <mesh ref={stream} visible={false} material={streamMat}><cylinderGeometry args={[0.007, 0.009, 1, 8]} /></mesh>
+        <mesh ref={stream} visible={false} material={streamMat}><cylinderGeometry args={[0.005, 0.008, 1, 8]} /></mesh>
         <group ref={bag} visible={false} scale={0.85}><TakeawayBag /></group>
         <group ref={phone3d} visible={false}><Phone3D /></group>
       </group>

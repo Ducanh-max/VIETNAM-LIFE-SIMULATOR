@@ -282,7 +282,7 @@ function TableSpread({ order, progress, inHand }: { order: Order; progress: numb
   return <group>
     {bowls > 0 && <BunChaSet eaten={lv.food} showChopsticks={!inHand} />}
     {bowls > 1 && <group position={[SET.extra[0], 0, SET.extra[1]]} rotation={[0, Math.PI, 0]} scale={0.62}><BunChaSet steam={false} /></group>}
-    {first && <group position={[bowls ? SET.drink[0] : 0, 0, bowls ? SET.drink[1] : 0]}><DrinkSet id={first} glassLevel={lv.glass} canHeld={inHand && lv.canHeld} glassHeld={inHand && lv.glassHeld} /></group>}
+    {first && <group position={[SET.drink[0], 0, SET.drink[1]]}><DrinkSet id={first} glassLevel={lv.glass} canHeld={inHand && lv.canHeld} glassHeld={inHand && lv.glassHeld} opened={lv.opened} foam={lv.foam} /></group>}
     {others.map((id, i) => <group key={i} position={[0.42 - i * 0.1, 0, -0.3]}><Bottle id={id} /></group>)}
   </group>;
 }

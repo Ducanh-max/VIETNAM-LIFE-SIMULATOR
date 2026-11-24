@@ -283,22 +283,25 @@ const lavieLabel = () => once('lavie', () => new THREE.MeshStandardMaterial({
     ctx.fillText('LaVie', 64, 33); ctx.fillText('LaVie', 192, 33);
   }), roughness: 0.4,
 }));
-const liquidColor = (id: Exclude<MenuId, 'buncha'>) => id === 'lavie' ? '#dfeffa' : id === 'sevenup' ? '#eef6d8' : '#3a1a0c';
-const liquidMaterial = (id: Exclude<MenuId, 'buncha'>) => once(`liquid-${id}`, () => new THREE.MeshStandardMaterial({ color: liquidColor(id), roughness: 0.1, transparent: true, opacity: id === 'lavie' || id === 'sevenup' ? 0.4 : 0.9 }));
+const liquidColor = (id: Exclude<MenuId, 'buncha'>) => id === 'lavie' ? '#b9dcef' : id === 'sevenup' ? '#d9edbd' : '#3a1a0c';
+const foamMaterial = () => once('foam', () => new THREE.MeshStandardMaterial({ color: '#f4efe6', roughness: 0.9 }));
+const liquidMaterial = (id: Exclude<MenuId, 'buncha'>) => once(`liquid-${id}`, () => new THREE.MeshStandardMaterial({ color: liquidColor(id), roughness: 0.1 }) /* opaque: the glass uses transmission, which hides transparent things inside it */);
 
 /** A can (or Lavie bottle), origin at its base. */
-export function Bottle({ id }: { id: Exclude<MenuId, 'buncha'> }) {
+export function Bottle({ id, open = false }: { id: Exclude<MenuId, 'buncha'>; open?: boolean }) {
   const m = foodMaterials();
   if (id === 'lavie') return <group>
     <mesh position={[0, 0.1, 0]} material={m.glass}><cylinderGeometry args={[0.032, 0.032, 0.2, 18]} /></mesh>
     <mesh position={[0, 0.09, 0]} material={lavieLabel()}><cylinderGeometry args={[0.0325, 0.0325, 0.06, 18, 1, true]} /></mesh>
     <mesh position={[0, 0.215, 0]} material={m.glass}><cylinderGeometry args={[0.012, 0.03, 0.03, 14]} /></mesh>
-    <mesh position={[0, 0.235, 0]}><cylinderGeometry args={[0.014, 0.014, 0.016, 12]} /><meshStandardMaterial color="#1f5fb4" roughness={0.5} /></mesh>
+    {!open && <mesh position={[0, 0.235, 0]}><cylinderGeometry args={[0.014, 0.014, 0.016, 12]} /><meshStandardMaterial color="#1f5fb4" roughness={0.5} /></mesh>}
   </group>;
   return <group>
     <mesh position={[0, 0.061, 0]} material={canMaterial(id)} castShadow><cylinderGeometry args={[0.033, 0.033, 0.112, 24]} /></mesh>
     <mesh position={[0, 0.119, 0]} material={m.steel}><cylinderGeometry args={[0.027, 0.033, 0.006, 24]} /></mesh>
-    <mesh position={[0.012, 0.123, 0]} material={m.steel}><boxGeometry args={[0.014, 0.002, 0.008]} /></mesh>
+    {/* ring-pull: flat when closed, flipped up when opened (with the dark opening showing) */}
+    <mesh position={[open ? 0.006 : 0.012, open ? 0.13 : 0.123, 0]} rotation={[0, 0, open ? 1.2 : 0]} material={m.steel}><boxGeometry args={[0.014, 0.002, 0.008]} /></mesh>
+    {open && <mesh position={[-0.012, 0.1225, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[0.008, 10]} /><meshBasicMaterial color="#111" /></mesh>}
     <mesh position={[0, 0.003, 0]} material={m.steel}><cylinderGeometry args={[0.033, 0.027, 0.006, 24]} /></mesh>
   </group>;
 }
@@ -306,22 +309,24 @@ export function Bottle({ id }: { id: Exclude<MenuId, 'buncha'> }) {
 export const bottleLip = (id: Exclude<MenuId, 'buncha'>) => (id === 'lavie' ? 0.24 : 0.122);
 
 /** Ice-filled glass, origin at its base; `level` 0..1 of drink in it. */
-export function IceGlass({ id, level }: { id: Exclude<MenuId, 'buncha'>; level: number }) {
+export function IceGlass({ id, level, foam = 0 }: { id: Exclude<MenuId, 'buncha'>; level: number; foam?: number }) {
   const m = foodMaterials();
   const ice = useMemo(() => { const r = rng(17); return Array.from({ length: 6 }, (_, i) => trs((r() - 0.5) * 0.03, 0.025 + i * 0.014, (r() - 0.5) * 0.03, r() * 3, 0.019, 0.019, 0.019, r(), r())); }, []);
   return <group>
     <mesh position={[0, 0.06, 0]} material={m.glass}><cylinderGeometry args={[0.036, 0.03, 0.12, 22, 1, true]} /></mesh>
     <mesh position={[0, 0.003, 0]} material={m.glass}><cylinderGeometry args={[0.03, 0.03, 0.006, 22]} /></mesh>
     <Instances geometry={cube} material={m.ice} matrices={ice} castShadow={false} />
-    {level > 0.02 && <mesh position={[0, 0.006 + 0.05 * level, 0]} material={liquidMaterial(id)}><cylinderGeometry args={[0.031 + 0.003 * level, 0.029, 0.1 * level, 20]} /></mesh>}
+    {level > 0.02 && <mesh position={[0, 0.006 + 0.05 * level, 0]} material={liquidMaterial(id)}><cylinderGeometry args={[0.027 + 0.006 * level, 0.0265, 0.1 * level, 20]} /></mesh>}
+    {/* fizz: a head of foam on top of the soda while it is poured, settling afterwards */}
+    {id !== 'lavie' && foam > 0.05 && level > 0.04 && <mesh position={[0, 0.006 + 0.1 * level + 0.008 * foam, 0]} material={foamMaterial()} scale={[1, foam, 1]}><cylinderGeometry args={[0.032 + 0.003 * level, 0.031 + 0.003 * level, 0.016, 20]} /></mesh>}
   </group>;
 }
 
 /** Drink corner of a served table: can/bottle and an ice glass. Either can be "in hand" (hidden here). */
-export function DrinkSet({ id, glassLevel = 0, canHeld = false, glassHeld = false }: { id: Exclude<MenuId, 'buncha'>; glassLevel?: number; canHeld?: boolean; glassHeld?: boolean }) {
+export function DrinkSet({ id, glassLevel = 0, canHeld = false, glassHeld = false, opened = false, foam = 0 }: { id: Exclude<MenuId, 'buncha'>; glassLevel?: number; canHeld?: boolean; glassHeld?: boolean; opened?: boolean; foam?: number }) {
   return <group>
-    {!canHeld && <group position={[CAN_OFFSET, 0, 0]}><Bottle id={id} /></group>}
-    {!glassHeld && <group position={[GLASS_OFFSET, 0, 0]}><IceGlass id={id} level={glassLevel} /></group>}
+    {!canHeld && <group position={[CAN_OFFSET, 0, 0]}><Bottle id={id} open={opened} /></group>}
+    {!glassHeld && <group position={[GLASS_OFFSET, 0, 0]}><IceGlass id={id} level={glassLevel} foam={foam} /></group>}
   </group>;
 }
 

@@ -21,14 +21,14 @@ export const SET = {
   broth: [0.035, 0.18],
   bun: [0.23, 0.05],
   herbs: [-0.16, 0.01],
-  pickle: [-0.13, 0.26],
+  pickle: [-0.3, 0.2],
   chili: [-0.02, -0.09],
   chopsticks: [0.17, 0.32],
-  drink: [-0.31, 0.23], // can at +0.05, glass at −0.045 from here (within the left hand's reach)
+  drink: [-0.04, 0.33], // in front of the diner: can (right hand) and glass (left hand) side by side
   extra: [0.02, -0.3], // a second portion, pushed to the far side
 } as const;
-export const CAN_OFFSET = 0.05;
-export const GLASS_OFFSET = -0.045;
+export const CAN_OFFSET = 0.06;
+export const GLASS_OFFSET = -0.055;
 
 /** Body space of the seated avatar: the body group is lowered SEAT_DROP so the hips sit on the stool. */
 export const SEAT_DROP = PLAYER_DIMENSIONS.hipY - PLAYER_DIMENSIONS.sitHip;
@@ -38,7 +38,13 @@ export function setToBody(sx: number, sy: number, sz: number, out = new THREE.Ve
 }
 
 export type MealAction = { kind: 'bite' | 'pour' | 'sip'; start: number; dur: number };
-const DUR = { bite: 3.8, pour: 3.6, sip: 2.8 } as const;
+const DUR = { bite: 3.8, pour: 6.0, sip: 3.0 } as const;
+/**
+ * Pouring, as the avatar plays it: 0–.12 reach (right hand → bottle, left hand → glass), .12–.18 lift,
+ * .18–.3 open (twist the cap off / pop the tab), .3–.4 over the glass, .4–.46 tip, .46–.76 pour,
+ * .76–.82 upright, .82–.92 put it down, .92–1 hand back.
+ */
+export const POUR = { grab: 0.12, lift: 0.18, open: 0.27, over: 0.4, tip: 0.46, stop: 0.76, upright: 0.82, down: 0.92 } as const;
 export const firstDrink = (order: Order) => (['pepsi', 'coca', 'sevenup', 'lavie'] as MenuId[]).find((id) => (order[id] ?? 0) > 0) as Exclude<MenuId, 'buncha'> | undefined;
 
 export function mealScript(order: Order): MealAction[] {
@@ -68,13 +74,20 @@ export function drinkLevels(order: Order, p: number) {
   const m = mealAt(order, p);
   const FULL = 0.85;
   let glass = m.poured ? FULL : 0;
-  if (m.action?.kind === 'pour') glass = FULL * THREE.MathUtils.clamp((m.u - 0.47) / 0.25, 0, 1);
+  if (m.action?.kind === 'pour') glass = FULL * THREE.MathUtils.clamp((m.u - POUR.tip - 0.02) / (POUR.stop - POUR.tip - 0.02), 0, 1);
   const perSip = FULL / Math.max(1, m.sipsTotal);
   glass -= perSip * m.sips;
   if (m.action?.kind === 'sip') glass -= perSip * THREE.MathUtils.clamp((m.u - 0.56) / 0.18, 0, 1);
   let food = m.bites;
   if (m.action?.kind === 'bite' && m.u > 0.88) food += 1;
-  return { glass: Math.max(0, glass), food: m.bitesTotal ? Math.min(1, food / m.bitesTotal) : 0, canHeld: m.action?.kind === 'pour' && m.u > 0.2 && m.u < 0.92, glassHeld: m.action?.kind === 'sip' && m.u > 0.22 && m.u < 0.9 };
+  const pouring = m.action?.kind === 'pour';
+  // soda foams up while it is poured and settles over a second or two afterwards
+  const foam = pouring ? THREE.MathUtils.clamp((m.u - POUR.tip) / 0.12, 0, 1) * (m.u < POUR.stop ? 1 : Math.max(0, 1 - (m.u - POUR.stop) / 0.24)) : 0;
+  return {
+    glass: Math.max(0, glass), food: m.bitesTotal ? Math.min(1, food / m.bitesTotal) : 0,
+    canHeld: pouring && m.u > POUR.grab && m.u < POUR.down, glassHeld: m.action?.kind === 'sip' && m.u > 0.22 && m.u < 0.9,
+    opened: m.poured || (pouring && m.u > POUR.open), foam,
+  };
 }
 
 /** Piecewise keyframe track with smoothstep easing. */
