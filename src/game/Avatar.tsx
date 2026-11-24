@@ -153,7 +153,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
       const turn = -bike.steer * 1.6;
       for (const side of [R, L]) {
         const a = (side < 0 ? Math.PI * 0.85 : Math.PI * 0.15) + turn; // hands at ~10 and 2 o'clock on the wheel
-        arm(side, toTorso(V(Math.cos(a) * 0.12, HIP + 0.27 + Math.sin(a) * 0.12, 0.3), al), V(side, -0.6, -0.3));
+        arm(side, toTorso(V(Math.cos(a) * 0.14, HIP + 0.3 + Math.sin(a) * 0.13, 0.31), al), V(side, -0.6, -0.3));
       }
       handPoseL = handPoseR = 'wheel';
       headPitch = -0.05;
