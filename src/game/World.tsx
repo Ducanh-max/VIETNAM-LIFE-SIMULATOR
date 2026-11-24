@@ -9,6 +9,7 @@ import { OsmBuildings } from './world/OsmBuildings';
 import { DenSM } from './world/DenSM';
 import { DriverJob } from './world/DriverJob';
 import { Signs } from './world/Signs';
+import { Lotte } from './world/Lotte';
 import { Pedestrians } from './world/Pedestrians';
 import { Interaction, Job } from './world/Job';
 import { Restaurant } from './world/Restaurant';
@@ -65,6 +66,19 @@ function Sun({ time, shadow, focus }: { time: TimeOfDay; shadow: number; focus: 
     shadow-camera-near={20} shadow-camera-far={260} shadow-bias={-0.0006} shadow-normalBias={0.06} shadow-radius={3} />;
 }
 
+/** Up high (the Lotte observation deck, the drone) the haze recedes so the city below stays visible. */
+function HighFog({ near, far }: { near: number; far: number }) {
+  useFrame((state) => {
+    const f = state.scene.fog as THREE.Fog | null; if (!f) return;
+    const h = Math.max(0, state.camera.position.y - 20);
+    f.near = near + h * 3; f.far = far + h * 9;
+    const cam = state.camera as THREE.PerspectiveCamera;
+    const wantFar = Math.max(2000, f.far + 200);
+    if (cam.far !== wantFar) { cam.far = wantFar; cam.updateProjectionMatrix(); }
+  });
+  return null;
+}
+
 export function World({ time, quality, paused, freeCamera, onFps, onPosition }: {
   time: TimeOfDay; quality: Quality; paused: boolean; freeCamera: boolean; onFps: (fps: number) => void; onPosition: (p: Point) => void;
 }) {
@@ -77,6 +91,7 @@ export function World({ time, quality, paused, freeCamera, onFps, onPosition }: 
   return <>
     <color attach="background" args={[cfg.sky]} />
     <fog attach="fog" args={[cfg.sky, 120, q.fog]} />
+    <HighFog near={120} far={q.fog} />
     {time !== 'night'
       ? <Sky distance={4500} sunPosition={cfg.sun} turbidity={time === 'day' ? 4 : 7} rayleigh={time === 'day' ? 1.2 : 2.6} mieCoefficient={0.004} mieDirectionalG={0.85} />
       : <Stars radius={600} depth={60} count={1500} factor={4} fade speed={0.3} />}
@@ -89,6 +104,7 @@ export function World({ time, quality, paused, freeCamera, onFps, onPosition }: 
     <Restaurant paused={paused} />
     <Job />
     <Signs />
+    <Lotte />
     <DriverJob />
     <DenSM paused={paused} />
     <Pedestrians />

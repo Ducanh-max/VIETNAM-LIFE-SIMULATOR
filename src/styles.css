@@ -237,3 +237,16 @@
 .speedo-num { font: 800 34px/1 "Be Vietnam Pro", Arial, sans-serif; margin-top: 6px; }
 .speedo-unit { font: 600 11px "Be Vietnam Pro", Arial, sans-serif; color: #e6bd83; }
 .speedo-tag { font: 700 9px "Be Vietnam Pro", Arial, sans-serif; letter-spacing: .06em; color: #cfd9d4; margin-top: 4px; }
+
+/* Lotte lift panel */
+.lift-panel { position: fixed; right: 24px; top: 50%; transform: translateY(-50%); width: 300px; padding: 14px; border-radius: 18px; background: rgba(20, 22, 24, .94); border: 1.5px solid #8d9399; color: #eef1f3; z-index: 30; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+.lift-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+.lift-head b { color: #ff4a5e; letter-spacing: .12em; }
+.lift-head span { font-size: 12px; color: #c3c9cd; }
+.lift-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.lift-grid button { aspect-ratio: 1; border-radius: 50%; border: 1.5px solid #6c7378; background: #2a2d30; color: #f2f4f5; font: 700 12px Arial, sans-serif; cursor: pointer; }
+.lift-grid button:hover { border-color: #ff9a2e; color: #ff9a2e; }
+.lift-grid button.here { background: #ff9a2e; color: #111; border-color: #ff9a2e; }
+.lift-grid button.deck { border-color: #16a0c7; }
+.lift-foot { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 10px; color: #aab1b6; }
+.lift-foot button { padding: 6px 12px; border-radius: 10px; border: 1px solid #8d9399; background: transparent; color: #fff; }

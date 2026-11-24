@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { bridgeEnds, canWalk, groundHeight, type Point } from './geo';
 import { findRoute, routeLength } from './navigation';
 import { buildings, deliverySpots, RESTAURANT, restaurantToWorld, roads } from './osm';
+import { LOTTE, lotteDoor } from './lotte';
 import { addMoney, bike, formatVnd, game, player, pushMessage } from './state';
 import { WHEEL_R } from './world/Scooter';
 
@@ -42,6 +43,7 @@ export function places(): Place[] {
   const away: Point = [bridgeEnds[0][0] - bridgeEnds[1][0], bridgeEnds[0][1] - bridgeEnds[1][1]];
   const al = Math.hypot(away[0], away[1]);
   list.push({ name: 'Cầu Thê Húc · Đền Ngọc Sơn', note: 'Lối vào đền, bờ đông Hồ Gươm', x: bridgeEnds[0][0] + (away[0] / al) * 9, z: bridgeEnds[0][1] + (away[1] / al) * 9 });
+  if (LOTTE) { const [x, z] = lotteDoor(); list.push({ name: 'Lotte Center Hà Nội', note: '54 Liễu Giai · đài quan sát tầng 65', x, z }); }
   byName('Nhà hát Lớn', 'Quảng trường Cách mạng Tháng Tám');
   byName('Nhà thờ Lớn', 'Phố Nhà Chung');
   byName('Tràng Tiền Plaza', 'Phố Tràng Tiền');

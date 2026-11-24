@@ -216,7 +216,11 @@ function standBack(ring: Point[]): { ring: Point[]; moved: boolean } | null {
 /** How many footprints were pulled back from the street, and how many small unnamed ones were dropped. */
 export const roadTrim = { moved: 0, dropped: 0 };
 
+/** Lotte Center Hà Nội's footprint (the tower and podium are modelled by hand in world/Lotte.tsx). */
+export const lotteFootprint: Point[] | null = ((osm.buildings as RawBuilding[]).find((b) => /^Lotte Center/i.test(b.n ?? ''))?.p as Point[] | undefined) ?? null;
+
 export const buildings: Building[] = (osm.buildings as RawBuilding[]).flatMap((b) => {
+  if (/^Lotte Center/i.test(b.n ?? '')) return [];
   const trimmed = standBack(b.p as Point[]);
   if (!trimmed) { if (!b.n) { roadTrim.dropped++; return []; } }
   else if (trimmed.moved) roadTrim.moved++;

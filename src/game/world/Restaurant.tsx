@@ -355,7 +355,7 @@ export function Restaurant({ paused }: { paused: boolean }) {
     const s = game.get();
     const local = worldToRestaurant([player.position.x, player.position.z]);
     const inside = Math.abs(local[0]) < HW && local[1] > -HD && local[1] < HD + 0.3;
-    player.cameraMax = inside && !bike.riding ? 3.4 : Infinity;
+    if (inside && !bike.riding) player.cameraMax = 3.4; else if (player.cameraMax === 3.4) player.cameraMax = Infinity;
     const near = (p: Point, r: number) => Math.hypot(local[0] - p[0], local[1] - p[1]) < r;
 
     // ---- context actions
