@@ -8,22 +8,22 @@ import { player, view } from '../game/state';
  * then blitted with pan / zoom / rotation by the minimap and the phone's map app, with the live route,
  * the destination, the shop and the player arrow drawn on top.
  */
-const MIN = -1340;
-const SPAN = 2680;
-const S = 1.25; // px per metre in the base image
+const MINX = -4540, MINZ = -1340;
+const SPANX = 5880, SPANZ = 2680;
+const S = 0.85; // px per metre in the base image (the corridor to Lotte makes the map wide)
 let base: HTMLCanvasElement | null = null;
 
 const majorKinds = new Set(['primary', 'secondary', 'tertiary', 'trunk']);
 function drawPoly(ctx: CanvasRenderingContext2D, ring: Point[]) {
   ctx.beginPath();
-  ring.forEach(([x, z], i) => { const px = (x - MIN) * S, py = (z - MIN) * S; if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
+  ring.forEach(([x, z], i) => { const px = (x - MINX) * S, py = (z - MINZ) * S; if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
   ctx.closePath();
 }
 
 export function mapBase() {
   if (base) return base;
   const c = document.createElement('canvas');
-  c.width = c.height = Math.round(SPAN * S);
+  c.width = Math.round(SPANX * S); c.height = Math.round(SPANZ * S);
   const ctx = c.getContext('2d')!;
   ctx.fillStyle = '#ece6d8'; ctx.fillRect(0, 0, c.width, c.height);
   ctx.fillStyle = '#b9d99a'; for (const p of parks) { drawPoly(ctx, p.ring); ctx.fill(); }
@@ -34,7 +34,7 @@ export function mapBase() {
     ctx.strokeStyle = pass ? (majorKinds.has(r.kind) ? '#fff6dc' : '#ffffff') : '#c9bfae';
     ctx.lineWidth = Math.max(2, r.width * S) + (pass ? 0 : 2);
     ctx.beginPath();
-    r.points.forEach(([x, z], i) => { const px = (x - MIN) * S, py = (z - MIN) * S; if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
+    r.points.forEach(([x, z], i) => { const px = (x - MINX) * S, py = (z - MINZ) * S; if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
     ctx.stroke();
   }
   ctx.fillStyle = '#d6cdbd'; ctx.strokeStyle = '#bfb5a3'; ctx.lineWidth = 0.6;
@@ -44,9 +44,9 @@ export function mapBase() {
   ctx.strokeStyle = '#5a9fb6'; ctx.lineWidth = 2; ctx.stroke();
   ctx.fillStyle = '#9fcf84'; for (const isl of [templeIsland, turtleIsland]) { drawPoly(ctx, isl); ctx.fill(); }
   ctx.fillStyle = '#2f6f86'; ctx.font = 'italic 600 22px "Be Vietnam Pro", Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('Hồ Hoàn Kiếm', (0 - MIN) * S, (60 - MIN) * S);
+  ctx.fillText('Hồ Hoàn Kiếm', (0 - MINX) * S, (60 - MINZ) * S);
   ctx.font = '600 12px "Be Vietnam Pro", Arial'; ctx.fillStyle = '#7a2d1a';
-  ctx.fillText('Đền Ngọc Sơn', (templeIsland[0][0] - MIN) * S, (templeIsland[0][1] - 18 - MIN) * S);
+  ctx.fillText('Đền Ngọc Sơn', (templeIsland[0][0] - MINX) * S, (templeIsland[0][1] - 18 - MINZ) * S);
   // street names along the bigger streets, once per street
   const seen = new Map<string, Point[]>();
   ctx.font = '600 11px "Be Vietnam Pro", Arial';
@@ -63,7 +63,7 @@ export function mapBase() {
     let ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
     if (ang > Math.PI / 2) ang -= Math.PI; if (ang < -Math.PI / 2) ang += Math.PI;
     const label = r.name.replace(/^Phố /, '').replace(/^Đường /, '');
-    ctx.save(); ctx.translate((cx - MIN) * S, (cz - MIN) * S); ctx.rotate(ang);
+    ctx.save(); ctx.translate((cx - MINX) * S, (cz - MINZ) * S); ctx.rotate(ang);
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.strokeText(label, 0, 0);
     ctx.fillStyle = '#4a4036'; ctx.fillText(label, 0, 0);
     ctx.restore();
@@ -85,9 +85,9 @@ export function drawMap(ctx: CanvasRenderingContext2D, w: number, h: number, v: 
   ctx.rotate(v.rotation);
   ctx.scale(v.scale, v.scale);
   ctx.translate(-v.cx, -v.cz);
-  // world → image: (x - MIN) * S
+  // world → image: (x - MINX) * S
   ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(img, MIN, MIN, SPAN, SPAN);
+  ctx.drawImage(img, MINX, MINZ, SPANX, SPANZ);
   // route
   const r = nav.route;
   if (r && r.length > 1) {

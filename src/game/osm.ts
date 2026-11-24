@@ -172,8 +172,53 @@ const HAND_MODELLED = new Set(['Tháp Bút', 'Đài Nghiên', 'Cầu Thê Húc',
 function overlapsRect(ring: Point[], rect: Point[]) {
   return ring.some((p) => insidePolygon(p, rect)) || rect.some((p) => insidePolygon(p, ring)) || insidePolygon(centroid(ring), rect);
 }
+/** Carriageway classes buildings must stand back from (service ways, alleys and pedestrian streets excluded). */
+const streetKinds = new Set(['trunk', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link', 'residential', 'unclassified']);
+const NO_TRIM = import.meta.env.DEV && typeof location !== 'undefined' && location.search.includes('notrim'); // for before/after checks
+const PAVEMENT = 1.6; // footpath kept clear between the kerb and the shopfronts
+/**
+ * Pushes footprint corners that stick into a street (carriageway + pavement) back out to its edge, so
+ * houses no longer stand on the road (the OSM widths here are estimated from the road class, and some
+ * footprints are traced generously). Returns null when the house would be cut down to a sliver.
+ */
+function standBack(ring: Point[]): { ring: Point[]; moved: boolean } | null {
+  if (NO_TRIM) return { ring, moved: false };
+  let moved = false;
+  const out = ring.map((p): Point => {
+    let q: Point = [p[0], p[1]];
+    for (let pass = 0; pass < 2; pass++) {
+      const list = segGrid.get(cellKey(Math.floor(q[0] / CELL), Math.floor(q[1] / CELL)));
+      if (!list) break;
+      let pushed = false;
+      for (const s of list) {
+        if (!streetKinds.has(s.road.kind)) continue;
+        const clear = s.half + PAVEMENT;
+        const dx = s.b[0] - s.a[0], dz = s.b[1] - s.a[1], l2 = dx * dx + dz * dz || 1;
+        const t = ((q[0] - s.a[0]) * dx + (q[1] - s.a[1]) * dz) / l2;
+        if (t < 0 || t > 1) continue; // only push sideways from a segment, not off its ends
+        const fx = s.a[0] + t * dx, fz = s.a[1] + t * dz;
+        const ox = q[0] - fx, oz = q[1] - fz; const d = Math.hypot(ox, oz);
+        if (d >= clear) continue;
+        // which side of the street is the house on: use the footprint centre
+        const c = centroid(ring); const side = Math.sign((c[0] - fx) * -dz / Math.sqrt(l2) + (c[1] - fz) * dx / Math.sqrt(l2)) || 1;
+        const nx = (-dz / Math.sqrt(l2)) * side, nz = (dx / Math.sqrt(l2)) * side;
+        q = [fx + nx * clear, fz + nz * clear]; pushed = true; moved = true;
+      }
+      if (!pushed) break;
+    }
+    return q;
+  });
+  if (!moved) return { ring, moved };
+  return polygonArea(out) < Math.max(12, polygonArea(ring) * 0.45) ? null : { ring: out, moved };
+}
+/** How many footprints were pulled back from the street, and how many small unnamed ones were dropped. */
+export const roadTrim = { moved: 0, dropped: 0 };
+
 export const buildings: Building[] = (osm.buildings as RawBuilding[]).flatMap((b) => {
-  const ring = b.p as Point[];
+  const trimmed = standBack(b.p as Point[]);
+  if (!trimmed) { if (!b.n) { roadTrim.dropped++; return []; } }
+  else if (trimmed.moved) roadTrim.moved++;
+  const ring = trimmed ? trimmed.ring : (b.p as Point[]);
   const center = centroid(ring);
   // Landmarks on the lake are modelled by hand.
   if (insidePolygon(center, shore)) return [];
@@ -260,3 +305,4 @@ if (import.meta.env.DEV) (window as unknown as { __restaurant?: unknown }).__res
 
 // Dev hook for test scripts.
 if (import.meta.env.DEV) (window as unknown as { __osmDropped?: unknown }).__osmDropped = droppedNearLake;
+if (import.meta.env.DEV) (window as unknown as { __roadTrim?: unknown }).__roadTrim = roadTrim;

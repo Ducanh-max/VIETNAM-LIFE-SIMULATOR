@@ -114,6 +114,13 @@ function Ground() {
       curbIn: wallRibbon(roadInner, GROUND_HEIGHT - 0.05, GROUND_HEIGHT + 0.02),
     };
   }, []);
+  const corridorGround = useMemo(() => {
+    const g = new THREE.PlaneGeometry(3340, 1240, 1, 1);
+    g.rotateX(-Math.PI / 2); g.translate(-2950, 0, -190);
+    const uv = g.getAttribute('uv'); const pos = g.getAttribute('position');
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i), pos.getZ(i));
+    return g;
+  }, []);
   const outerGround = useMemo(() => {
     const shape = new THREE.Shape([new THREE.Vector2(-1400, -1400), new THREE.Vector2(1400, -1400), new THREE.Vector2(1400, 1400), new THREE.Vector2(-1400, 1400)]);
     shape.holes.push(new THREE.Path(streetRing(12 - 0.3).map(([x, z]) => new THREE.Vector2(x, -z))));
@@ -132,6 +139,8 @@ function Ground() {
     <mesh geometry={geometry.curbIn} material={mats.curb} />
     {/* pavement under the whole district; OSM roads and buildings sit on top */}
     <mesh geometry={outerGround} position={[0, GROUND_HEIGHT - 0.02, 0]} receiveShadow><primitive object={mats.outer} attach="material" /></mesh>
+    {/* ground under the corridor west to Lotte (x −4600…−1300) */}
+    <mesh geometry={corridorGround} position={[0, GROUND_HEIGHT - 0.02, 0]} receiveShadow><primitive object={mats.outer} attach="material" /></mesh>
   </group>;
 }
 

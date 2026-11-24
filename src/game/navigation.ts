@@ -1,4 +1,4 @@
-import { distanceToShore, type Point } from './geo';
+import { distanceToShore, inWorld, type Point } from './geo';
 import { pickupPoint } from './job';
 import { insideBuilding, roadClearance } from './osm';
 import { taxi } from './ride';
@@ -9,14 +9,17 @@ import { game, player } from './state';
  * are cheap, pavements and squares cost more, buildings and the lake are blocked. A* over that grid
  * follows the real OSM streets, and the path is simplified into a polyline for the maps.
  */
-export const NAV = { min: -1320, size: 2640, cell: 4 };
-const N = NAV.size / NAV.cell;
+/** Raster over the whole map: the lake district and the corridor west to Lotte (x −4520…1320, z −1320…1320). */
+export const NAV = { minX: -4520, minZ: -1320, sizeX: 5840, sizeZ: 2640, cell: 4 };
+const N = NAV.sizeX / NAV.cell; // row length
+const NZ = NAV.sizeZ / NAV.cell;
 let costs: Uint8Array | null = null; // 0 = blocked, otherwise step cost
 
 function buildCosts() {
-  const c = new Uint8Array(N * N);
-  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-    const p: Point = [NAV.min + (i + 0.5) * NAV.cell, NAV.min + (j + 0.5) * NAV.cell];
+  const c = new Uint8Array(N * NZ);
+  for (let j = 0; j < NZ; j++) for (let i = 0; i < N; i++) {
+    const p: Point = [NAV.minX + (i + 0.5) * NAV.cell, NAV.minZ + (j + 0.5) * NAV.cell];
+    if (!inWorld(p)) continue;
     if (distanceToShore(p) < 0.5) continue; // lake
     const road = roadClearance(p);
     if (road < 0.5) { c[j * N + i] = 1; continue; }
@@ -25,8 +28,8 @@ function buildCosts() {
   }
   return c;
 }
-const cellOf = (x: number, z: number): [number, number] => [Math.floor((x - NAV.min) / NAV.cell), Math.floor((z - NAV.min) / NAV.cell)];
-const inGrid = (i: number, j: number) => i >= 0 && j >= 0 && i < N && j < N;
+const cellOf = (x: number, z: number): [number, number] => [Math.floor((x - NAV.minX) / NAV.cell), Math.floor((z - NAV.minZ) / NAV.cell)];
+const inGrid = (i: number, j: number) => i >= 0 && j >= 0 && i < N && j < NZ;
 
 /** Nearest open cell (the player may stand inside a doorway cell marked as building). */
 function nearestOpen(i: number, j: number) {
@@ -44,9 +47,9 @@ export function findRoute(from: Point, to: Point): Point[] | null {
   const t = nearestOpen(...cellOf(to[0], to[1]));
   if (!s || !t) return null;
   const start = s[1] * N + s[0]; const goal = t[1] * N + t[0];
-  const g = new Float32Array(N * N).fill(Infinity);
-  const came = new Int32Array(N * N).fill(-1);
-  const closed = new Uint8Array(N * N);
+  const g = new Float32Array(N * NZ).fill(Infinity);
+  const came = new Int32Array(N * NZ).fill(-1);
+  const closed = new Uint8Array(N * NZ);
   const heap: number[] = []; const hf: number[] = [];
   const push = (node: number, f: number) => {
     heap.push(node); hf.push(f);
@@ -84,7 +87,7 @@ export function findRoute(from: Point, to: Point): Point[] | null {
   }
   if (!found) return null;
   const cells: Point[] = [];
-  for (let n = goal; n !== -1; n = came[n]) cells.push([NAV.min + ((n % N) + 0.5) * NAV.cell, NAV.min + (((n / N) | 0) + 0.5) * NAV.cell]);
+  for (let n = goal; n !== -1; n = came[n]) cells.push([NAV.minX + ((n % N) + 0.5) * NAV.cell, NAV.minZ + (((n / N) | 0) + 0.5) * NAV.cell]);
   cells.reverse();
   cells[0] = from; cells[cells.length - 1] = to;
   return simplify(cells, 2.5);

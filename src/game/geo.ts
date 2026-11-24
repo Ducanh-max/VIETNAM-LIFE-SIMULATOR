@@ -278,13 +278,19 @@ function hitsObstacle([px, pz]: Point) {
 /** True when a camera position would be inside a building, wall or other blocker. */
 export function cameraBlocked(p: Point) { return hitsObstacle(p); }
 
-export const WORLD_LIMIT = { x: 1300, z: 1300 }; // the OSM extract covers about ±1.3 km around the lake
+export const WORLD_LIMIT = { x: 1300, z: 1300 }; // the lake district: about ±1.3 km around the lake
+/** The corridor west along Tràng Thi, Nguyễn Thái Học, Kim Mã and Liễu Giai to Lotte Center Hà Nội. */
+export const CORRIDOR = { x0: -4500, x1: -1200, z0: -740, z1: 360 };
+/** Inside the mapped area (the district or the corridor). */
+export function inWorld([x, z]: Point) {
+  return (Math.abs(x) <= WORLD_LIMIT.x && Math.abs(z) <= WORLD_LIMIT.z) || (x >= CORRIDOR.x0 && x <= CORRIDOR.x1 && z >= CORRIDOR.z0 && z <= CORRIDOR.z1);
+}
 
 const templeWalk = offsetRing(templeIsland, -0.6);
 const bridgeShore = offsetRing(shore, 1.5);
 
 export function canWalk(point: Point): boolean {
-  if (Math.abs(point[0]) > WORLD_LIMIT.x || Math.abs(point[1]) > WORLD_LIMIT.z) return false;
+  if (!inWorld(point)) return false;
   if (hitsObstacle(point)) return false;
   if (!insidePolygon(point, shore)) return true;
   if (insidePolygon(point, templeWalk)) return true;

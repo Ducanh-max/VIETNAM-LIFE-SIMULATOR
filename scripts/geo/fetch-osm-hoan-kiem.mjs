@@ -11,11 +11,12 @@ const toLocal = ({ lat, lon }) => [(lon - cLon) * mLon, -(lat - cLat) * 111_320]
 // Hồ Gươm, the whole old quarter up to Đồng Xuân market, the French quarter (Tràng Tiền, Nhà hát Lớn, Hai Bà Trưng,
 // Bà Triệu, Hàng Bài) and Nhà thờ Lớn / Lý Quốc Sư to the west: about ±1.3 km around the lake centre.
 const bbox = '21.0175,105.8405,21.0405,105.8645';
-const query = `[out:json][timeout:180];(
-  way["highway"](${bbox});
-  way["building"](${bbox});
-  way["leisure"~"park|garden"](${bbox});
-);out geom tags;`;
+// Plus a corridor west to Lotte Center Hà Nội (54 Liễu Giai) along Tràng Thi, Điện Biên Phủ, Nguyễn Thái Học, Kim Mã and Liễu Giai.
+const corridor = '21.0255,105.8090,21.0355,105.8405';
+const query = `[out:json][timeout:240];(
+  way["highway"](${bbox}); way["building"](${bbox}); way["leisure"~"park|garden"](${bbox});
+  way["highway"](${corridor}); way["building"](${corridor}); way["leisure"~"park|garden"](${corridor});
+);out body geom;`;
 
 const endpoints = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
 let data;
@@ -29,10 +30,12 @@ for (const url of endpoints) {
 }
 if (!data) throw new Error('All Overpass endpoints failed');
 
-function simplify(points, tolerance) {
+/** Douglas–Peucker; vertices flagged in `fixed` (nodes shared with other ways: junctions) are always kept. */
+function simplify(points, tolerance, fixed) {
   if (points.length < 3) return points;
   const sq = tolerance * tolerance;
   const keep = new Uint8Array(points.length); keep[0] = keep[points.length - 1] = 1;
+  if (fixed) fixed.forEach((f, i) => { if (f) keep[i] = 1; });
   const stack = [[0, points.length - 1]];
   while (stack.length) {
     const [a, b] = stack.pop();
@@ -52,16 +55,22 @@ function simplify(points, tolerance) {
 const round = (p, step) => [Math.round(p[0] / step) * step, Math.round(p[1] / step) * step].map((v) => +v.toFixed(1));
 const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : undefined; };
 
+// how many ways use each node: junction nodes must survive simplification so streets stay connected
+const uses = new Map();
+for (const el of data.elements) if (el.type === 'way' && el.tags?.highway && el.nodes) for (const n of new Set(el.nodes)) uses.set(n, (uses.get(n) ?? 0) + 1);
+const seenWays = new Set();
 const skip = new Set(['steps', 'corridor', 'elevator', 'proposed', 'construction', 'platform', 'bus_stop']);
 const roads = [];
 const buildings = [];
 const parks = [];
 for (const el of data.elements) {
-  if (el.type !== 'way' || !el.geometry) continue;
+  if (el.type !== 'way' || !el.geometry || seenWays.has(el.id)) continue;
+  seenWays.add(el.id);
   const t = el.tags ?? {};
   const pts = el.geometry.map(toLocal);
   if (t.highway && !skip.has(t.highway) && t.area !== 'yes') {
-    const p = simplify(pts, 0.8).map((q) => round(q, 0.1));
+    const fixed = el.nodes ? el.nodes.map((n) => (uses.get(n) ?? 0) > 1) : null;
+    const p = simplify(pts, 0.8, fixed).map((q) => round(q, 0.1));
     if (p.length < 2) continue;
     roads.push({ n: t.name ?? '', h: t.highway, l: num(t.lanes), o: t.oneway === 'yes' ? 1 : undefined, w: num(t.width), p });
   } else if (t.building) {
