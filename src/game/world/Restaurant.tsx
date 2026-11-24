@@ -129,6 +129,7 @@ function useRestaurantMaterials() {
       pot: new THREE.MeshStandardMaterial({ color: '#a7aaab', roughness: 0.3, metalness: 0.9 }),
       tissue: new THREE.MeshStandardMaterial({ color: '#e45b7a', roughness: 0.6 }),
       sauce: new THREE.MeshStandardMaterial({ color: '#b5651d', roughness: 0.2, transparent: true, opacity: 0.85 }),
+      ember: new THREE.MeshBasicMaterial({ color: '#ffb347' }),
     };
   }, []);
 }
@@ -154,7 +155,10 @@ function DiningTable({ t, mats, bare = false }: { t: Table; mats: ReturnType<typ
 }
 
 /** Charcoal brazier on the pavement with clamps of chả and rising smoke. */
-function Grill({ mats }: { mats: ReturnType<typeof useRestaurantMaterials> }) {
+function Grill({ mats, fan }: { mats: ReturnType<typeof useRestaurantMaterials>; fan: PersonAnim }) {
+  const embers = useRef<THREE.Group>(null);
+  const emberData = useMemo(() => Array.from({ length: 10 }, () => ({ t: Math.random(), x: (Math.random() - 0.5) * 0.4, z: (Math.random() - 0.5) * 0.4 })), []);
+  const glow = useRef(0);
   const smoke = useRef<THREE.Group>(null);
   const coal = useRef<THREE.PointLight>(null);
   const puffTexture = useMemo(() => canvasTexture(64, 64, (ctx) => {
@@ -164,7 +168,17 @@ function Grill({ mats }: { mats: ReturnType<typeof useRestaurantMaterials> }) {
   const puffs = useMemo(() => Array.from({ length: 14 }, (_, i) => ({ t: i / 14, x: (Math.random() - 0.5) * 0.3, z: (Math.random() - 0.5) * 0.3 })), []);
   const puffMats = useMemo(() => puffs.map(() => new THREE.SpriteMaterial({ map: puffTexture, transparent: true, depthWrite: false, opacity: 0.5 })), [puffs, puffTexture]);
   useFrame((state, dt) => {
-    if (coal.current) coal.current.intensity = 2.2 + Math.sin(state.clock.elapsedTime * 13) * 0.4 + Math.sin(state.clock.elapsedTime * 7.3) * 0.3;
+    // the coals brighten and throw a few sparks while Đạt fans them
+    glow.current = THREE.MathUtils.damp(glow.current, fan.beat ?? 0, 6, dt);
+    if (coal.current) coal.current.intensity = 2.0 + glow.current * 1.6 + Math.sin(state.clock.elapsedTime * 13) * 0.4 + Math.sin(state.clock.elapsedTime * 7.3) * 0.3;
+    embers.current?.children.forEach((child, i) => {
+      const e = emberData[i];
+      e.t += dt * (0.5 + glow.current * 1.4);
+      if (e.t > 1) { e.t = 0; e.x = (Math.random() - 0.5) * 0.4; e.z = (Math.random() - 0.5) * 0.4; }
+      child.position.set(e.x + Math.sin(e.t * 9 + i) * 0.04, 0.66 + e.t * (0.35 + glow.current * 0.5), e.z);
+      child.visible = glow.current > 0.15 && e.t < 0.9;
+      child.scale.setScalar(0.012 * (1 - e.t));
+    });
     const g = smoke.current; if (!g) return;
     g.children.forEach((child, i) => {
       const p = puffs[i];
@@ -181,6 +195,7 @@ function Grill({ mats }: { mats: ReturnType<typeof useRestaurantMaterials> }) {
     {[-0.12, 0.08].map((z, i) => <group key={z} position={[-0.05, 0.68, z]} rotation={[0, 0.2 * (i ? -1 : 1), 0]}><GrillClamp /></group>)}
     <pointLight ref={coal} position={[0, 0.9, 0]} color="#ff7a2e" intensity={2.4} distance={4} decay={2} />
     <group ref={smoke}>{puffMats.map((mat, i) => <sprite key={i} material={mat} />)}</group>
+    <group ref={embers}>{emberData.map((_, i) => <mesh key={i} material={mats.ember}><sphereGeometry args={[1, 5, 4]} /></mesh>)}</group>
     {/* tray of raw chả waiting */}
     <mesh position={[0.6, 0.45, 0]} material={mats.steel}><boxGeometry args={[0.4, 0.02, 0.3]} /></mesh>
     <mesh position={[0.6, 0.22, 0]} material={mats.blue}><cylinderGeometry args={[0.15, 0.17, 0.44, 12]} /></mesh>
@@ -415,10 +430,10 @@ export function Restaurant({ paused }: { paused: boolean }) {
   return <group position={[RESTAURANT.center[0], GROUND_HEIGHT, RESTAURANT.center[1]]} rotation={[0, RESTAURANT.angle, 0]}>
     <Building mats={mats} />
     {TABLES.map((tb, i) => <DiningTable key={i} t={tb} mats={mats} bare={served && i === table} />)}
-    <Grill mats={mats} />
+    <Grill mats={mats} fan={cookAnim.current} />
     {/* Đạt, the grill cook, fanning the coals in a nón lá */}
     <group position={[GRILL[0] - 0.65, 0, GRILL[1]]} rotation={[0, Math.PI / 2, 0]}>
-      <Person anim={cookAnim.current} shirt="#5a7d5a" pants="#3a3226" hat="#d9c38a" skin="#b98a68" seed={4} />
+      <Person anim={cookAnim.current} shirt="#5a7d5a" pants="#3a3226" hat="#d9c38a" skin="#b98a68" seed={4} rightHand={<BambooFan />} />
       <mesh position={[0, STOOL_TOP / 2, 0]} material={mats.red}><cylinderGeometry args={[0.13, 0.15, STOOL_TOP, 12]} /></mesh>
       <NameTag name="Đạt" role="Nướng chả" y={1.65} />
     </group>
@@ -444,5 +459,28 @@ export function Restaurant({ paused }: { paused: boolean }) {
       {carrying && <group position={[0, 0.78, 0.36]}><Tray><TrayLoad order={order} /></Tray></group>}
     </group>
     {served && t && <group position={[t.x, TABLE_TOP, t.z]} rotation={[0, playerSide > 0 ? 0 : Math.PI, 0]}><TableSpread order={order} progress={phase === 'finished' ? 1 : eatProgress} inHand={inHand} /></group>}
+  </group>;
+}
+/** Quạt nan: a half-round woven bamboo fan on a bamboo handle (held at the palm anchor, blade beyond the fingers). */
+const fanGeo = (() => {
+  const blade = new THREE.CircleGeometry(0.12, 14, Math.PI, Math.PI); // the half below the handle
+  blade.rotateY(Math.PI / 2); blade.translate(0, -0.1, 0);
+  return { blade, rim: new THREE.TorusGeometry(0.12, 0.005, 4, 14, Math.PI).rotateZ(Math.PI).rotateY(Math.PI / 2).translate(0, -0.1, 0) };
+})();
+const fanMats = (() => {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 64;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#d9bd84'; ctx.fillRect(0, 0, 128, 64);
+  ctx.strokeStyle = 'rgba(120,85,40,.55)'; ctx.lineWidth = 2;
+  for (let i = 0; i <= 12; i++) { const a = Math.PI + (i / 12) * Math.PI; ctx.beginPath(); ctx.moveTo(64, 64); ctx.lineTo(64 + Math.cos(a) * 80, 64 + Math.sin(a) * 80); ctx.stroke(); }
+  for (let y = 4; y < 64; y += 6) { ctx.strokeStyle = 'rgba(150,110,60,.35)'; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(128, y); ctx.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return { blade: new THREE.MeshStandardMaterial({ map: t, roughness: 0.9, side: THREE.DoubleSide }), cane: new THREE.MeshStandardMaterial({ color: '#8a6234', roughness: 0.8 }) };
+})();
+function BambooFan() {
+  return <group>
+    <mesh position={[0, -0.03, 0]} material={fanMats.cane}><cylinderGeometry args={[0.006, 0.007, 0.15, 6]} /></mesh>
+    <mesh geometry={fanGeo.blade} material={fanMats.blade} castShadow />
+    <mesh geometry={fanGeo.rim} material={fanMats.cane} />
   </group>;
 }

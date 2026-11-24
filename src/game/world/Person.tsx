@@ -1,5 +1,5 @@
-import { useFrame } from '@react-three/fiber';
-import { useMemo, useRef, type ReactNode } from 'react';
+import { createPortal, useFrame } from '@react-three/fiber';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { BlobShadow, ChibiModel, PLAYER_DIMENSIONS as PD, type Expression, type PlayerRig } from '../character/ChibiModel';
 import { npcOutfit, type NpcRole, type Outfit } from '../character/outfit';
@@ -21,7 +21,7 @@ export function NameTag({ name, role, y = 1.85, color = '#e6bd83' }: { name: str
   return <sprite material={material} position={[0, y, 0]} scale={[1.1, 0.275, 1]} />;
 }
 
-export type PersonAnim = { mode: 'stand' | 'walk' | 'sit' | 'eat' | 'fan' | 'carry' | 'wave' | 'phone' | 'talk' | 'ride' | 'drive'; speed: number };
+export type PersonAnim = { mode: 'stand' | 'walk' | 'sit' | 'eat' | 'fan' | 'carry' | 'wave' | 'phone' | 'talk' | 'ride' | 'drive'; speed: number; /** written back by 'fan': 0..1 how hard the coals are fanned right now */ beat?: number };
 /** Hips height of a seated chibi (on a low stool or a vehicle seat: place the Person so its origin is SIT_HIP below the seat). */
 export const SIT_HIP = PD.sitHip;
 
@@ -32,8 +32,9 @@ export const SIT_HIP = PD.sitHip;
  * can change pose every frame without React re-renders. NPCs use LOD 1 up close and LOD 2 further away,
  * a blob shadow instead of shadow maps, and update their pose less often when far.
  */
-export function Person({ anim, shirt = '#f3efe6', pants = '#2d3442', skin, hair, apron, hat, children, seed = 0, role = 'middleAged', outfit, expression }: {
+export function Person({ anim, shirt = '#f3efe6', pants = '#2d3442', skin, hair, apron, hat, children, seed = 0, role = 'middleAged', outfit, expression, rightHand }: {
   anim: PersonAnim; shirt?: string; pants?: string; skin?: string; hair?: string; apron?: string; hat?: string; children?: ReactNode; seed?: number; role?: NpcRole; outfit?: Outfit; expression?: Expression;
+  /** A prop held in the right hand (attached to the palm anchor). */ rightHand?: ReactNode;
 }) {
   const o = useMemo(() => outfit ?? npcOutfit(role, seed, {
     top: apron ? 'tee' : 'shirt', tee: shirt, hood: null, sling: false, backpack: false,
@@ -42,6 +43,9 @@ export function Person({ anim, shirt = '#f3efe6', pants = '#2d3442', skin, hair,
     apron: apron ?? null, hat: hat ? 'nonla' : 'none', hatColor: hat ?? '#d9c38a',
   }), [outfit, role, seed, shirt, pants, skin, hair, apron, hat]);
   const rig = useRef<PlayerRig>(null);
+  const [handR, setHandR] = useState<THREE.Group | null>(null);
+  useEffect(() => { setHandR(rig.current?.anchors.handR ?? null); }, [o]);
+  const fanT = useRef(seed);
   const phase = useRef(seed * 3.7);
   const skip = useRef(seed % 3);
   const acc = useRef(0);
@@ -77,7 +81,19 @@ export function Person({ anim, shirt = '#f3efe6', pants = '#2d3442', skin, hair,
     let hl: Parameters<PlayerRig['setHand']>[1] = 'relaxed', hr: Parameters<PlayerRig['setHand']>[1] = 'relaxed';
     if (a.mode === 'carry') { arm(1, -0.75, 0.3, -1.2); arm(-1, -0.75, -0.3, -1.2); hl = hr = 'open'; }
     else if (a.mode === 'wave') { arm(-1, -0.2, -2.5 + s * 0.35, -0.5); arm(1, 0, 0.1, -0.1); hr = 'wave'; }
-    else if (a.mode === 'fan') { arm(-1, -0.9, -0.4 - s * 0.35, -0.9); arm(1, -0.7, 0.2, -0.9); hr = 'grip'; }
+    else if (a.mode === 'fan') {
+      // fan the coals with a steady side-to-side rhythm; now and then stop and flip the chả with the other hand
+      fanT.current += dt;
+      const c = fanT.current % 7.5;
+      const fanning = c < 5.6;
+      const ease = fanning ? Math.min(1, c / 0.4, (5.6 - c) / 0.4) : 0;
+      const w = Math.sin(fanT.current * 8.5);
+      arm(-1, -0.95 + (1 - ease) * 0.35, -0.3 - w * 0.32 * ease, -1.05 + w * 0.22 * ease);
+      if (fanning) arm(1, -0.55, 0.2, -0.95);
+      else { const f = Math.sin(((c - 5.6) / 1.9) * Math.PI); arm(1, -1.0 - f * 0.45, 0.12, -0.7 + f * 0.3); hl = 'grip'; }
+      hr = 'grip';
+      a.beat = ease * (0.6 + 0.4 * Math.abs(w));
+    }
     else if (a.mode === 'eat') { const bite = Math.max(0, s); arm(-1, -0.9 - bite * 0.6, -0.25, -1.2 - bite * 0.8); arm(1, -0.7, 0.25, -1.0); hr = 'chopsticks'; }
     else if (a.mode === 'ride' || a.mode === 'drive') { arm(1, -1.25, 0.25, -0.3); arm(-1, -1.25, -0.25, -0.3); hl = hr = 'wheel'; }
     else if (a.mode === 'sit') { arm(1, -0.55, 0.15, -0.8); arm(-1, -0.55, -0.15, -0.8); }
@@ -91,6 +107,7 @@ export function Person({ anim, shirt = '#f3efe6', pants = '#2d3442', skin, hair,
   return <group>
     {!(anim.mode === 'ride' || anim.mode === 'drive') && <BlobShadow size={0.6} />}
     <ChibiModel ref={rig} outfit={o} expression={expr} idleLook={anim.mode === 'stand'} lodLevels={[1, 2, 2]} lodDistances={[11, 60]} />
+    {handR && rightHand ? createPortal(rightHand, handR) : null}
     {children}
   </group>;
 }

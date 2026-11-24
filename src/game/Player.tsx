@@ -34,6 +34,10 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
   const seatYaw = useRef(0);
   const lookOffset = useRef(0);
   const lastChaseYaw = useRef(0);
+  // mouse look is accumulated and fed in smoothly each frame; the follow camera orbits a smoothed focus
+  const lookPending = useRef({ yaw: 0, pitch: 0 });
+  const camFocus = useRef<THREE.Vector3 | null>(null);
+  const camDist = useRef(7.5);
 
   useEffect(() => { if (freeCamera) drone.current.copy(camera.position); }, [freeCamera, camera]);
   useEffect(() => {
@@ -52,8 +56,10 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
     };
     const up = (e: KeyboardEvent) => keys.current.delete(e.code);
     const look = (dx: number, dy: number) => {
-      yaw.current -= dx * 0.0028;
-      pitch.current = THREE.MathUtils.clamp(pitch.current + dy * 0.0022, -0.15, 1.25);
+      // pointer-lock sometimes reports a huge bogus jump: ignore it
+      if (Math.abs(dx) > 300 || Math.abs(dy) > 300) return;
+      lookPending.current.yaw -= dx * 0.0026;
+      lookPending.current.pitch += dy * 0.002;
     };
     const move = (e: MouseEvent) => {
       if (paused) return;
@@ -100,6 +106,13 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
       if (debugCam) { camera.position.set(debugCam[0], debugCam[1], debugCam[2]); camera.lookAt(debugCam[3], debugCam[4], debugCam[5]); focus.set(debugCam[3], 0, debugCam[5]); return; }
     }
     const k = keys.current;
+    // feed the accumulated mouse movement in over a few frames (frame-rate independent)
+    {
+      const lp = lookPending.current; const f = 1 - Math.exp(-22 * dt);
+      const dyaw = lp.yaw * f, dpitch = lp.pitch * f;
+      yaw.current += dyaw; lp.yaw -= dyaw;
+      pitch.current = THREE.MathUtils.clamp(pitch.current + dpitch, -0.15, 1.25); lp.pitch -= dpitch;
+    }
     /**
      * Chase camera locked behind a vehicle's heading. Mouse / arrow look only adds a temporary offset
      * that eases back to zero, so the bike is always seen from behind in its direction of travel.
@@ -278,12 +291,15 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
       const q: Point = [p.x - forward.x * Math.cos(pitch.current) * dd, p.z - forward.z * Math.cos(pitch.current) * dd];
       if (cameraBlocked(q)) { dist = Math.max(1.2, dd - 0.35); break; }
     }
-    const desired = p.clone()
-      .addScaledVector(forward, -Math.cos(pitch.current) * dist)
-      .add(new THREE.Vector3(0, 1.6 + Math.sin(pitch.current) * dist, 0));
-    desired.y = Math.max(desired.y, p.y + 0.4);
-    camera.position.lerp(desired, 1 - Math.exp(-8 * dt));
-    camera.lookAt(p.x, p.y + 1.5, p.z);
+    // orbit a smoothed focus at the exact yaw/pitch (no chord-cutting lerp, so turning stays smooth);
+    // pull in instantly when a wall blocks the view, ease back out
+    if (!camFocus.current || camFocus.current.distanceTo(p) > 4) camFocus.current = p.clone(); // after a teleport, ride or seat
+    const cf = camFocus.current.lerp(p, 1 - Math.exp(-14 * dt));
+    camDist.current = dist < camDist.current ? THREE.MathUtils.damp(camDist.current, dist, 25, dt) : THREE.MathUtils.damp(camDist.current, dist, 4, dt);
+    const cd = camDist.current;
+    camera.position.set(cf.x - forward.x * Math.cos(pitch.current) * cd, cf.y + 1.25 + Math.sin(pitch.current) * cd, cf.z - forward.z * Math.cos(pitch.current) * cd);
+    camera.position.y = Math.max(camera.position.y, cf.y + 0.4);
+    camera.lookAt(cf.x, cf.y + 1.1, cf.z);
   });
 
   return <group ref={avatar} position={position.current.toArray()}><Avatar speed={speed} /></group>;
