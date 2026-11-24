@@ -4,7 +4,8 @@
  * glasses, bag, backpack, apron) and the player's outfit is saved in localStorage, ready for a wardrobe
  * or clothes shop.
  */
-export type HairStyle = 'swept' | 'short' | 'bob' | 'ponytail' | 'bun' | 'thin';
+/** 'swept' = the player's messy chibi hair, 'thin' = short grey elder hair. */
+export type HairStyle = 'swept' | 'short' | 'fringe' | 'side' | 'bob' | 'long' | 'ponytail' | 'bun' | 'thin';
 export type Outfit = {
   skin: string;
   hairStyle: HairStyle; hair: string; hairLight: string; hairDark: string;
@@ -22,17 +23,17 @@ export type Outfit = {
 
 /** The main character, after the "Đời Việt – Nhân vật chính" sheet. */
 export const PLAYER_OUTFIT: Outfit = {
-  skin: '#efc29f',
+  skin: '#F1B98B',
   hairStyle: 'swept', hair: '#302A29', hairLight: '#49403D', hairDark: '#211D1C',
   top: 'jacket', tee: '#F2EFE8', jacket: '#78836A', jacketLight: '#929D82', jacketDark: '#515C48', jacketTrim: '#444F3F', hood: '#E5DCCC',
   pants: '#35363C', pantsLight: '#484951', pantsDark: '#24252A', pantsCuff: '#616269', cargo: true, shorts: false, skirt: false,
-  shoe: '#F4F1EA', shoeSole: '#E9E2D4', shoeStripe: '#3a3b40',
+  shoe: '#F2EFE8', shoeSole: '#DDD8CF', shoeStripe: '#35363C',
   sling: true, backpack: false, apron: null,
   hat: 'none', hatColor: '#1d1d1f', glasses: false,
   build: 1, height: 1,
 };
 
-const KEY = 'doi-viet-outfit-v1';
+const KEY = 'doi-viet-outfit-v2'; // v2: chibi palette
 export function loadPlayerOutfit(): Outfit {
   try { const s = JSON.parse(localStorage.getItem(KEY) ?? 'null'); if (s && typeof s === 'object') return { ...PLAYER_OUTFIT, ...s }; } catch { /* ignore */ }
   return PLAYER_OUTFIT;
@@ -57,7 +58,7 @@ export const HAIR_PRESETS: { name: string; hair: string; light: string; dark: st
 // ---- NPC variety -----------------------------------------------------------
 function rnd(seed: number) { let s = (Math.abs(Math.floor(seed * 9301 + 49297)) % 233280) || 1; return () => (s = (s * 9301 + 49297) % 233280) / 233280; }
 const pick = <T,>(r: () => number, list: T[]) => list[Math.floor(r() * list.length) % list.length];
-const SKINS = ['#f1c7a6', '#e8b896', '#dcaa86', '#c9946f', '#b98364', '#f3d0b4'];
+const SKINS = ['#F1B98B', '#FFD2AD', '#DFA077', '#f3c7a0', '#d39a72', '#c48a64'];
 const HAIRS = [['#2a2422', '#3f3532', '#1a1615'], ['#1c1a1a', '#2f2b2a', '#0f0e0e'], ['#4a3426', '#634837', '#2f2118'], ['#8d8a86', '#a8a5a0', '#6d6a66'], ['#d8d4cc', '#ece8e0', '#b9b4aa']];
 const TOPS = ['#f2efe8', '#d9e4ef', '#e9d3c4', '#c84b3c', '#3f6e9e', '#2f5d50', '#e0b04a', '#6a5a8c', '#f4f4f2', '#2b2b2e', '#a7c7a1', '#e88a7a'];
 const PANTS = [['#35363C', '#484951', '#24252A'], ['#2b3a55', '#3d4f70', '#1d2840'], ['#6b5b47', '#85735c', '#4f4334'], ['#d8d0bf', '#e8e1d2', '#b8b0a0'], ['#1f1f22', '#333338', '#141416']];
@@ -76,7 +77,7 @@ export function npcOutfit(role: NpcRole, seed: number, overrides: Partial<Outfit
   const o: Outfit = {
     ...PLAYER_OUTFIT,
     skin: pick(r, SKINS), hair, hairLight, hairDark,
-    hairStyle: female ? pick(r, ['bob', 'ponytail', 'bun'] as HairStyle[]) : elder ? 'thin' : pick(r, ['short', 'swept', 'short'] as HairStyle[]),
+    hairStyle: female ? (elder ? 'bun' : pick(r, ['bob', 'ponytail', 'long', 'bun', 'fringe'] as HairStyle[])) : elder ? 'thin' : pick(r, ['short', 'swept', 'fringe', 'side', 'short'] as HairStyle[]),
     top: r() < 0.25 ? 'jacket' : r() < 0.5 ? 'shirt' : r() < 0.75 ? 'polo' : 'tee',
     tee, jacket: jacketBase.jacket, jacketLight: jacketBase.light, jacketDark: jacketBase.dark, jacketTrim: jacketBase.trim, hood: r() < 0.5 ? '#e5dccc' : null,
     pants, pantsLight, pantsDark, pantsCuff: pantsLight, cargo: r() < 0.25, shorts: role === 'jogger' || role === 'tourist' && r() < 0.6, skirt: female && r() < 0.3,

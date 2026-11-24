@@ -1,27 +1,36 @@
 import { useFrame } from '@react-three/fiber';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { CAN_OFFSET, drinkLevels, firstDrink, GLASS_OFFSET, lerpN, lerpV, mealAt, SET, setToBody, track } from './meal';
+import { AnimMachine, GAIT, type AnimState } from './character/animState';
+import { BlobShadow } from './character/ChibiModel';
+import { FACE, surf } from './character/chibiGeometry';
+import { Phone3D } from './character/Phone3D';
+import { CAN_OFFSET, drinkLevels, firstDrink, GLASS_OFFSET, lerpN, lerpV, mealAt, SEAT_DROP, SET, setToBody, track } from './meal';
+import { PLAYER_DIMENSIONS as PD, PlayerModel, type Expression, type HandPose, type PlayerRig } from './PlayerModel';
 import { taxi } from './ride';
 import { bike, game, player, useGame } from './state';
-import { Phone3D } from './character/Phone3D';
-import { PlayerModel, type Expression, type HandPose, type PlayerRig } from './PlayerModel';
 import { Bottle, bottleLip, Chopsticks, IceGlass, Morsel, TakeawayBag } from './world/food';
 import { GRIP, PILLION, SEAT } from './world/Scooter';
 
 /*
- * The player's avatar: two-bone arms solved by IK (so hands really hold chopsticks, a can, a glass or the
- * scooter grips) and two-bone legs (so it can sit on a stool or a scooter with the feet on the floor).
+ * The player's chibi avatar, driven by an animation state machine (IDLE, WALK, RUN, SPRINT, SIT_DOWN,
+ * SITTING, STAND_UP, EATING, DRINKING, TALKING, WAVING, USING_PHONE, INTERACTING, RIDING, PASSENGER).
+ * Arms are two-bone IK chains (so the mitten hands really hold chopsticks, a can, a glass, the phone or
+ * the scooter grips); legs are posed so the feet stay on the ground, the stool's footrest or the scooter
+ * floor. The walk/run cycle advances with the distance actually covered (no foot sliding).
  * The avatar faces +z. "Body" space is the avatar group shifted by the current seat; the torso pivots at
- * the hips to lean forward. Held props follow the hand where the IK actually put it.
+ * the spine to lean. Held props follow the hand where the IK actually put it.
  */
-const HIP = 0.92;
-const SPINE = 0.98; // spine pivot (hips + 0.06) of PlayerModel; 'torso space' below means spine space
-const L1 = 0.3; // upper arm
-const L2 = 0.305; // elbow → hand joint (forearm + wrist)
-const HAND = 0.035; // hand centre beyond the hand joint
-const SHOULDER = (side: number) => new THREE.Vector3(side * 0.22, 0.38, 0); // spine space
-const MOUTH = new THREE.Vector3(0, 0.55, 0.15); // spine space (head lowered by HEAD_DROP)
+const HIP = PD.hipY;
+const SPINE = PD.hipY + PD.spineY; // spine pivot; 'torso space' below means spine space
+const L1 = PD.upperArm;
+const L2 = PD.forearm;
+const HAND = PD.hand; // palm centre beyond the wrist
+const LEG = PD.hipY - PD.hipDrop; // hip joint height = leg length to the ground
+const SHOULDER = (side: number) => new THREE.Vector3(side * PD.shoulderX, PD.shoulderY, 0); // spine space
+const MOUTH = new THREE.Vector3(0, PD.neckY + PD.headY + FACE.mouthY, surf(0, FACE.mouthY) + 0.01); // spine space
+const STICK = 0.15; // hand → chopstick tips
+const SCOOTER_FWD = 0.2; // the small rider sits a little forward on the scooter seat
 const DOWN = new THREE.Vector3(0, -1, 0);
 const X = new THREE.Vector3(1, 0, 0);
 const tmpQ = new THREE.Quaternion();
@@ -30,27 +39,27 @@ const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 function toTorso(p: THREE.Vector3, lean: number) { return p.clone().sub(V(0, SPINE, 0)).applyAxisAngle(X, -lean); }
 function toBody(p: THREE.Vector3, lean: number) { return p.clone().applyAxisAngle(X, lean).add(V(0, SPINE, 0)); }
 
-/** Point a shoulder joint along upperDir and its elbow along oreDir (both in spine space). */
+/** Point a shoulder joint along upperDir and its elbow along foreDir (both in spine space). */
 function setArm(shoulder: THREE.Group, elbow: THREE.Group, upperDir: THREE.Vector3, foreDir: THREE.Vector3) {
-  shoulder.quaternion.copy(tmpQ.setFromUnitVectors(DOWN, upperDir));
+  shoulder.quaternion.copy(tmpQ.setFromUnitVectors(DOWN, upperDir.clone().normalize()));
   const local = foreDir.clone().applyQuaternion(shoulder.quaternion.clone().invert());
   elbow.quaternion.copy(tmpQ.setFromUnitVectors(DOWN, local.normalize()));
 }
 
 /**
  * Two-bone IK in torso space. `pole` is the direction the elbow should point (out, down and a little
- * forward for anything done in front of the body). Returns the hand centre actually reached.
+ * back for anything done in front of the body). Returns the palm centre actually reached.
  */
-function solveArm(side: number, hand: THREE.Vector3, upper: THREE.Group, fore: THREE.Group, pole = V(side * 0.85, -0.55, 0.3)) {
+function solveArm(side: number, hand: THREE.Vector3, upper: THREE.Group, fore: THREE.Group, pole = V(side * 0.85, -0.55, -0.1)) {
   const S = SHOULDER(side);
   const d = hand.clone().sub(S);
   const dir = d.clone().normalize();
-  const len = THREE.MathUtils.clamp(d.length(), 0.12, L1 + L2 + HAND - 0.003);
+  const len = THREE.MathUtils.clamp(d.length(), 0.1, L1 + L2 + HAND - 0.003);
   const lw = len - HAND; // shoulder → wrist
   const cosA = THREE.MathUtils.clamp((L1 * L1 + lw * lw - L2 * L2) / (2 * L1 * lw), -1, 1);
   const a = Math.acos(cosA);
   const p = pole.clone().sub(dir.clone().multiplyScalar(pole.dot(dir)));
-  if (p.lengthSq() < 1e-6) p.set(side, -1, 0); // pole parallel to the reach: pick any sideways bend
+  if (p.lengthSq() < 1e-6) p.set(side, -1, 0);
   p.normalize();
   const E = S.clone().addScaledVector(dir, Math.cos(a) * L1).addScaledVector(p, Math.sin(a) * L1);
   const W = S.clone().addScaledVector(dir, lw);
@@ -58,10 +67,14 @@ function solveArm(side: number, hand: THREE.Vector3, upper: THREE.Group, fore: T
   return S.clone().addScaledVector(dir, len);
 }
 
+/** Debug hook: the current animation state (read by tests). */
+export const avatarAnim = { state: 'IDLE' as AnimState };
+
 export function Avatar({ speed, expressionOverride }: { speed: { current: number }; expressionOverride?: { current: Expression | null } }) {
   const body = useRef<THREE.Group>(null);
   const rig = useRef<PlayerRig>(null);
   const propSpace = useRef<THREE.Group>(null);
+  const blob = useRef<THREE.Group>(null);
   const [expr, setExpr] = useState<Expression>('neutral');
   const shipping = useGame((s) => !!s.job);
   const outfit = useGame((s) => s.outfit);
@@ -75,6 +88,8 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
   const stream = useRef<THREE.Mesh>(null);
   const bag = useRef<THREE.Group>(null);
   const phase = useRef(0);
+  const machine = useMemo(() => new AnimMachine(), []);
+  const clock = useRef({ t: 0, dialogAt: -1, interactAt: -10, gait: 0 });
   const [morselKind, setMorselKind] = useState<'noodle' | 'wrap' | 'dipped'>('noodle');
   const [glassLevel, setGlassLevel] = useState(0);
   const drinkId = useGame((s) => firstDrink(s.order) ?? 'lavie');
@@ -82,13 +97,31 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
   const expression = useRef<Expression>('neutral');
   const mood = useRef<{ kind: Expression; until: number; toast: number }>({ kind: 'neutral', until: 0, toast: 0 });
 
-  useFrame((_, dt) => {
+  // E (interact) gives a short reach-forward gesture when standing
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.code === 'KeyE' && !e.repeat) clock.current.interactAt = clock.current.t; };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05);
     const b = body.current, R0 = rig.current, pr = propSpace.current;
     if (!b || !R0 || !pr || !R0.spine) return;
     const t = R0.spine;
     const s = game.get();
-    phase.current += dt * (4 + speed.current * 1.25);
-    let showSticks = false, showMorsel = false, showBottle = false, showGlass = false, showStream = false, showBag = false;
+    const c = clock.current; c.t += dt;
+    if (s.dialog && c.dialogAt < 0) c.dialogAt = c.t; else if (!s.dialog) c.dialogAt = -1;
+    sitBlend.current = THREE.MathUtils.damp(sitBlend.current, player.seat ? 1 : 0, 5, dt);
+    const k = sitBlend.current;
+    const mealNow = s.phase === 'eating' ? mealAt(s.order, s.eatProgress) : null;
+    const state = machine.update({
+      speed: speed.current, sitBlend: k, seated: !!player.seat, onScooter: bike.riding && !taxi.passenger, pillion: taxi.passenger && taxi.vehicle !== 'car', inCar: taxi.passenger && taxi.vehicle === 'car',
+      meal: mealNow?.action?.kind ?? null, ordering: s.phase === 'menu', dialog: !!s.dialog, dialogAge: c.dialogAt < 0 ? 0 : c.t - c.dialogAt, phone: s.phone, interactAge: c.t - c.interactAt,
+    }, dt);
+    avatarAnim.state = state;
+
+    let showSticks = false, showMorsel = false, showBottle = false, showGlass = false, showStream = false, showBag = false, showPhone = false;
     let headPitch = 0;
     const R = -1, L = 1; // right arm at −x, left arm at +x
     const leg = (side: number, thigh: number, knee: number, splay = 0) => {
@@ -97,75 +130,85 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
       (i ? R0.kneeL : R0.kneeR).rotation.set(knee, 0, 0);
     };
     /** Damp the torso toward the target lean and return the lean actually shown. */
-    const lean = (target: number) => { t.rotation.x = THREE.MathUtils.damp(t.rotation.x, target, 12, dt); pr.rotation.x = t.rotation.x; return t.rotation.x; };
+    const lean = (target: number) => { t.rotation.x = THREE.MathUtils.damp(t.rotation.x, target, 10, dt); pr.rotation.x = t.rotation.x; return t.rotation.x; };
     const arm = (side: number, target: THREE.Vector3, pole?: THREE.Vector3) => solveArm(side, target, side < 0 ? R0.shoulderR : R0.shoulderL, side < 0 ? R0.elbowR : R0.elbowL, pole);
     let handPoseL: HandPose = 'relaxed', handPoseR: HandPose = 'relaxed';
-    let showPhone = false; let idle = false; let mouthState: Expression | null = null;
-    // smooth sit-down / stand-up instead of snapping onto the stool
-    sitBlend.current = THREE.MathUtils.damp(sitBlend.current, player.seat ? 1 : 0, 6, dt);
-    const k = sitBlend.current;
+    let idle = false; let mouthState: Expression | null = null;
+    // hips start neutral every frame; states add sway / twist
+    R0.hips.position.set(0, HIP, 0); R0.hips.rotation.set(0, 0, 0);
+    t.rotation.y = 0; t.rotation.z = 0;
+    if (R0.bag) R0.bag.rotation.x = THREE.MathUtils.damp(R0.bag.rotation.x, 0, 4, dt);
+    if (blob.current) blob.current.visible = state !== 'PASSENGER' || taxi.vehicle !== 'car';
 
-    if (taxi.passenger && taxi.vehicle === 'car') {
-      // ---- back seat of an Đen Car: the avatar root sits at the hip point (placed by the controller)
+    if (state === 'PASSENGER' && taxi.vehicle === 'car') {
+      // ---- back seat of an Đen SM car: the avatar root sits at the hip point (placed by the controller)
       b.position.set(0, -HIP, 0);
-      leg(-1, -1.5, 1.5, 0.06); leg(1, -1.5, 1.5, -0.06);
-      const al = lean(-0.05);
-      arm(R, toTorso(V(-0.17, HIP + 0.06, 0.3), al), V(-1, -0.4, -0.2));
-      arm(L, toTorso(V(0.17, HIP + 0.06, 0.3), al), V(1, -0.4, -0.2));
+      leg(-1, -1.45, 1.35, 0.06); leg(1, -1.45, 1.35, -0.06);
+      const al = lean(-0.04);
+      arm(R, toTorso(V(-0.14, HIP + 0.02, 0.22), al), V(-1, -0.4, -0.2));
+      arm(L, toTorso(V(0.14, HIP + 0.02, 0.22), al), V(1, -0.4, -0.2));
       idle = true;
-    } else if (bike.riding || taxi.passenger) {
-      // ---- on a scooter: hips on the seat, knees bent, feet on the floor / pegs
-      const pillion = taxi.passenger;
+    } else if (state === 'RIDING' || state === 'PASSENGER') {
+      // ---- on a scooter: hips on the seat, knees bent, feet on the floor board; hands on the grips
+      const pillion = state === 'PASSENGER';
       const seat = pillion ? PILLION : SEAT;
-      b.position.set(0, seat.y - HIP, seat.z);
-      leg(-1, pillion ? -1.3 : -1.45, pillion ? 1.2 : 1.25, 0.12); leg(1, pillion ? -1.3 : -1.45, pillion ? 1.2 : 1.25, -0.12);
-      const al = lean(pillion ? 0.1 : 0.22);
+      const fwd = pillion ? 0.04 : SCOOTER_FWD;
+      b.position.set(0, seat.y - HIP, seat.z + fwd);
+      leg(-1, pillion ? -1.15 : -1.25, pillion ? 0.95 : 1.0, 0.16); leg(1, pillion ? -1.15 : -1.25, pillion ? 0.95 : 1.0, -0.16);
+      const al = lean(pillion ? 0.08 : 0.42);
       if (pillion) {
-        arm(R, toTorso(V(-0.2, HIP + 0.05, 0.32), al), V(-1, -0.4, -0.2)); // hands resting on the thighs
-        arm(L, toTorso(V(0.2, HIP + 0.05, 0.32), al), V(1, -0.4, -0.2));
+        arm(R, toTorso(V(-0.15, HIP + 0.02, 0.24), al), V(-1, -0.4, -0.2)); // hands resting on the thighs
+        arm(L, toTorso(V(0.15, HIP + 0.02, 0.24), al), V(1, -0.4, -0.2));
       } else {
-        handPoseL = handPoseR = 'fist';
+        handPoseL = handPoseR = 'wheel';
         for (const side of [R, L]) {
           const g = GRIP(side, bike.steer);
-          arm(side, toTorso(V(g.x - seat.x, g.y - seat.y + HIP, g.z - seat.z), al), V(side, -0.7, -0.25));
+          arm(side, toTorso(V(g.x - seat.x, g.y - seat.y + HIP, g.z - seat.z - fwd), al), V(side, -0.6, -0.3));
         }
+        headPitch = -0.12;
       }
     } else if (player.seat) {
-      // ---- seated at the table
-      b.position.set(0, -0.52 * k, 0);
-      leg(-1, -1.7 * k, 0.08 + 1.77 * k, 0.08 * k); leg(1, -1.7 * k, 0.08 + 1.77 * k, -0.08 * k); // low stool: knees up, feet flat
-      const restR = V(-0.18, 1.1, 0.42); const restL = V(0.3, 1.08, 0.4);
+      // ---- SIT_DOWN / SITTING / EATING / DRINKING / INTERACTING at the table (low plastic stool)
+      b.position.set(0, -SEAT_DROP * k, 0);
+      leg(-1, -1.3 * k, 0.05 + 1.05 * k, 0.1 * k); leg(1, -1.3 * k, 0.05 + 1.05 * k, -0.1 * k);
+      const restR = V(-0.13, 0.67, 0.27); const restL = V(0.14, 0.66, 0.25);
       const eating = s.phase === 'eating' || s.phase === 'finished' || s.phase === 'served';
       let handR = restR.clone(); let handL = restL.clone();
-      let leanTarget = 0.05;
+      let leanTarget = 0.06;
       let tipDir = V(-0.05, -0.62, 0.78).normalize();
       let bottlePose: { tilt: number; grip: number } | null = null;
       let glassPose: { tilt: number } | null = null;
       let streamSurface: THREE.Vector3 | null = null;
+      if (state === 'INTERACTING') {
+        // reading the menu and waving the waiter over
+        handR = V(-0.2, 0.98 + Math.sin(c.t * 9) * 0.03, 0.18); handPoseR = 'wave'; headPitch = 0.12;
+      }
       if (eating) {
         showSticks = s.phase === 'eating';
-        if (showSticks) handPoseR = 'pinch';
+        if (showSticks) handPoseR = 'chopsticks';
         const p = s.phase === 'eating' ? s.eatProgress : s.phase === 'finished' ? 1 : 0;
         const m = mealAt(s.order, p);
         const lv = drinkLevels(s.order, p);
         if (Math.abs(lv.glass - glassLevel) > 0.01) setGlassLevel(lv.glass);
-        const mouth = toBody(MOUTH, 0);
+        const mouth = toBody(MOUTH, t.rotation.x);
         const tableD = V(-0.05, -0.62, 0.78).normalize();
-        const mouthD = V(0.35, 0.3, -0.88).normalize();
-        let tip = restR.clone().addScaledVector(tableD, 0.2);
+        const mouthD = V(0.2, 0.62, -0.75).normalize();
+        let tip = restR.clone().addScaledVector(tableD, STICK);
+        headPitch = 0.22;
         if (m.action?.kind === 'bite') {
           const u = m.u;
           const B = setToBody(SET.bun[0], 0, SET.bun[1]); const H = setToBody(SET.herbs[0], 0, SET.herbs[1]); const Br = setToBody(SET.broth[0], 0, SET.broth[1]);
           const rest = tip.clone();
+          // pick noodles → a herb leaf → dip in the broth → up to the mouth → back
           tip = track(u, [
-            [0, rest], [0.14, B.clone().add(V(0, 0.09, 0))], [0.2, B.clone().add(V(0, 0.025, 0))], [0.3, B.clone().add(V(0, 0.11, 0))],
-            [0.4, H.clone().add(V(0, 0.13, 0))], [0.46, H.clone().add(V(0, 0.065, 0))], [0.54, H.clone().add(V(0, 0.14, 0))],
-            [0.62, Br.clone().add(V(0, 0.13, 0))], [0.68, Br.clone().add(V(0, 0.06, 0))], [0.74, Br.clone().add(V(0, 0.15, 0))],
-            [0.85, mouth.clone().add(V(0, -0.02, 0.03))], [0.89, mouth.clone().add(V(0, -0.01, 0.02))], [1, rest],
+            [0, rest], [0.14, B.clone().add(V(0, 0.08, 0))], [0.2, B.clone().add(V(0, 0.025, 0))], [0.3, B.clone().add(V(0, 0.1, 0))],
+            [0.4, H.clone().add(V(0, 0.12, 0))], [0.46, H.clone().add(V(0, 0.06, 0))], [0.54, H.clone().add(V(0, 0.13, 0))],
+            [0.62, Br.clone().add(V(0, 0.12, 0))], [0.68, Br.clone().add(V(0, 0.05, 0))], [0.74, Br.clone().add(V(0, 0.14, 0))],
+            [0.85, mouth.clone().add(V(0, -0.012, 0.012))], [0.89, mouth.clone().add(V(0, -0.006, 0.006))], [1, rest],
           ], lerpV);
-          tipDir = track(u, [[0, tableD], [0.74, tableD], [0.85, mouthD], [0.89, mouthD], [1, tableD]], (a, c, k) => a.clone().lerp(c, k).normalize());
-          leanTarget = track(u, [[0, 0.05], [0.14, 0.22], [0.4, 0.32], [0.62, 0.2], [0.85, 0.12], [1, 0.05]], lerpN);
-          headPitch = track(u, [[0, 0.25], [0.74, 0.3], [0.85, 0.05], [0.9, 0.08], [1, 0.25]], lerpN);
+          tipDir = track(u, [[0, tableD], [0.74, tableD], [0.85, mouthD], [0.89, mouthD], [1, tableD]], (a, c2, kk) => a.clone().lerp(c2, kk).normalize());
+          leanTarget = track(u, [[0, 0.06], [0.14, 0.28], [0.4, 0.36], [0.62, 0.28], [0.85, 0.08], [1, 0.06]], lerpN);
+          headPitch = track(u, [[0, 0.25], [0.74, 0.3], [0.85, -0.05], [0.9, 0.0], [1, 0.25]], lerpN);
           showMorsel = u > 0.2 && u < 0.885;
           if (u > 0.84) mouthState = 'eating';
           const kind = u < 0.46 ? 'noodle' : u < 0.68 ? 'wrap' : 'dipped';
@@ -177,7 +220,6 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
           const C = setToBody(dx + CAN_OFFSET, 0, dz); const G = setToBody(dx + GLASS_OFFSET, 0, dz);
           const grip = id === 'lavie' ? 0.1 : 0.06;
           const u = m.u;
-          headPitch = 0.22;
           if (m.action.kind === 'pour') {
             // grip the can, lift it over the glass, tip it, pour, put it back
             const above = G.clone().add(V(-0.06, 0.2, 0));
@@ -185,30 +227,30 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
             bottlePose = { tilt: track(u, [[0, 0], [0.38, 0], [0.48, -1.95], [0.7, -1.95], [0.8, 0], [1, 0]], lerpN), grip };
             showBottle = u > 0.2 && u < 0.92;
             if (showBottle) handPoseL = 'grip';
-            leanTarget = track(u, [[0, 0.05], [0.18, 0.3], [0.36, 0.25], [0.9, 0.3], [1, 0.05]], lerpN);
+            leanTarget = track(u, [[0, 0.06], [0.18, 0.34], [0.36, 0.3], [0.9, 0.34], [1, 0.06]], lerpN);
             showStream = u > 0.47 && u < 0.72;
             streamSurface = G.clone().add(V(0, 0.012 + 0.1 * lv.glass, 0));
           } else {
             // grip the glass, bring it to the mouth, tip it and the head back, put it down
-            const atMouth = mouth.clone().add(V(0.03, -0.12, 0.11));
+            const atMouth = mouth.clone().add(V(0.02, -0.075, 0.085));
             handL = track(u, [[0, restL], [0.2, G.clone().add(V(0, 0.06, 0))], [0.24, G.clone().add(V(0, 0.06, 0))], [0.46, atMouth], [0.74, atMouth], [0.86, G.clone().add(V(0, 0.06, 0))], [0.9, G.clone().add(V(0, 0.06, 0))], [1, restL]], lerpV);
             glassPose = { tilt: track(u, [[0, 0], [0.46, 0], [0.56, -1.0], [0.72, -1.2], [0.8, 0], [1, 0]], lerpN) };
             headPitch = track(u, [[0, 0.22], [0.46, 0], [0.56, -0.3], [0.72, -0.34], [0.8, 0.1], [1, 0.22]], lerpN);
-            leanTarget = track(u, [[0, 0.05], [0.2, 0.3], [0.46, 0.02], [0.86, 0.3], [1, 0.05]], lerpN);
+            leanTarget = track(u, [[0, 0.06], [0.2, 0.34], [0.46, 0.02], [0.86, 0.34], [1, 0.06]], lerpN);
             showGlass = u > 0.22 && u < 0.9;
-            if (showGlass) handPoseL = 'grip';
+            if (showGlass) handPoseL = 'cup';
             if (u > 0.44 && u < 0.76) mouthState = 'drinking';
           }
         }
-        handR = tip.clone().addScaledVector(tipDir, -0.2);
+        handR = tip.clone().addScaledVector(tipDir, -STICK);
       }
-      const al = lean(leanTarget);
+      // blend the seated reach in as the avatar settles onto the stool
+      const al = lean(leanTarget * k);
       const hr = arm(R, toTorso(handR, al));
       const hl = arm(L, toTorso(handL, al));
-      // props follow the hands where the IK actually put them
       const dirT = tipDir.clone().applyAxisAngle(X, -al);
-      if (sticks.current) { sticks.current.position.copy(hr).addScaledVector(dirT, 0.08); sticks.current.quaternion.setFromUnitVectors(V(0, 0, 1), dirT); }
-      if (morsel.current) morsel.current.position.copy(hr).addScaledVector(dirT, 0.2).add(V(0, -0.008, 0));
+      if (sticks.current) { sticks.current.position.copy(hr).addScaledVector(dirT, STICK - 0.12); sticks.current.quaternion.setFromUnitVectors(V(0, 0, 1), dirT); }
+      if (morsel.current) morsel.current.position.copy(hr).addScaledVector(dirT, STICK).add(V(0, -0.008, 0));
       if (heldBottle.current && bottlePose) {
         heldBottle.current.position.copy(hl);
         heldBottle.current.rotation.set(-al, 0, bottlePose.tilt);
@@ -227,34 +269,62 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
         heldGlass.current.children[0].position.set(0, -0.06, 0);
       }
     } else {
-      // ---- walking (with the takeaway bag in hand while delivering)
-      const run = Math.min(1, speed.current / 5);
-      const swing = run * Math.sin(phase.current) * 0.6;
-      b.position.set(0, Math.abs(Math.sin(phase.current)) * 0.04 * run - 0.52 * k, 0);
+      // ---- IDLE / WALK / RUN / SPRINT / STAND_UP / TALKING / WAVING / USING_PHONE / INTERACTING
+      const sp = speed.current;
+      const move = THREE.MathUtils.smoothstep(sp, 0.15, 1.2); // 0 standing … 1 moving
+      const runK = THREE.MathUtils.smoothstep(sp, GAIT.run - 0.4, GAIT.sprint + 0.6); // walk → run blend
+      const stepLen = THREE.MathUtils.lerp(0.48, 0.86, runK); // metres per step
+      // the cycle advances with the distance covered: one half cycle (π) per step → no foot sliding
+      phase.current += (sp * dt / stepLen) * Math.PI;
+      const ph = phase.current;
+      const A = THREE.MathUtils.lerp(0.5, 0.95, runK) * move; // thigh swing amplitude
+      const sw = Math.sin(ph) * A; // right thigh (+ = back)
+      const kneeK = THREE.MathUtils.lerp(0.55, 1.5, runK) * move;
+      const kneeR = 0.05 + kneeK * Math.max(0, -Math.cos(ph));
+      const kneeL = 0.05 + kneeK * Math.max(0, Math.cos(ph));
+      // the stance leg stays straight under the hips: drop the hips by how far the legs spread
+      const drop = LEG * (1 - Math.cos(sw)) * (1 - runK * 0.5);
+      const flight = runK * 0.035 * Math.abs(Math.sin(ph * 2 + 0.6));
       const lerp = THREE.MathUtils.lerp;
-      leg(-1, lerp(swing, -1.7, k), lerp(0.08 + Math.max(0, -swing) * 1.1, 1.85, k)); leg(1, lerp(-swing, -1.7, k), lerp(0.08 + Math.max(0, swing) * 1.1, 1.85, k));
-      lean(0.04 * run);
-      idle = run < 0.1;
-      showPhone = s.phone;
+      b.position.set(0, -drop + flight - SEAT_DROP * k, 0);
+      leg(-1, lerp(sw, -1.3, k), lerp(kneeR, 1.1, k), 0.02); leg(1, lerp(-sw, -1.3, k), lerp(kneeL, 1.1, k), -0.02);
+      // hips twist with the stride, the torso counter-rotates; running leans forward
+      R0.hips.rotation.y = Math.sin(ph) * 0.12 * move;
+      t.rotation.y = -Math.sin(ph) * 0.16 * move;
+      lean(lerp(0.03, 0.24, runK) * move);
+      if (R0.bag) R0.bag.rotation.x = Math.sin(ph * 2) * 0.12 * move;
+      idle = state === 'IDLE';
+      if (idle) {
+        // weight shift from foot to foot, feet stay planted
+        const w = Math.sin(c.t * 0.9);
+        R0.hips.position.x = w * 0.008; R0.hips.rotation.z = w * 0.025;
+        leg(-1, 0, 0.05 + Math.max(0, w) * 0.08, 0.02 - w * 0.025); leg(1, 0, 0.05 + Math.max(0, -w) * 0.08, -0.02 - w * 0.025);
+      }
+      showPhone = state === 'USING_PHONE';
       const carrying = s.job?.stage === 'deliver';
       for (const side of [R, L]) {
         if (showPhone && side === L) {
-          // holding the phone in front of the chest, looking down at it
-          const hl = arm(L, V(0.06, 0.3, 0.3), V(1, -0.6, -0.1));
+          // holding the phone in front of the chest, looking down at it; the other hand taps
+          const hl = arm(L, V(0.04, 0.27, 0.25), V(1, -0.6, -0.2));
           handPoseL = 'phone'; headPitch = 0.35;
-          if (phone3d.current) { phone3d.current.position.copy(hl).add(V(-0.02, -0.03, 0.02)); phone3d.current.rotation.set(-0.9, 0.35, 0); }
+          if (phone3d.current) { phone3d.current.position.copy(hl).add(V(-0.025, 0.01, 0.02)); phone3d.current.rotation.set(-1.05, 0.15, 0); }
           continue;
         }
+        if (showPhone && side === R) { arm(R, V(-0.02, 0.28 + Math.max(0, Math.sin(c.t * 7)) * 0.015, 0.29), V(-1, -0.6, -0.2)); handPoseR = 'pinch'; continue; }
         if (carrying && side === R) {
           handPoseR = 'grip';
-          const w = arm(R, V(-0.3, 0.12, 0.12), V(-1, -0.3, -0.3));
-          if (bag.current) { bag.current.position.copy(w).add(V(0, -0.3, 0)); showBag = true; }
+          const w = arm(R, V(-0.24, 0.0, 0.08), V(-1, -0.3, -0.3));
+          if (bag.current) { bag.current.position.copy(w).add(V(0, -0.28, 0)); showBag = true; }
           continue;
         }
-        const sw = (side < 0 ? -swing : swing) * 0.8;
-        const dirU = V(side * 0.08, -Math.cos(sw), Math.sin(sw)).normalize();
-        const dirF = dirU.clone().add(V(0, 0, 0.18 + Math.max(0, sw) * 0.4)).normalize();
-        setArm(side < 0 ? R0.shoulderR : R0.shoulderL, side < 0 ? R0.elbowR : R0.elbowL, dirU, dirF);
+        if (state === 'WAVING' && side === R) { arm(R, V(-0.27, 0.56, 0.06 + Math.sin(c.t * 11) * 0.05), V(-1, -0.2, -0.3)); handPoseR = 'wave'; continue; }
+        if (state === 'TALKING' && side === R) { const g = Math.sin(c.t * 3.1); arm(R, V(-0.16, 0.1 + g * 0.03, 0.2), V(-1, -0.5, -0.2)); handPoseR = 'open'; continue; }
+        if (state === 'INTERACTING' && side === R) { const u = Math.min(1, (c.t - c.interactAt) / 0.3); arm(R, V(-0.14, 0.1 + u * 0.06, 0.18 + u * 0.12), V(-1, -0.5, -0.2)); handPoseR = 'open'; continue; }
+        // natural swing: the arm opposite each leg swings forward; running bends the elbows
+        const a = (side < 0 ? sw : -sw) * 0.9 + (idle ? Math.sin(c.t * 0.9 + side) * 0.025 : 0);
+        const e = lerp(0.18, 1.35, runK) * Math.max(move, 0.3) + Math.max(0, a) * 0.3;
+        setArm(side < 0 ? R0.shoulderR : R0.shoulderL, side < 0 ? R0.elbowR : R0.elbowL, V(side * 0.16, -Math.cos(a), Math.sin(a)), V(side * 0.08, -Math.cos(a + e), Math.sin(a + e)));
+        if (runK > 0.5) { if (side < 0) handPoseR = 'fist'; else handPoseL = 'fist'; }
       }
     }
     // ---- facial expression: happy while eating / after good news, surprised when starving or on bad news
@@ -269,6 +339,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
     }
     expression.current = expressionOverride?.current ? expressionOverride.current : performance.now() < mood.current.until ? mood.current.kind
       : mouthState ? mouthState
+      : state === 'WAVING' ? 'happy'
       : s.dialog ? 'talking'
       : s.phase === 'eating' ? 'smile' : s.phase === 'finished' ? 'happy'
       : s.phone ? 'smile'
@@ -286,17 +357,20 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
     if (idle !== idleLook) setIdleLook(idle);
   });
 
-  return <group ref={body}>
-    <PlayerModel ref={rig} expression={expr} shipperBag={shipping} outfit={outfit} idleLook={idleLook} />
-    {/* held props live in a frame that follows the spine */}
-    <group ref={propSpace} position={[0, SPINE, 0]}>
-      <group ref={sticks} visible={false}><Chopsticks spread={0.008} /></group>
-      <group ref={morsel} visible={false}><Morsel kind={morselKind} /></group>
-      <group ref={heldBottle} visible={false}><group><Bottle id={drinkId} /></group></group>
-      <group ref={heldGlass} visible={false}><group><IceGlass id={drinkId} level={glassLevel} /></group></group>
-      <mesh ref={stream} visible={false} material={streamMat}><cylinderGeometry args={[0.007, 0.009, 1, 8]} /></mesh>
-      <group ref={bag} visible={false}><TakeawayBag /></group>
-      <group ref={phone3d} visible={false}><Phone3D /></group>
+  return <group>
+    <group ref={blob}><BlobShadow size={0.62} /></group>
+    <group ref={body}>
+      <PlayerModel ref={rig} expression={expr} shipperBag={shipping} outfit={outfit} idleLook={idleLook} />
+      {/* held props live in a frame that follows the spine */}
+      <group ref={propSpace} position={[0, SPINE, 0]}>
+        <group ref={sticks} visible={false}><Chopsticks spread={0.008} /></group>
+        <group ref={morsel} visible={false}><Morsel kind={morselKind} /></group>
+        <group ref={heldBottle} visible={false}><group><Bottle id={drinkId} /></group></group>
+        <group ref={heldGlass} visible={false}><group><IceGlass id={drinkId} level={glassLevel} /></group></group>
+        <mesh ref={stream} visible={false} material={streamMat}><cylinderGeometry args={[0.007, 0.009, 1, 8]} /></mesh>
+        <group ref={bag} visible={false} scale={0.85}><TakeawayBag /></group>
+        <group ref={phone3d} visible={false}><Phone3D /></group>
+      </group>
     </group>
   </group>;
 }

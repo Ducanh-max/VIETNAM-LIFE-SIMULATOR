@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { GROUND_HEIGHT, registerObstacles, type Obstacle, type Point } from '../geo';
 import { RESTAURANT, restaurantToWorld, worldToRestaurant } from '../osm';
 import { jobActions } from '../job';
-import { drinkLevels, firstDrink, mealDuration, SEAT_Z, SET, TABLE_D, TABLE_TOP, TABLE_W } from '../meal';
+import { drinkLevels, firstDrink, mealDuration, SEAT_Z, SET, STOOL_TOP, TABLE_D, TABLE_TOP, TABLE_W } from '../meal';
 import { actions, bike, game, MENU, player, useGame, type MenuId, type Order } from '../state';
 import { Bottle, BunChaSet, DishStack, DrinkSet, GrillClamp, Tray } from './food';
 import { NameTag, Person, type PersonAnim } from './Person';
@@ -140,8 +140,8 @@ function DiningTable({ t, mats, bare = false }: { t: Table; mats: ReturnType<typ
     <mesh position={[0, TABLE_TOP - 0.04, 0]} material={mats.steel}><boxGeometry args={[TABLE_W - 0.06, 0.03, TABLE_D - 0.06]} /></mesh>
     {[-1, 1].flatMap((a) => [-1, 1].map((b) => <mesh key={`${a}${b}`} position={[a * (TABLE_W / 2 - 0.06), TABLE_TOP / 2, b * (TABLE_D / 2 - 0.06)]} material={mats.steel}><cylinderGeometry args={[0.018, 0.018, TABLE_TOP, 6]} /></mesh>))}
     {[-1, 1].map((s) => <group key={s} position={[0, 0, s * SEAT_Z]}>
-      <mesh position={[0, 0.31, 0]} material={s > 0 ? mats.blue : mats.red} castShadow><cylinderGeometry args={[0.15, 0.17, 0.04, 16]} /></mesh>
-      <mesh position={[0, 0.15, 0]} material={s > 0 ? mats.blue : mats.red}><cylinderGeometry args={[0.13, 0.17, 0.28, 12, 1, true]} /></mesh>
+      <mesh position={[0, STOOL_TOP - 0.02, 0]} material={s > 0 ? mats.blue : mats.red} castShadow><cylinderGeometry args={[0.15, 0.16, 0.04, 16]} /></mesh>
+      <mesh position={[0, (STOOL_TOP - 0.04) / 2, 0]} material={s > 0 ? mats.blue : mats.red}><cylinderGeometry args={[0.13, 0.16, STOOL_TOP - 0.04, 12, 1, true]} /></mesh>
     </group>)}
     {/* condiments at the end of the table: tissues, chopstick tube, fish-sauce jar, chilli sauce */}
     {!bare && <group position={[TABLE_W / 2 - 0.12, 0, 0]}>
@@ -419,13 +419,13 @@ export function Restaurant({ paused }: { paused: boolean }) {
     {/* Đạt, the grill cook, fanning the coals in a nón lá */}
     <group position={[GRILL[0] - 0.65, 0, GRILL[1]]} rotation={[0, Math.PI / 2, 0]}>
       <Person anim={cookAnim.current} shirt="#5a7d5a" pants="#3a3226" hat="#d9c38a" skin="#b98a68" seed={4} />
-      <mesh position={[0, 0.17, 0]} material={mats.red}><cylinderGeometry args={[0.13, 0.15, 0.32, 12]} /></mesh>
-      <NameTag name="Đạt" role="Nướng chả" y={1.95} />
+      <mesh position={[0, STOOL_TOP / 2, 0]} material={mats.red}><cylinderGeometry args={[0.13, 0.15, STOOL_TOP, 12]} /></mesh>
+      <NameTag name="Đạt" role="Nướng chả" y={1.65} />
     </group>
     {/* Đức Anh, the owner, behind the cashier desk */}
     <group position={[BOSS[0], 0, BOSS[1]]} rotation={[0, Math.PI / 2, 0]}>
       <Person anim={bossAnim.current} shirt="#2f4f7a" pants="#2a2a2a" hair="#3a3a3a" skin="#c4946f" seed={9} />
-      <NameTag name="Đức Anh" role="Ông chủ quán" y={2.4} color="#ffd35c" />
+      <NameTag name="Đức Anh" role="Ông chủ quán" y={1.9} color="#ffd35c" />
     </group>
     {/* diners already eating */}
     {TABLES.map((tb, i) => tb.npc ? <group key={`n${i}`}>
@@ -441,7 +441,7 @@ export function Restaurant({ paused }: { paused: boolean }) {
     <group ref={waiter} position={[HOME[0], 0, HOME[1]]}>
       <Person anim={waiterAnim.current} shirt="#ffffff" pants="#1d1d1f" apron="#1d1d1f" seed={7} />
       <NameTag name="Khánh" role="Phục vụ" />
-      {carrying && <group position={[0, 1.12, 0.42]}><Tray><TrayLoad order={order} /></Tray></group>}
+      {carrying && <group position={[0, 0.78, 0.36]}><Tray><TrayLoad order={order} /></Tray></group>}
     </group>
     {served && t && <group position={[t.x, TABLE_TOP, t.z]} rotation={[0, playerSide > 0 ? 0 : Math.PI, 0]}><TableSpread order={order} progress={phase === 'finished' ? 1 : eatProgress} inHand={inHand} /></group>}
   </group>;

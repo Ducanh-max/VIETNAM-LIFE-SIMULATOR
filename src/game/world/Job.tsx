@@ -83,7 +83,7 @@ export function Job() {
       <Waypoint />
       <group ref={customer} rotation={[0, d.facing, 0]}>
         <Person anim={customerAnim.current} shirt="#d98fb0" pants="#3a3f4a" hair="#1b1715" seed={3} />
-        <NameTag name={d.customer} role={`Khách · ${d.street}`} y={2.35} color="#ffd35c" />
+        <NameTag name={d.customer} role={`Khách · ${d.street}`} y={1.85} color="#ffd35c" />
       </group>
     </group>}
   </group>;

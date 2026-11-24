@@ -1,16 +1,16 @@
-import { forwardRef } from 'react';
-import { HumanModel, type Detail, type Expression, type PlayerRig } from './character/HumanModel';
+import { forwardRef, useMemo } from 'react';
+import { ChibiModel, type Expression, type Lod, type PlayerRig } from './character/ChibiModel';
 import { PLAYER_OUTFIT, type Outfit } from './character/outfit';
 
-export type { Expression, HandPose, PlayerRig } from './character/HumanModel';
-export { PLAYER_DIMENSIONS } from './character/HumanModel';
+export type { Expression, HandPose, PlayerRig } from './character/ChibiModel';
+export { PLAYER_DIMENSIONS } from './character/ChibiModel';
 
 /**
- * The player character: the shared HumanModel dressed in the player's outfit. While shipping, the
- * crossbody bag is swapped for the delivery backpack.
+ * The player character: the shared chibi model dressed in the player's outfit, with real shadows and
+ * all three LODs (full detail up close). While shipping, the crossbody bag becomes the delivery backpack.
  */
-export const PlayerModel = forwardRef<PlayerRig, { expression?: Expression; shipperBag?: boolean; outfit?: Outfit; idleLook?: boolean; detail?: Detail }>(
-  function PlayerModel({ expression = 'neutral', shipperBag = false, outfit = PLAYER_OUTFIT, idleLook = false, detail = 'high' }, ref) {
-    const o = shipperBag ? { ...outfit, sling: false, backpack: true } : outfit;
-    return <HumanModel ref={ref} outfit={o} expression={expression} idleLook={idleLook} detail={detail} />;
+export const PlayerModel = forwardRef<PlayerRig, { expression?: Expression; shipperBag?: boolean; outfit?: Outfit; idleLook?: boolean; lod?: Lod }>(
+  function PlayerModel({ expression = 'neutral', shipperBag = false, outfit = PLAYER_OUTFIT, idleLook = false, lod }, ref) {
+    const o = useMemo(() => (shipperBag ? { ...outfit, sling: false, backpack: true } : outfit), [outfit, shipperBag]);
+    return <ChibiModel ref={ref} outfit={o} expression={expression} idleLook={idleLook} castShadow lodLevels={lod === undefined ? [0, 1, 2] : [lod, lod, lod]} lodDistances={[16, 45]} />;
   });

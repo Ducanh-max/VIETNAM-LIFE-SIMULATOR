@@ -9,20 +9,20 @@ import { setOutfit, useGame } from '../game/state';
 const EXPRESSIONS: { id: Expression; label: string }[] = [
   { id: 'neutral', label: 'Bình thường' }, { id: 'smile', label: 'Mỉm cười' }, { id: 'happy', label: 'Vui vẻ' }, { id: 'laugh', label: 'Cười lớn' },
   { id: 'surprised', label: 'Ngạc nhiên' }, { id: 'sad', label: 'Buồn' }, { id: 'angry', label: 'Tức giận' }, { id: 'confused', label: 'Bối rối' },
-  { id: 'talking', label: 'Nói chuyện' }, { id: 'eating', label: 'Đang ăn' }, { id: 'drinking', label: 'Đang uống' }, { id: 'closed', label: 'Nhắm mắt' },
+  { id: 'talking', label: 'Nói chuyện' }, { id: 'eating', label: 'Đang ăn' }, { id: 'drinking', label: 'Đang uống' }, { id: 'closed', label: 'Nhắm mắt' }, { id: 'wink', label: 'Nháy mắt' },
 ];
 
 function Turntable({ expression, close }: { expression: { current: Expression | null }; close: boolean }) {
   const group = useRef<THREE.Group>(null);
   const speed = useRef(0);
   useFrame((state, dt) => {
-    if (group.current) group.current.rotation.y += dt * (close ? 0.25 : 0.6);
+    if (group.current) group.current.rotation.y = close ? THREE.MathUtils.damp(group.current.rotation.y, Math.round(group.current.rotation.y / (Math.PI * 2)) * Math.PI * 2 + Math.sin(state.clock.elapsedTime * 0.5) * 0.5, 3, dt) : group.current.rotation.y + dt * 0.6;
     const cam = state.camera;
-    const target = close ? new THREE.Vector3(0, 0.66, 1.25) : new THREE.Vector3(0, 0.15, 3.5);
+    const target = close ? new THREE.Vector3(0, 0.4, 2.0) : new THREE.Vector3(0, 0.05, 3.3);
     cam.position.lerp(target, 1 - Math.exp(-dt * 5));
-    cam.lookAt(0, close ? 0.58 : 0.0, 0);
+    cam.lookAt(0, close ? 0.33 : -0.05, 0);
   });
-  return <group ref={group} position={[0, -0.95, 0]}><Avatar speed={speed} expressionOverride={expression} /></group>;
+  return <group ref={group} position={[0, -0.82, 0]}><Avatar speed={speed} expressionOverride={expression} /></group>;
 }
 
 /** Turntable preview of the player character, with expressions and a few outfit options (saved). */
@@ -41,7 +41,7 @@ export function CharacterPreview({ name }: { name: string }) {
         <directionalLight position={[2, 3, 3]} intensity={2.0} />
         <directionalLight position={[-3, 1.5, -2]} intensity={0.8} color="#cfe0ff" />
         <Turntable expression={ref} close={close} />
-        <mesh position={[0, -0.955, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[0.6, 32]} /><meshStandardMaterial color="#2a4a42" transparent opacity={0.6} /></mesh>
+        <mesh position={[0, -0.825, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[0.6, 32]} /><meshStandardMaterial color="#2a4a42" transparent opacity={0.6} /></mesh>
       </Canvas>
       <button className="character-zoom" onClick={() => setClose(!close)}>{close ? 'Toàn thân' : 'Cận mặt'}</button>
     </div>

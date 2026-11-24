@@ -124,12 +124,11 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
       const inCar = taxi.vehicle === 'car';
       if (avatar.current) {
         if (inCar) {
-          // sit in the rear passenger seat, scaled to fit the cabin
+          // sit in the rear passenger seat (the chibi fits the cabin at full size)
           const h = taxi.heading;
           const sx = CAR_PASSENGER.x, sz = CAR_PASSENGER.z;
           avatar.current.position.set(taxi.position.x + sx * Math.cos(h) + sz * Math.sin(h), taxi.position.y + CAR_PASSENGER.y, taxi.position.z - sx * Math.sin(h) + sz * Math.cos(h));
           avatar.current.rotation.set(0, h, 0, 'YXZ');
-          avatar.current.scale.setScalar(0.78);
         } else {
           avatar.current.position.copy(taxi.position); avatar.current.rotation.set(0, taxi.heading, taxi.lean, 'YXZ');
         }

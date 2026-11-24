@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { PLAYER_DIMENSIONS } from './character/chibiGeometry';
 import type { MenuId, Order } from './state';
 
 /*
@@ -9,27 +10,29 @@ import type { MenuId, Order } from './state';
  * diner's left-hand side as seen from above when facing −z... i.e. the diner's RIGHT hand is at −x
  * in avatar space, which is +x in the set frame (the set is rotated 180° to face the diner).
  */
-export const TABLE_TOP = 0.52;
+export const TABLE_TOP = 0.46; // low street-food table, sized for the chibi diners
 export const TABLE_W = 1.25; // along x
 export const TABLE_D = 0.82; // along z
-export const SEAT_Z = 0.62; // stool distance from the table centre
+export const SEAT_Z = 0.58; // stool distance from the table centre
+export const STOOL_TOP = 0.25; // low plastic stool
 
 /** Dish positions in the set frame (x, z). */
 export const SET = {
-  broth: [0.04, 0.13],
-  bun: [0.27, 0.0],
-  herbs: [-0.19, -0.04],
-  pickle: [-0.15, 0.21],
-  chili: [-0.02, -0.14],
-  chopsticks: [0.2, 0.27],
-  drink: [-0.36, 0.18], // can at +0.05, glass at −0.045 from here (within the left hand's reach)
+  broth: [0.035, 0.18],
+  bun: [0.23, 0.05],
+  herbs: [-0.16, 0.01],
+  pickle: [-0.13, 0.26],
+  chili: [-0.02, -0.09],
+  chopsticks: [0.17, 0.32],
+  drink: [-0.31, 0.23], // can at +0.05, glass at −0.045 from here (within the left hand's reach)
   extra: [0.02, -0.3], // a second portion, pushed to the far side
 } as const;
 export const CAN_OFFSET = 0.05;
 export const GLASS_OFFSET = -0.045;
 
-/** Body space of the seated avatar: the body group is lowered 0.52 m, hips at y 0.92. */
-const BODY_DROP = 0.52;
+/** Body space of the seated avatar: the body group is lowered SEAT_DROP so the hips sit on the stool. */
+export const SEAT_DROP = PLAYER_DIMENSIONS.hipY - PLAYER_DIMENSIONS.sitHip;
+const BODY_DROP = SEAT_DROP;
 export function setToBody(sx: number, sy: number, sz: number, out = new THREE.Vector3()) {
   return out.set(-sx, TABLE_TOP + sy + BODY_DROP, SEAT_Z - sz);
 }
