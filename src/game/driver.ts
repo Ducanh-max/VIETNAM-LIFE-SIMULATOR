@@ -2,14 +2,15 @@ import { canWalk, type Point } from './geo';
 import { jobActions } from './job';
 import { findRoute, routeLength } from './navigation';
 import { deliverySpots } from './osm';
-import { fareFor } from './ride';
+import { fareFor, MIN_TRIP } from './ride';
 import { addMoney, bike, formatVnd, game, player, pushMessage, type Fare } from './state';
 
 /*
  * Working as an Đen SM driver: sign up in the Đen SM app, pick Đen Bike (electric scooter) or Đen Car
  * (electric car), put on the uniform, and take ride requests: drive to the passenger waiting at the
  * curb, stop and let them on (E), drive them to their destination and let them off (E). The fare is
- * the real street distance of the trip at the app's rate (Bike 500đ / Car 1.000đ per started 100 m),
+ * the real street distance of the trip at the app's rate (Bike 18.000đ / Car 34.000đ per km, rounded up per 100 m;
+ * trips are 1 km or longer),
  * plus sometimes a tip and a star rating. One job at a time: not while shipping bún chả.
  */
 export const PASSENGERS = ['Chị Thu', 'Anh Nam', 'Cô Liên', 'Bạn Khoa', 'Chú Hải', 'Em Vy', 'Anh Đức', 'Chị Trang', 'Bác Sơn', 'Bạn Linh', 'Anh Phúc', 'Cô Yến'];
@@ -33,12 +34,13 @@ function pickSpot(from: Point, min: number, max: number, avoid?: Point) {
 
 function newFare(vehicle: 'bike' | 'car'): Fare | null {
   const at: Point = [bike.position.x, bike.position.z];
-  for (let attempt = 0; attempt < 6; attempt++) {
+  for (let attempt = 0; attempt < 10; attempt++) {
     const pick = pickSpot(at, 70, 380);
-    const drop = pickSpot(pick.p, 250, 900, at);
+    const drop = pickSpot(pick.p, 750, 1900, at);
     const route = findRoute(pick.p, drop.p);
     if (!route) continue;
     const distance = routeLength(route);
+    if (distance < MIN_TRIP) continue; // Đen SM only takes trips of 1 km or more
     return {
       passenger: PASSENGERS[Math.floor(Math.random() * PASSENGERS.length)], seed: 20 + Math.floor(Math.random() * 400),
       pickup: { x: pick.p[0], z: pick.p[1], facing: pick.facing, street: pick.street }, dest: { x: drop.p[0], z: drop.p[1], street: drop.street },
@@ -59,7 +61,7 @@ export const driverActions = {
     game.set({ driver: { vehicle, stage: 'free', fare: null, trips: 0, earned: 0, stars: [], nextAt: performance.now() + 4000 } });
     const name = vehicle === 'car' ? 'Đen Car' : 'Đen Bike';
     game.toast(`Đã nhận việc tài xế ${name}! Đồng phục đã mặc. Xe ở ngay cạnh bạn: bấm F để lên xe, cuốc đầu tiên sẽ tới sau vài giây.`);
-    pushMessage('Đen SM Tài xế', `Chào mừng bạn gia nhập đội ${name}. Bật app khi lái xe để nhận cuốc; giá ${vehicle === 'car' ? '1.000đ' : '500đ'} mỗi 100 m theo đường phố.`);
+    pushMessage('Đen SM Tài xế', `Chào mừng bạn gia nhập đội ${name}. Bật app khi lái xe để nhận cuốc; giá ${vehicle === 'car' ? '34.000đ' : '18.000đ'}/km theo đường phố (làm tròn mỗi 100 m), cuốc từ 1 km trở lên.`);
   },
   /** Called every frame while working. */
   tick() {

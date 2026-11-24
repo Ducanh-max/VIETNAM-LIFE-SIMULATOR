@@ -13,10 +13,12 @@ import { WHEEL_R } from './world/Scooter';
 export type Place = { name: string; note: string; x: number; z: number };
 export type Vehicle = 'bike' | 'car';
 export type Ride = { stage: 'arriving' | 'waiting' | 'riding'; vehicle: Vehicle; dest: Place; fare: number; distance: number; driver: string; plate: string };
-export const VEHICLES: Record<Vehicle, { name: string; note: string; speed: number; seats: number; per100: number }> = {
-  bike: { name: 'Đen Bike', note: 'Xe máy điện · 1 khách', speed: 9, seats: 1, per100: 500 },
-  car: { name: 'Đen Car', note: 'Ô tô điện 4 chỗ · điều hoà', speed: 10.5, seats: 4, per100: 1000 },
+export const VEHICLES: Record<Vehicle, { name: string; note: string; speed: number; seats: number; perKm: number; per100: number }> = {
+  bike: { name: 'Đen Bike', note: 'Xe máy điện · 1 khách', speed: 9, seats: 1, perKm: 18_000, per100: 1_800 },
+  car: { name: 'Đen Car', note: 'Ô tô điện 4 chỗ · điều hoà', speed: 10.5, seats: 4, perKm: 34_000, per100: 3_400 },
 };
+/** Shortest trip Đen SM takes (real street distance): shorter places can't be booked and no shorter requests come in. */
+export const MIN_TRIP = 1000;
 
 const DRIVERS = ['Anh Minh', 'Anh Quân', 'Chị Hạnh', 'Anh Toàn', 'Anh Sơn', 'Chị Vy'];
 
@@ -54,7 +56,7 @@ export function places(): Place[] {
   return (placesCache = list);
 }
 
-/** Per started 100 m of the route along the streets: Đen Bike 500đ, Đen Car 1.000đ (1,23 km → 6.500đ / 13.000đ). */
+/** Đen Bike 18.000đ/km, Đen Car 34.000đ/km of the route along the streets, rounded up to each started 100 m (1,25 km → 1,3 km → 23.400đ / 44.200đ). */
 export const fareFor = (meters: number, vehicle: Vehicle) => Math.max(1, Math.ceil(meters / 100)) * VEHICLES[vehicle].per100;
 
 /** Exact route quote from the player to a place: real street distance, fare and riding time for each vehicle. */
@@ -94,6 +96,7 @@ export const rideActions = {
     const trip = findRoute(from, [place.x, place.z]);
     if (!trip) { game.toast('Đen SM chưa tìm được đường tới đó, bạn chọn điểm khác nhé.'); return; }
     const distance = routeLength(trip);
+    if (distance < MIN_TRIP) { game.toast(`Chuyến này chỉ ${Math.round(distance)} m. Đen SM nhận chuyến từ 1 km trở lên.`); return; }
     const fare = fareFor(distance, vehicle);
     if (fare > s.money) { game.toast(`Không đủ tiền: chuyến này ${formatVnd(fare)}.`); return; }
     // the driver starts a couple of blocks away and rides to you

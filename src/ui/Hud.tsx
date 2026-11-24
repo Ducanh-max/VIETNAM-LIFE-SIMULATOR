@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { jobActions, pickupPoint } from '../game/job';
-import { actions, formatVnd, game, MENU, orderCount, orderTotal, player, useGame, view, type MenuId, type Order } from '../game/state';
+import { actions, bike, formatVnd, game, MENU, orderCount, orderTotal, player, useGame, view, type MenuId, type Order } from '../game/state';
 
 function Meter({ label, value, color, icon }: { label: string; value: number; color: string; icon: string }) {
   const low = value < 20;
@@ -143,5 +143,43 @@ export function MenuPanel() {
         {total > money ? 'Không đủ tiền' : `Gọi món · ${formatVnd(total)}`}
       </button>
     </section>
+  </div>;
+}
+
+/**
+ * Speedometer while riding or driving: a round dial (0 → top speed) with the speed in km/h, the gear
+ * of the moment (town riding, or BOOST with Shift) and the vehicle's top speed.
+ */
+export function Speedometer() {
+  const root = useRef<HTMLDivElement>(null);
+  const num = useRef<HTMLSpanElement>(null);
+  const arc = useRef<SVGPathElement>(null);
+  const tag = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    let id = 0;
+    const R = 46, C = 2 * Math.PI * R * 0.75; // a 270° dial
+    const tick = () => {
+      id = requestAnimationFrame(tick);
+      const el = root.current; if (!el) return;
+      el.style.display = bike.riding ? 'flex' : 'none';
+      if (!bike.riding) return;
+      const car = bike.kind === 'dencar';
+      const top = car ? 200 : 120;
+      const kmh = Math.abs(bike.speed) * 3.6;
+      if (num.current) num.current.textContent = String(Math.round(kmh));
+      if (arc.current) arc.current.style.strokeDashoffset = String(C * (1 - Math.min(1, kmh / top)));
+      if (tag.current) tag.current.textContent = `${bike.speed < -0.2 ? 'LÙI' : kmh > (car ? 72 : 52) ? 'BOOST' : 'PHỐ'} · tối đa ${top}`;
+    };
+    tick();
+    return () => cancelAnimationFrame(id);
+  }, []);
+  return <div ref={root} className="speedo" style={{ display: 'none' }}>
+    <svg viewBox="0 0 120 120" aria-hidden="true">
+      <path d="M 27.5 92.5 A 46 46 0 1 1 92.5 92.5" className="speedo-track" />
+      <path ref={arc} d="M 27.5 92.5 A 46 46 0 1 1 92.5 92.5" className="speedo-value" style={{ strokeDasharray: 2 * Math.PI * 46 * 0.75, strokeDashoffset: 2 * Math.PI * 46 * 0.75 }} />
+    </svg>
+    <span ref={num} className="speedo-num">0</span>
+    <span className="speedo-unit">km/h</span>
+    <span ref={tag} className="speedo-tag">PHỐ</span>
   </div>;
 }

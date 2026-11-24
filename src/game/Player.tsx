@@ -160,27 +160,42 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
     }
     if (avatar.current && avatar.current.scale.x !== 1) avatar.current.scale.setScalar(1);
     if (!bike.riding) { lastChaseYaw.current = yaw.current; lookOffset.current = 0; }
+    if (!bike.riding && Math.abs((camera as THREE.PerspectiveCamera).fov - 55) > 0.05) { const cam = camera as THREE.PerspectiveCamera; cam.fov = THREE.MathUtils.damp(cam.fov, 55, 4, dt); cam.updateProjectionMatrix(); }
     // ---- Riding the delivery scooter: W/S throttle and brake, A/D steer, Shift for full throttle.
     if (bike.riding && !freeCamera) {
       sitting.current = false;
       const car = bike.kind === 'dencar';
       const throttle = paused ? 0 : (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0);
       const steerIn = paused ? 0 : (k.has('KeyA') ? 1 : 0) - (k.has('KeyD') ? 1 : 0);
-      const vmax = (k.has('ShiftLeft') || k.has('ShiftRight') ? 15 : 10.5) * (car ? 1.15 : 1); // ≈ 54 / 38 km/h (car a bit faster)
-      if (throttle > 0) bike.speed = Math.min(vmax, bike.speed + (bike.speed < 0 ? 9 : 3.4) * dt);
-      else if (throttle < 0) bike.speed = bike.speed > 0.2 ? Math.max(0, bike.speed - 9 * dt) : Math.max(-2.2, bike.speed - 2.4 * dt);
-      else bike.speed -= Math.sign(bike.speed) * Math.min(Math.abs(bike.speed), 1.5 * dt);
-      if (bike.speed > vmax) bike.speed = Math.max(vmax, bike.speed - 4 * dt);
-      const maxSteer = THREE.MathUtils.lerp(0.6, 0.2, Math.min(1, Math.abs(bike.speed) / 14));
-      bike.steer = THREE.MathUtils.damp(bike.steer, steerIn * maxSteer, 7, dt);
+      // Speeds: town riding with W, Shift opens it up to the top speed (Đen Bike / Wave 120 km/h, Đen Car 200 km/h).
+      const boost = k.has('ShiftLeft') || k.has('ShiftRight');
+      const top = car ? 200 / 3.6 : 120 / 3.6;
+      const vmax = boost ? top : (car ? 70 : 50) / 3.6;
+      const accel = car ? (boost ? 7.5 : 4) : (boost ? 6.5 : 4.2);
+      if (throttle > 0) bike.speed = Math.min(Math.max(vmax, bike.speed), bike.speed + (bike.speed < 0 ? 10 : accel * (1 - 0.55 * Math.min(1, bike.speed / top))) * dt);
+      else if (throttle < 0) bike.speed = bike.speed > 0.2 ? Math.max(0, bike.speed - (car ? 11 : 10) * dt) : Math.max(-4, bike.speed - 3 * dt);
+      else bike.speed -= Math.sign(bike.speed) * Math.min(Math.abs(bike.speed), (1.2 + Math.abs(bike.speed) * 0.04) * dt); // rolling + air drag
+      if (bike.speed > vmax) bike.speed = Math.max(vmax, bike.speed - 3 * dt); // let go of Shift: ease back to town speed
+      // steering gets gentler with speed and centres itself when you let go
+      const v = Math.abs(bike.speed);
+      const maxSteer = car ? THREE.MathUtils.lerp(0.55, 0.06, Math.min(1, v / 40)) : THREE.MathUtils.lerp(0.6, 0.08, Math.min(1, v / 28));
+      bike.steer = THREE.MathUtils.damp(bike.steer, steerIn * maxSteer, steerIn ? (car ? 5 : 7) : 9, dt);
       bike.heading += (bike.speed * Math.tan(bike.steer) / (car ? 2.7 : WHEELBASE)) * dt;
       const fwd = new THREE.Vector3(Math.sin(bike.heading), 0, Math.cos(bike.heading));
-      const next = bike.position.clone().addScaledVector(fwd, bike.speed * dt);
-      const dirSign = bike.speed >= 0 ? 1 : -1;
+      // move in small sub-steps so a fast vehicle can't tunnel through a house; slide along walls instead of stopping dead
       const reachAhead = car ? 2.25 : 0.95;
-      const nose: Point = [next.x + fwd.x * reachAhead * dirSign, next.z + fwd.z * reachAhead * dirSign];
-      if (canWalk([next.x, next.z]) && canWalk(nose)) { bike.position.x = next.x; bike.position.z = next.z; }
-      else bike.speed *= -0.2; // bump
+      const travel = bike.speed * dt;
+      const steps = Math.max(1, Math.ceil(Math.abs(travel) / 0.4));
+      const dirSign = bike.speed >= 0 ? 1 : -1;
+      const free = (x: number, z: number) => canWalk([x, z]) && canWalk([x + fwd.x * reachAhead * dirSign, z + fwd.z * reachAhead * dirSign]);
+      for (let i = 0; i < steps; i++) {
+        const sx = bike.position.x + fwd.x * travel / steps, sz = bike.position.z + fwd.z * travel / steps;
+        if (free(sx, sz)) { bike.position.x = sx; bike.position.z = sz; continue; }
+        if (free(sx, bike.position.z)) { bike.position.x = sx; bike.speed *= 0.97; continue; }
+        if (free(bike.position.x, sz)) { bike.position.z = sz; bike.speed *= 0.97; continue; }
+        bike.speed *= v > 8 ? -0.15 : -0.2; // head-on bump
+        break;
+      }
       bike.position.y = THREE.MathUtils.damp(bike.position.y, groundHeight([bike.position.x, bike.position.z]), 12, dt);
       bike.wheel += (bike.speed * dt) / WHEEL_R;
       bike.lean = car ? 0 : THREE.MathUtils.damp(bike.lean, -bike.steer * Math.min(1, Math.abs(bike.speed) / 7) * 0.5, 5, dt);
@@ -197,7 +212,12 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
       }
       chaseCamera(bike.heading, Math.abs(bike.speed), dt);
       const camFwd = new THREE.Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
-      const dist = Math.max(car ? 8 : 5, distance.current * (car ? 1.1 : 0.85));
+      // the camera pulls back and the view widens a little at speed
+      const fast = Math.min(1, Math.abs(bike.speed) / (car ? 55 : 33));
+      const dist = Math.max(car ? 8 : 5, distance.current * (car ? 1.1 : 0.85)) + fast * (car ? 5 : 3);
+      const cam = camera as THREE.PerspectiveCamera;
+      const fov = 55 + fast * 12;
+      if (Math.abs(cam.fov - fov) > 0.05) { cam.fov = THREE.MathUtils.damp(cam.fov, fov, 3, dt); cam.updateProjectionMatrix(); }
       const eye = bike.position.clone().addScaledVector(camFwd, -Math.cos(pitch.current) * dist).add(new THREE.Vector3(0, 1.7 + Math.sin(pitch.current) * dist, 0));
       camera.position.lerp(eye, 1 - Math.exp(-7 * dt));
       camera.lookAt(bike.position.x, bike.position.y + 1.2, bike.position.z);

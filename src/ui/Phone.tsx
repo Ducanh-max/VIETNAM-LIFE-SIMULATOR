@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { driverActions } from '../game/driver';
 import { jobActions } from '../game/job';
 import { nav, updateNav } from '../game/navigation';
-import { places, quote, rideActions, taxi, VEHICLES, type Vehicle } from '../game/ride';
+import { MIN_TRIP, places, quote, rideActions, taxi, VEHICLES, type Vehicle } from '../game/ride';
 import { formatVnd, game, player, useGame } from '../game/state';
 import { drawMap, headingUpRotation, mapBase } from './mapCanvas';
 import { useVietnamClock, VIETNAM_TZ } from './vietnamTime';
@@ -164,7 +164,7 @@ function ContactsApp() {
   </div>;
 }
 
-/** Đen SM: pick a place, choose Đen Bike or Đen Car, pay 1.000đ per 100 m of the real route on arrival. */
+/** Đen SM: pick a place (1 km or farther), choose Đen Bike (18.000đ/km) or Đen Car (34.000đ/km) along the real route. */
 /** Đen SM for drivers: sign up for Đen Bike or Đen Car, see the current request, cancel it or end the shift. */
 function DenDriverPanel() {
   const d = useGame((s) => s.driver);
@@ -174,7 +174,7 @@ function DenDriverPanel() {
     <small>Nhận cuốc trong khu Hồ Gươm, giá theo quãng đường thật trên phố. Nhận việc là mặc đồng phục và nhận xe ngay cạnh bạn.</small>
     {job ? <small className="den-warn">Bạn đang ship bún chả cho quán, nghỉ việc ship trước đã nhé.</small> : <div className="den-vehicles">
       {(['bike', 'car'] as Vehicle[]).map((v) => <button key={v} onClick={() => driverActions.accept(v)}>
-        <span className="den-veh-icon">{v === 'bike' ? '🛵' : '🚗'}</span><b>Chạy {VEHICLES[v].name}</b><small>{VEHICLES[v].note}</small><strong>{formatVnd(VEHICLES[v].per100)}/100 m</strong>
+        <span className="den-veh-icon">{v === 'bike' ? '🛵' : '🚗'}</span><b>Chạy {VEHICLES[v].name}</b><small>{VEHICLES[v].note}</small><strong>{formatVnd(VEHICLES[v].perKm)}/km</strong>
       </button>)}
     </div>}
   </div>;
@@ -185,7 +185,7 @@ function DenDriverPanel() {
     {!f ? <small>{d.stage === 'free' ? 'Đang chờ cuốc mới… (lên xe để nhận cuốc)' : ''}</small> : <>
       <div className="den-driver"><span className="msg-avatar den-avatar">{f.passenger.split(' ').pop()![0]}</span><div><b>{f.passenger}</b><small>{d.stage === 'pickup' ? `Đang đợi ở ${f.pickup.street}` : 'Đang ngồi trên xe'}</small><small>{d.stage === 'pickup' ? `Cách bạn ${fmtDist(nav.length)}` : `Còn ${fmtDist(nav.length)}`}</small></div></div>
       <div className="den-route"><span>📍 Điểm trả</span><b>{f.dest.street}</b><small>{fmtDist(f.distance)} theo đường phố</small></div>
-      <div className="den-fare"><span>Cước</span><b>{formatVnd(f.fare)}</b><small>{Math.ceil(f.distance / 100)} × 100 m × {formatVnd(VEHICLES[d.vehicle].per100)}</small></div>
+      <div className="den-fare"><span>Cước</span><b>{formatVnd(f.fare)}</b><small>{(Math.ceil(f.distance / 100) / 10).toLocaleString('vi-VN')} km × {formatVnd(VEHICLES[d.vehicle].perKm)}/km</small></div>
       <button className="danger-outline" onClick={() => driverActions.cancel()}>Huỷ cuốc</button>
     </>}
     <button className="danger-outline" onClick={() => driverActions.quit()}>Nghỉ việc (kết thúc ca)</button>
@@ -195,7 +195,7 @@ function DenDriverPanel() {
 function DenSMApp() {
   const [tab, setTab] = useState<'rider' | 'driver'>(() => (game.get().driver ? 'driver' : 'rider'));
   return <div className="app-page den-app">
-    <div className="den-header"><span className="den-logo">Đen<b>SM</b></span><small>Đen Bike 500đ · Đen Car 1.000đ mỗi 100 m</small></div>
+    <div className="den-header"><span className="den-logo">Đen<b>SM</b></span><small>Đen Bike 18.000đ/km · Đen Car 34.000đ/km · từ 1 km</small></div>
     <div className="den-tabs"><button className={tab === 'rider' ? 'on' : ''} onClick={() => setTab('rider')}>Đặt xe</button><button className={tab === 'driver' ? 'on' : ''} onClick={() => setTab('driver')}>Tài xế</button></div>
     {tab === 'driver' ? <DenDriverPanel /> : <DenRiderPanel />}
   </div>;
@@ -219,7 +219,7 @@ function DenRiderPanel() {
       <div className="den-status">{ride.stage === 'arriving' ? `${ride.driver} đang đến đón bạn` : ride.stage === 'waiting' ? `${ride.driver} đã tới, ra ${ride.vehicle === 'car' ? 'ô tô' : 'xe'} và bấm E` : `Đang tới ${ride.dest.name}`}</div>
       <div className="den-driver"><span className="msg-avatar den-avatar">{ride.driver.split(' ').pop()![0]}</span><div><b>{ride.driver}</b><small>{VEHICLES[ride.vehicle].name} · {VEHICLES[ride.vehicle].note} · {ride.plate}</small><small>★ 4.9 · {ride.stage === 'riding' ? `còn ${fmtDist(nav.length)}` : `cách bạn ${fmtDist(taxiDist)}`}</small></div></div>
       <div className="den-route"><span>📍 Điểm đến</span><b>{ride.dest.name}</b><small>{ride.dest.note} · {fmtDist(ride.distance)} theo đường phố</small></div>
-      <div className="den-fare"><span>Giá cước</span><b>{formatVnd(ride.fare)}</b><small>{Math.ceil(ride.distance / 100)} × 100 m × {formatVnd(VEHICLES[ride.vehicle].per100)} · trả qua ví khi tới nơi</small></div>
+      <div className="den-fare"><span>Giá cước</span><b>{formatVnd(ride.fare)}</b><small>{(Math.ceil(ride.distance / 100) / 10).toLocaleString('vi-VN')} km × {formatVnd(VEHICLES[ride.vehicle].perKm)}/km · trả qua ví khi tới nơi</small></div>
       {ride.stage !== 'riding' && <button className="danger-outline" onClick={() => rideActions.cancel()}>Huỷ chuyến</button>}
     </div> : <>
       <h4>Bạn muốn đi đâu?</h4>
@@ -228,15 +228,16 @@ function DenRiderPanel() {
       </li>)}</ul>
       {pick !== null && <div className="den-book">
         {q === null ? <small>Chưa tìm được đường tới điểm này, bạn chọn nơi khác nhé.</small> : q && <>
-          <small className="den-dist">Quãng đường theo phố: <b>{fmtDist(q.distance)}</b> = {Math.ceil(q.distance / 100)} × 100 m</small>
+          <small className="den-dist">Quãng đường theo phố: <b>{fmtDist(q.distance)}</b> → tính {(Math.ceil(q.distance / 100) / 10).toLocaleString('vi-VN')} km</small>
+          {q.distance < MIN_TRIP && <small className="den-warn">Dưới 1 km: Đen SM chỉ nhận chuyến từ 1 km trở lên.</small>}
           <div className="den-vehicles">
             {(['bike', 'car'] as Vehicle[]).map((v) => <button key={v} className={vehicle === v ? 'on' : ''} onClick={() => setVehicle(v)}>
               <span className="den-veh-icon">{v === 'bike' ? '🛵' : '🚗'}</span>
               <b>{VEHICLES[v].name}</b><small>{VEHICLES[v].note}</small>
-              <strong>{formatVnd(q.fare[v])}</strong><small>{formatVnd(VEHICLES[v].per100)}/100 m · ~{q.minutes[v]} phút</small>
+              <strong>{formatVnd(q.fare[v])}</strong><small>{formatVnd(VEHICLES[v].perKm)}/km · ~{q.minutes[v]} phút</small>
             </button>)}
           </div>
-          <button className="den-button" disabled={q.fare[vehicle] > money} onClick={() => rideActions.book(list[pick], vehicle)}>{q.fare[vehicle] > money ? 'Không đủ tiền trong ví' : `Đặt ${VEHICLES[vehicle].name} · ${formatVnd(q.fare[vehicle])}`}</button>
+          <button className="den-button" disabled={q.fare[vehicle] > money || q.distance < MIN_TRIP} onClick={() => rideActions.book(list[pick], vehicle)}>{q.distance < MIN_TRIP ? 'Chuyến dưới 1 km' : q.fare[vehicle] > money ? 'Không đủ tiền trong ví' : `Đặt ${VEHICLES[vehicle].name} · ${formatVnd(q.fare[vehicle])}`}</button>
         </>}
       </div>}
     </>}
