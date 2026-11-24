@@ -16,6 +16,7 @@ const corridor = '21.0255,105.8090,21.0355,105.8405';
 const query = `[out:json][timeout:240];(
   way["highway"](${bbox}); way["building"](${bbox}); way["leisure"~"park|garden"](${bbox});
   way["highway"](${corridor}); way["building"](${corridor}); way["leisure"~"park|garden"](${corridor});
+  node["highway"~"^(traffic_signals|stop|give_way|crossing)$"](${bbox}); node["highway"~"^(traffic_signals|stop|give_way|crossing)$"](${corridor});
 );out body geom;`;
 
 const endpoints = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
@@ -63,6 +64,14 @@ const skip = new Set(['steps', 'corridor', 'elevator', 'proposed', 'construction
 const roads = [];
 const buildings = [];
 const parks = [];
+// traffic signals, stop / give-way signs and pedestrian crossings mapped as nodes
+const nodes = [];
+const seenNodes = new Set();
+for (const el of data.elements) {
+  if (el.type !== 'node' || seenNodes.has(el.id) || !el.tags?.highway) continue;
+  seenNodes.add(el.id);
+  nodes.push({ t: el.tags.highway, p: round(toLocal(el), 0.1) });
+}
 for (const el of data.elements) {
   if (el.type !== 'way' || !el.geometry || seenWays.has(el.id)) continue;
   seenWays.add(el.id);
@@ -72,7 +81,7 @@ for (const el of data.elements) {
     const fixed = el.nodes ? el.nodes.map((n) => (uses.get(n) ?? 0) > 1) : null;
     const p = simplify(pts, 0.8, fixed).map((q) => round(q, 0.1));
     if (p.length < 2) continue;
-    roads.push({ n: t.name ?? '', h: t.highway, l: num(t.lanes), o: t.oneway === 'yes' ? 1 : undefined, w: num(t.width), p });
+    roads.push({ n: t.name ?? '', h: t.highway, l: num(t.lanes), o: t.oneway === 'yes' ? 1 : t.oneway === '-1' ? -1 : undefined, w: num(t.width), ms: num(t.maxspeed), p });
   } else if (t.building) {
     let p = simplify(pts, 0.7).map((q) => round(q, 0.5));
     if (p.length > 1 && p[0][0] === p.at(-1)[0] && p[0][1] === p.at(-1)[1]) p = p.slice(0, -1);
@@ -84,6 +93,6 @@ for (const el of data.elements) {
     if (p.length >= 3) parks.push({ p, n: t.name });
   }
 }
-const out = { source: 'OpenStreetMap contributors (ODbL 1.0)', fetched: new Date().toISOString().slice(0, 10), bbox, roads, buildings, parks };
+const out = { source: 'OpenStreetMap contributors (ODbL 1.0)', fetched: new Date().toISOString().slice(0, 10), bbox: `${bbox} + ${corridor}`, roads, buildings, parks, nodes };
 await writeFile(new URL('../../src/data/hoanKiemOsm.json', import.meta.url), JSON.stringify(out));
-console.log(`roads ${roads.length}, buildings ${buildings.length}, parks ${parks.length}`);
+console.log(`roads ${roads.length}, buildings ${buildings.length}, parks ${parks.length}, nodes ${nodes.length} (${[...new Set(nodes.map((n) => n.t))].map((k) => `${k} ${nodes.filter((n) => n.t === k).length}`).join(', ')})`);

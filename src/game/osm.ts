@@ -6,11 +6,13 @@ import { bridgeEnds, distanceToSegment, distanceToShore, insidePolygon, shore, t
  * (scripts/geo/fetch-osm-hoan-kiem.mjs). Coordinates are already local metres
  * (+X east, +Z south, origin at the lake centre used by geo.ts).
  */
-type RawRoad = { n: string; h: string; l?: number; o?: number; w?: number; p: number[][] };
+type RawRoad = { n: string; h: string; l?: number; o?: number; w?: number; ms?: number; p: number[][] };
+type RawNode = { t: string; p: number[] };
 type RawBuilding = { p: number[][]; lv?: number; h?: number; n?: string; k?: string };
 type RawPark = { p: number[][]; n?: string };
 
-export type Road = { name: string; kind: string; width: number; oneway: boolean; lanes: number; points: Point[] };
+/** `points` run in the direction of travel for one-way streets. `maxspeed` (km/h) when OSM has it. */
+export type Road = { name: string; kind: string; width: number; oneway: boolean; lanes: number; points: Point[]; maxspeed?: number };
 export type Building = { ring: Point[]; floors: number; height: number; name?: string; kind?: string; area: number; center: Point; seed: number };
 export type Park = { ring: Point[]; name?: string };
 
@@ -41,7 +43,7 @@ function hash(x: number, z: number) {
 /** Vehicle roads (footways are left out: in OSM they are mostly separately mapped sidewalks). */
 export const roads: Road[] = (osm.roads as RawRoad[])
   .filter((r) => vehicleKinds.has(r.h))
-  .map((r) => ({ name: r.n, kind: r.h, width: roadWidth(r), oneway: !!r.o, lanes: r.l ?? (r.h === 'service' ? 1 : 2), points: r.p as Point[] }))
+  .map((r) => ({ name: r.n, kind: r.h, width: roadWidth(r), oneway: !!r.o, lanes: r.l ?? (r.h === 'service' ? 1 : 2), points: (r.o === -1 ? [...r.p].reverse() : r.p) as Point[], maxspeed: r.ms }))
   // Drop anything mapped over the water (e.g. the bridge or lake paths).
   .filter((r) => { const mid = r.points[Math.floor(r.points.length / 2)]; return !insidePolygon(mid, shore); });
 
@@ -306,3 +308,6 @@ if (import.meta.env.DEV) (window as unknown as { __restaurant?: unknown }).__res
 // Dev hook for test scripts.
 if (import.meta.env.DEV) (window as unknown as { __osmDropped?: unknown }).__osmDropped = droppedNearLake;
 if (import.meta.env.DEV) (window as unknown as { __roadTrim?: unknown }).__roadTrim = roadTrim;
+
+/** Traffic signals and pedestrian crossings mapped as OSM nodes. */
+export const osmNodes = ((osm as { nodes?: RawNode[] }).nodes ?? []).map((n) => ({ kind: n.t, p: n.p as Point }));

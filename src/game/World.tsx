@@ -8,6 +8,7 @@ import { TheHucBridge } from './world/Bridge';
 import { OsmBuildings } from './world/OsmBuildings';
 import { DenSM } from './world/DenSM';
 import { DriverJob } from './world/DriverJob';
+import { Signs } from './world/Signs';
 import { Pedestrians } from './world/Pedestrians';
 import { Interaction, Job } from './world/Job';
 import { Restaurant } from './world/Restaurant';
@@ -87,6 +88,7 @@ export function World({ time, quality, paused, freeCamera, onFps, onPosition }: 
     <Interaction paused={paused} />
     <Restaurant paused={paused} />
     <Job />
+    <Signs />
     <DriverJob />
     <DenSM paused={paused} />
     <Pedestrians />
