@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { CAN_OFFSET, drinkLevels, firstDrink, GLASS_OFFSET, lerpN, lerpV, mealAt, SET, setToBody, track } from './meal';
 import { taxi } from './ride';
 import { bike, game, player, useGame } from './state';
-import { PlayerForearm, PlayerHead, PlayerShin, PlayerThigh, PlayerTorso, PlayerUpperArm, type Expression } from './PlayerLook';
+import { PlayerModel, type Expression, type PlayerRig } from './PlayerModel';
 import { Bottle, bottleLip, Chopsticks, IceGlass, Morsel, TakeawayBag } from './world/food';
 import { GRIP, PILLION, SEAT } from './world/Scooter';
 
@@ -15,20 +15,26 @@ import { GRIP, PILLION, SEAT } from './world/Scooter';
  * the hips to lean forward. Held props follow the hand where the IK actually put it.
  */
 const HIP = 0.92;
-const THIGH = 0.44;
-const SHIN = 0.44;
-const L1 = 0.31; // upper arm
-const L2 = 0.3; // forearm; the hand centre sits HAND beyond the wrist
-const HAND = 0.045;
-const SHOULDER = (side: number) => new THREE.Vector3(side * 0.31, 0.62, 0); // torso space
-const MOUTH = new THREE.Vector3(0, 1.0, 0.16); // torso space
+const SPINE = 0.98; // spine pivot (hips + 0.06) of PlayerModel; 'torso space' below means spine space
+const L1 = 0.3; // upper arm
+const L2 = 0.305; // elbow → hand joint (forearm + wrist)
+const HAND = 0.035; // hand centre beyond the hand joint
+const SHOULDER = (side: number) => new THREE.Vector3(side * 0.22, 0.38, 0); // spine space
+const MOUTH = new THREE.Vector3(0, 0.585, 0.15); // spine space
 const DOWN = new THREE.Vector3(0, -1, 0);
 const X = new THREE.Vector3(1, 0, 0);
 const tmpQ = new THREE.Quaternion();
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 
-function toTorso(p: THREE.Vector3, lean: number) { return p.clone().sub(V(0, HIP, 0)).applyAxisAngle(X, -lean); }
-function toBody(p: THREE.Vector3, lean: number) { return p.clone().applyAxisAngle(X, lean).add(V(0, HIP, 0)); }
+function toTorso(p: THREE.Vector3, lean: number) { return p.clone().sub(V(0, SPINE, 0)).applyAxisAngle(X, -lean); }
+function toBody(p: THREE.Vector3, lean: number) { return p.clone().applyAxisAngle(X, lean).add(V(0, SPINE, 0)); }
+
+/** Point a shoulder joint along upperDir and its elbow along oreDir (both in spine space). */
+function setArm(shoulder: THREE.Group, elbow: THREE.Group, upperDir: THREE.Vector3, foreDir: THREE.Vector3) {
+  shoulder.quaternion.copy(tmpQ.setFromUnitVectors(DOWN, upperDir));
+  const local = foreDir.clone().applyQuaternion(shoulder.quaternion.clone().invert());
+  elbow.quaternion.copy(tmpQ.setFromUnitVectors(DOWN, local.normalize()));
+}
 
 /**
  * Two-bone IK in torso space. `pole` is the direction the elbow should point (out, down and a little
@@ -47,21 +53,16 @@ function solveArm(side: number, hand: THREE.Vector3, upper: THREE.Group, fore: T
   p.normalize();
   const E = S.clone().addScaledVector(dir, Math.cos(a) * L1).addScaledVector(p, Math.sin(a) * L1);
   const W = S.clone().addScaledVector(dir, lw);
-  upper.position.copy(S);
-  upper.quaternion.copy(tmpQ.setFromUnitVectors(DOWN, E.clone().sub(S).normalize()));
-  fore.position.copy(E);
-  fore.quaternion.copy(tmpQ.setFromUnitVectors(DOWN, W.clone().sub(E).normalize()));
+  setArm(upper, fore, E.clone().sub(S).normalize(), W.clone().sub(E).normalize());
   return S.clone().addScaledVector(dir, len);
 }
 
 export function Avatar({ speed, expressionOverride }: { speed: { current: number }; expressionOverride?: { current: Expression | null } }) {
   const body = useRef<THREE.Group>(null);
-  const torso = useRef<THREE.Group>(null);
-  const head = useRef<THREE.Group>(null);
-  const thighs = [useRef<THREE.Group>(null), useRef<THREE.Group>(null)];
-  const shins = [useRef<THREE.Group>(null), useRef<THREE.Group>(null)];
-  const upper = [useRef<THREE.Group>(null), useRef<THREE.Group>(null)];
-  const fore = [useRef<THREE.Group>(null), useRef<THREE.Group>(null)];
+  const rig = useRef<PlayerRig>(null);
+  const propSpace = useRef<THREE.Group>(null);
+  const [expr, setExpr] = useState<Expression>('neutral');
+  const shipping = useGame((s) => !!s.job);
   const sticks = useRef<THREE.Group>(null);
   const morsel = useRef<THREE.Group>(null);
   const heldBottle = useRef<THREE.Group>(null);
@@ -77,9 +78,9 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
   const mood = useRef<{ kind: Expression; until: number; toast: number }>({ kind: 'neutral', until: 0, toast: 0 });
 
   useFrame((_, dt) => {
-    const b = body.current, t = torso.current;
-    const U = [upper[0].current, upper[1].current], F = [fore[0].current, fore[1].current];
-    if (!b || !t || !U[0] || !U[1] || !F[0] || !F[1]) return;
+    const b = body.current, R0 = rig.current, pr = propSpace.current;
+    if (!b || !R0 || !pr || !R0.spine) return;
+    const t = R0.spine;
     const s = game.get();
     phase.current += dt * (4 + speed.current * 1.25);
     let showSticks = false, showMorsel = false, showBottle = false, showGlass = false, showStream = false, showBag = false;
@@ -87,14 +88,21 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
     const R = -1, L = 1; // right arm at −x, left arm at +x
     const leg = (side: number, thigh: number, knee: number, splay = 0) => {
       const i = side < 0 ? 0 : 1;
-      thighs[i].current?.rotation.set(thigh, 0, splay);
-      shins[i].current?.rotation.set(knee, 0, 0);
+      (i ? R0.hipL : R0.hipR).rotation.set(thigh, 0, splay);
+      (i ? R0.kneeL : R0.kneeR).rotation.set(knee, 0, 0);
     };
     /** Damp the torso toward the target lean and return the lean actually shown. */
-    const lean = (target: number) => { t.rotation.x = THREE.MathUtils.damp(t.rotation.x, target, 12, dt); return t.rotation.x; };
-    const arm = (side: number, target: THREE.Vector3, pole?: THREE.Vector3) => solveArm(side, target, U[side < 0 ? 0 : 1]!, F[side < 0 ? 0 : 1]!, pole);
+    const lean = (target: number) => { t.rotation.x = THREE.MathUtils.damp(t.rotation.x, target, 12, dt); pr.rotation.x = t.rotation.x; return t.rotation.x; };
+    const arm = (side: number, target: THREE.Vector3, pole?: THREE.Vector3) => solveArm(side, target, side < 0 ? R0.shoulderR : R0.shoulderL, side < 0 ? R0.elbowR : R0.elbowL, pole);
 
-    if (bike.riding || taxi.passenger) {
+    if (taxi.passenger && taxi.vehicle === 'car') {
+      // ---- back seat of an Đen Car: the avatar root sits at the hip point (placed by the controller)
+      b.position.set(0, -HIP, 0);
+      leg(-1, -1.5, 1.5, 0.06); leg(1, -1.5, 1.5, -0.06);
+      const al = lean(-0.05);
+      arm(R, toTorso(V(-0.17, HIP + 0.06, 0.3), al), V(-1, -0.4, -0.2));
+      arm(L, toTorso(V(0.17, HIP + 0.06, 0.3), al), V(1, -0.4, -0.2));
+    } else if (bike.riding || taxi.passenger) {
       // ---- on a scooter: hips on the seat, knees bent, feet on the floor / pegs
       const pillion = taxi.passenger;
       const seat = pillion ? PILLION : SEAT;
@@ -210,7 +218,6 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
       lean(0.04 * run);
       const carrying = s.job?.stage === 'deliver';
       for (const side of [R, L]) {
-        const i = side < 0 ? 0 : 1;
         if (carrying && side === R) {
           const w = arm(R, V(-0.3, 0.12, 0.12), V(-1, -0.3, -0.3));
           if (bag.current) { bag.current.position.copy(w).add(V(0, -0.3, 0)); showBag = true; }
@@ -218,11 +225,8 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
         }
         const sw = (side < 0 ? -swing : swing) * 0.8;
         const dirU = V(side * 0.08, -Math.cos(sw), Math.sin(sw)).normalize();
-        const S = SHOULDER(side);
-        const E = S.clone().addScaledVector(dirU, L1);
         const dirF = dirU.clone().add(V(0, 0, 0.18 + Math.max(0, sw) * 0.4)).normalize();
-        U[i]!.position.copy(S); U[i]!.quaternion.copy(tmpQ.setFromUnitVectors(DOWN, dirU));
-        F[i]!.position.copy(E); F[i]!.quaternion.copy(tmpQ.setFromUnitVectors(DOWN, dirF));
+        setArm(side < 0 ? R0.shoulderR : R0.shoulderL, side < 0 ? R0.elbowR : R0.elbowL, dirU, dirF);
       }
     }
     // ---- facial expression: happy while eating / after good news, surprised when starving or on bad news
@@ -236,7 +240,8 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
     expression.current = expressionOverride?.current ? expressionOverride.current : performance.now() < mood.current.until ? mood.current.kind
       : s.phase === 'eating' || s.phase === 'finished' ? 'happy'
       : s.hunger < 15 || s.thirst < 15 ? 'surprised' : 'neutral';
-    if (head.current) head.current.rotation.x = THREE.MathUtils.damp(head.current.rotation.x, headPitch, 10, dt);
+    if (expression.current !== expr) setExpr(expression.current);
+    R0.head.rotation.x = THREE.MathUtils.damp(R0.head.rotation.x, headPitch, 10, dt);
     if (sticks.current) sticks.current.visible = showSticks;
     if (morsel.current) morsel.current.visible = showMorsel;
     if (heldBottle.current) heldBottle.current.visible = showBottle;
@@ -246,18 +251,9 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
   });
 
   return <group ref={body}>
-    {[-1, 1].map((side, i) => <group key={`l${side}`} ref={thighs[i]} position={[side * 0.13, HIP, 0]}>
-      <PlayerThigh length={THIGH} />
-      <group ref={shins[i]} position={[0, -THIGH, 0]}><PlayerShin length={SHIN} /></group>
-    </group>)}
-    <group ref={torso} position={[0, HIP, 0]}>
-      <PlayerTorso />
-      {/* neck and head, pivoting at the base of the neck */}
-      <group ref={head} position={[0, 0.78, 0]}><PlayerHead expression={expression} /></group>
-      {[-1, 1].map((side, i) => <group key={`a${side}`}>
-        <group ref={upper[i]}><PlayerUpperArm length={L1} /></group>
-        <group ref={fore[i]}><PlayerForearm length={L2} hand={HAND} /></group>
-      </group>)}
+    <PlayerModel ref={rig} expression={expr} shipperBag={shipping} />
+    {/* held props live in a frame that follows the spine */}
+    <group ref={propSpace} position={[0, SPINE, 0]}>
       <group ref={sticks} visible={false}><Chopsticks spread={0.008} /></group>
       <group ref={morsel} visible={false}><Morsel kind={morselKind} /></group>
       <group ref={heldBottle} visible={false}><group><Bottle id={drinkId} /></group></group>

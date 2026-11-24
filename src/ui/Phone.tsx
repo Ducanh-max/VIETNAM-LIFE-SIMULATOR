@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { jobActions } from '../game/job';
 import { nav, updateNav } from '../game/navigation';
-import { fareFor, places, rideActions, taxi, type Place } from '../game/ride';
+import { places, quote, rideActions, taxi, VEHICLES, type Vehicle } from '../game/ride';
 import { formatVnd, game, player, useGame } from '../game/state';
 import { drawMap, headingUpRotation, mapBase } from './mapCanvas';
 import { useVietnamClock, VIETNAM_TZ } from './vietnamTime';
@@ -163,34 +163,45 @@ function ContactsApp() {
   </div>;
 }
 
-/** Đen SM: book an electric bike ride to a landmark; follow the driver; pay from the wallet on arrival. */
+/** Đen SM: pick a place, choose Đen Bike or Đen Car, pay 1.000đ per 100 m of the real route on arrival. */
 function DenSMApp() {
   const ride = useGame((s) => s.ride);
   const money = useGame((s) => s.money);
   const [pick, setPick] = useState<number | null>(null);
+  const [vehicle, setVehicle] = useState<Vehicle>('bike');
+  const [q, setQ] = useState<ReturnType<typeof quote> | undefined>(undefined);
   const list = places();
   const here = { x: player.position.x, z: player.position.z };
-  const quote = (p: Place) => { const straight = Math.hypot(p.x - here.x, p.z - here.z) * 1.3; return { dist: straight, fare: fareFor(straight) }; };
   const [, force] = useState(0);
   useEffect(() => { const id = setInterval(() => force((n) => n + 1), 1000); return () => clearInterval(id); }, []);
+  // exact quote along the streets for the chosen place
+  useEffect(() => { setQ(pick === null ? undefined : quote(list[pick])); }, [pick, list]);
   const taxiDist = Math.round(Math.hypot(taxi.position.x - here.x, taxi.position.z - here.z));
   return <div className="app-page den-app">
-    <div className="den-header"><span className="den-logo">Đen<b>SM</b></span><small>Di chuyển xanh · giá minh bạch</small></div>
+    <div className="den-header"><span className="den-logo">Đen<b>SM</b></span><small>Đen Bike 500đ · Đen Car 1.000đ mỗi 100 m</small></div>
     {ride ? <div className="den-trip">
-      <div className="den-status">{ride.stage === 'arriving' ? `${ride.driver} đang đến đón bạn` : ride.stage === 'waiting' ? `${ride.driver} đã tới, ra xe và bấm E` : `Đang tới ${ride.dest.name}`}</div>
-      <div className="den-driver"><span className="msg-avatar den-avatar">{ride.driver.split(' ').pop()![0]}</span><div><b>{ride.driver}</b><small>Đen Bike · xe máy điện · {ride.plate}</small><small>★ 4.9 · {ride.stage === 'riding' ? `còn ${fmtDist(nav.length)}` : `cách bạn ${fmtDist(taxiDist)}`}</small></div></div>
-      <div className="den-route"><span>📍 Điểm đến</span><b>{ride.dest.name}</b><small>{ride.dest.note}</small></div>
-      <div className="den-fare"><span>Giá cước</span><b>{formatVnd(ride.fare)}</b><small>Trả qua ví khi tới nơi</small></div>
+      <div className="den-status">{ride.stage === 'arriving' ? `${ride.driver} đang đến đón bạn` : ride.stage === 'waiting' ? `${ride.driver} đã tới, ra ${ride.vehicle === 'car' ? 'ô tô' : 'xe'} và bấm E` : `Đang tới ${ride.dest.name}`}</div>
+      <div className="den-driver"><span className="msg-avatar den-avatar">{ride.driver.split(' ').pop()![0]}</span><div><b>{ride.driver}</b><small>{VEHICLES[ride.vehicle].name} · {VEHICLES[ride.vehicle].note} · {ride.plate}</small><small>★ 4.9 · {ride.stage === 'riding' ? `còn ${fmtDist(nav.length)}` : `cách bạn ${fmtDist(taxiDist)}`}</small></div></div>
+      <div className="den-route"><span>📍 Điểm đến</span><b>{ride.dest.name}</b><small>{ride.dest.note} · {fmtDist(ride.distance)} theo đường phố</small></div>
+      <div className="den-fare"><span>Giá cước</span><b>{formatVnd(ride.fare)}</b><small>{Math.ceil(ride.distance / 100)} × 100 m × {formatVnd(VEHICLES[ride.vehicle].per100)} · trả qua ví khi tới nơi</small></div>
       {ride.stage !== 'riding' && <button className="danger-outline" onClick={() => rideActions.cancel()}>Huỷ chuyến</button>}
     </div> : <>
       <h4>Bạn muốn đi đâu?</h4>
-      <ul className="den-places">{list.map((p, i) => { const q = quote(p); return <li key={p.name} className={pick === i ? 'picked' : ''} onClick={() => setPick(i)}>
-        <span className="den-pin">📍</span><div><b>{p.name}</b><small>{p.note} · ~{fmtDist(q.dist)}</small></div><em>{formatVnd(q.fare)}</em>
-      </li>; })}</ul>
+      <ul className="den-places">{list.map((p, i) => <li key={p.name} className={pick === i ? 'picked' : ''} onClick={() => setPick(i)}>
+        <span className="den-pin">📍</span><div><b>{p.name}</b><small>{p.note} · cách ~{fmtDist(Math.hypot(p.x - here.x, p.z - here.z))}</small></div><em>›</em>
+      </li>)}</ul>
       {pick !== null && <div className="den-book">
-        <div><b>Đen Bike</b><small>Xe máy điện · 1 khách · tài xế tới trong ~30 giây</small></div>
-        <button className="den-button" disabled={quote(list[pick]).fare > money} onClick={() => rideActions.book(list[pick])}>Đặt xe · {formatVnd(quote(list[pick]).fare)}</button>
-        <small className="den-note">Giá ước tính theo đường đi thực tế, chốt khi đặt.</small>
+        {q === null ? <small>Chưa tìm được đường tới điểm này, bạn chọn nơi khác nhé.</small> : q && <>
+          <small className="den-dist">Quãng đường theo phố: <b>{fmtDist(q.distance)}</b> = {Math.ceil(q.distance / 100)} × 100 m</small>
+          <div className="den-vehicles">
+            {(['bike', 'car'] as Vehicle[]).map((v) => <button key={v} className={vehicle === v ? 'on' : ''} onClick={() => setVehicle(v)}>
+              <span className="den-veh-icon">{v === 'bike' ? '🛵' : '🚗'}</span>
+              <b>{VEHICLES[v].name}</b><small>{VEHICLES[v].note}</small>
+              <strong>{formatVnd(q.fare[v])}</strong><small>{formatVnd(VEHICLES[v].per100)}/100 m · ~{q.minutes[v]} phút</small>
+            </button>)}
+          </div>
+          <button className="den-button" disabled={q.fare[vehicle] > money} onClick={() => rideActions.book(list[pick], vehicle)}>{q.fare[vehicle] > money ? 'Không đủ tiền trong ví' : `Đặt ${VEHICLES[vehicle].name} · ${formatVnd(q.fare[vehicle])}`}</button>
+        </>}
       </div>}
     </>}
   </div>;

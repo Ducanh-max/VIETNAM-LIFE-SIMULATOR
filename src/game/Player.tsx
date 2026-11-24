@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { bridgeEnds, canWalk, groundHeight, type Point } from './geo';
 import { Avatar } from './Avatar';
 import { taxi } from './ride';
+import { CAR_PASSENGER } from './world/DenCar';
 import { bike, game, player, tickNeeds, view } from './state';
 import { WHEEL_R, WHEELBASE } from './world/Scooter';
 
@@ -120,10 +121,22 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
       sitting.current = false;
       velocity.current.set(0, 0, 0); speed.current = 0;
       position.current.copy(taxi.position);
-      if (avatar.current) { avatar.current.position.copy(taxi.position); avatar.current.rotation.set(0, taxi.heading, taxi.lean, 'YXZ'); }
+      const inCar = taxi.vehicle === 'car';
+      if (avatar.current) {
+        if (inCar) {
+          // sit in the rear passenger seat, scaled to fit the cabin
+          const h = taxi.heading;
+          const sx = CAR_PASSENGER.x, sz = CAR_PASSENGER.z;
+          avatar.current.position.set(taxi.position.x + sx * Math.cos(h) + sz * Math.sin(h), taxi.position.y + CAR_PASSENGER.y, taxi.position.z - sx * Math.sin(h) + sz * Math.cos(h));
+          avatar.current.rotation.set(0, h, 0, 'YXZ');
+          avatar.current.scale.setScalar(0.78);
+        } else {
+          avatar.current.position.copy(taxi.position); avatar.current.rotation.set(0, taxi.heading, taxi.lean, 'YXZ');
+        }
+      }
       chaseCamera(taxi.heading, 9, dt);
       const camFwd = new THREE.Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
-      const dist = Math.max(5, distance.current * 0.85);
+      const dist = Math.max(inCar ? 8 : 5, distance.current * (inCar ? 1.1 : 0.85));
       const eye = taxi.position.clone().addScaledVector(camFwd, -Math.cos(pitch.current) * dist).add(new THREE.Vector3(0, 1.7 + Math.sin(pitch.current) * dist, 0));
       camera.position.lerp(eye, 1 - Math.exp(-7 * dt));
       camera.lookAt(taxi.position.x, taxi.position.y + 1.2, taxi.position.z);
@@ -133,6 +146,7 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
       if (!paused) tickNeeds(dt, false, false);
       return;
     }
+    if (avatar.current && avatar.current.scale.x !== 1) avatar.current.scale.setScalar(1);
     if (!bike.riding) { lastChaseYaw.current = yaw.current; lookOffset.current = 0; }
     // ---- Riding the delivery scooter: W/S throttle and brake, A/D steer, Shift for full throttle.
     if (bike.riding && !freeCamera) {

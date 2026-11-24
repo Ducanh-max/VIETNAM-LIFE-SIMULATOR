@@ -11,7 +11,12 @@ import { WHEEL_R } from './world/Scooter';
  * there; the fare comes out of the wallet when you arrive.
  */
 export type Place = { name: string; note: string; x: number; z: number };
-export type Ride = { stage: 'arriving' | 'waiting' | 'riding'; dest: Place; fare: number; distance: number; driver: string; plate: string };
+export type Vehicle = 'bike' | 'car';
+export type Ride = { stage: 'arriving' | 'waiting' | 'riding'; vehicle: Vehicle; dest: Place; fare: number; distance: number; driver: string; plate: string };
+export const VEHICLES: Record<Vehicle, { name: string; note: string; speed: number; seats: number; per100: number }> = {
+  bike: { name: 'Đen Bike', note: 'Xe máy điện · 1 khách', speed: 9, seats: 1, per100: 500 },
+  car: { name: 'Đen Car', note: 'Ô tô điện 4 chỗ · điều hoà', speed: 10.5, seats: 4, per100: 1000 },
+};
 
 const DRIVERS = ['Anh Minh', 'Anh Quân', 'Chị Hạnh', 'Anh Toàn', 'Anh Sơn', 'Chị Vy'];
 
@@ -49,12 +54,22 @@ export function places(): Place[] {
   return (placesCache = list);
 }
 
-export const fareFor = (meters: number) => Math.max(15_000, Math.round((12_000 + (meters / 1000) * 5_000) / 1000) * 1000);
+/** Per started 100 m of the route along the streets: Đen Bike 500đ, Đen Car 1.000đ (1,23 km → 6.500đ / 13.000đ). */
+export const fareFor = (meters: number, vehicle: Vehicle) => Math.max(1, Math.ceil(meters / 100)) * VEHICLES[vehicle].per100;
+
+/** Exact route quote from the player to a place: real street distance, fare and riding time for each vehicle. */
+export function quote(place: Place) {
+  const trip = findRoute([player.position.x, player.position.z], [place.x, place.z]);
+  if (!trip) return null;
+  const distance = routeLength(trip);
+  return { distance, fare: { bike: fareFor(distance, 'bike'), car: fareFor(distance, 'car') }, minutes: { bike: Math.max(1, Math.round(distance / VEHICLES.bike.speed / 60)), car: Math.max(1, Math.round(distance / VEHICLES.car.speed / 60)) } };
+}
 
 /** Live pose of the Đen Bike plus the route it is following. */
 export const taxi = {
   position: new THREE.Vector3(), heading: 0, steer: 0, lean: 0, wheel: 0, riding: true,
   passenger: false,
+  vehicle: 'bike' as Vehicle,
   route: [] as Point[],
   s: 0, // distance travelled along the route
 };
@@ -71,7 +86,7 @@ function pointAt(route: Point[], s: number) {
 }
 
 export const rideActions = {
-  book(place: Place) {
+  book(place: Place, vehicle: Vehicle = 'bike') {
     const s = game.get();
     if (s.ride) return;
     if (bike.riding) { game.toast('Bạn đang lái xe Wave của quán, xuống xe trước đã nhé.'); return; }
@@ -79,19 +94,19 @@ export const rideActions = {
     const trip = findRoute(from, [place.x, place.z]);
     if (!trip) { game.toast('Đen SM chưa tìm được đường tới đó, bạn chọn điểm khác nhé.'); return; }
     const distance = routeLength(trip);
-    const fare = fareFor(distance);
+    const fare = fareFor(distance, vehicle);
     if (fare > s.money) { game.toast(`Không đủ tiền: chuyến này ${formatVnd(fare)}.`); return; }
     // the driver starts a couple of blocks away and rides to you
     const near = deliverySpots.filter((d) => { const dd = Math.hypot(d.p[0] - from[0], d.p[1] - from[1]); return dd > 90 && dd < 200; });
     const start = near[Math.floor(Math.random() * near.length)]?.p ?? [from[0] + 60, from[1]];
     const approach = findRoute(start, from) ?? [start, from];
-    taxi.route = approach; taxi.s = 0; taxi.passenger = false;
+    taxi.route = approach; taxi.s = 0; taxi.passenger = false; taxi.vehicle = vehicle;
     const first = pointAt(approach, 0);
     taxi.position.set(first.p[0], groundHeight(first.p), first.p[1]); taxi.heading = first.dir;
     const driver = DRIVERS[Math.floor(Math.random() * DRIVERS.length)];
-    const plate = `29-MĐ ${100 + Math.floor(Math.random() * 899)}.${10 + Math.floor(Math.random() * 89)}`;
-    game.set({ ride: { stage: 'arriving', dest: place, fare, distance, driver, plate } });
-    pushMessage('Đen SM', `${driver} (Đen Bike ${plate}) đang đến đón bạn. Chuyến tới ${place.name}: ${formatVnd(fare)}.`);
+    const plate = vehicle === 'car' ? `30K-${100 + Math.floor(Math.random() * 899)}.${10 + Math.floor(Math.random() * 89)}` : `29-MĐ ${100 + Math.floor(Math.random() * 899)}.${10 + Math.floor(Math.random() * 89)}`;
+    game.set({ ride: { stage: 'arriving', vehicle, dest: place, fare, distance, driver, plate } });
+    pushMessage('Đen SM', `${driver} (${VEHICLES[vehicle].name} ${plate}) đang đến đón bạn. Chuyến tới ${place.name} · ${(distance / 1000).toFixed(2)} km · ${formatVnd(fare)}.`);
   },
   cancel() {
     const r = game.get().ride;
@@ -115,7 +130,8 @@ export const rideActions = {
     taxi.passenger = false;
     const h = taxi.heading;
     for (const side of [1, -1]) {
-      const p: Point = [taxi.position.x + Math.cos(h) * 0.9 * side, taxi.position.z - Math.sin(h) * 0.9 * side];
+      const off = taxi.vehicle === 'car' ? 1.5 : 0.9;
+      const p: Point = [taxi.position.x + Math.cos(h) * off * side, taxi.position.z - Math.sin(h) * off * side];
       if (canWalk(p)) { player.teleport?.(p[0], p[1]); break; }
     }
     addMoney(-r.fare, `Đen SM · ${r.dest.name}`);

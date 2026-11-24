@@ -205,3 +205,8 @@
 .character-moods button{flex:1;padding:6px 2px;border:1px solid #ffffff2a;background:#0e2220;color:#c7d1cb;font-size:10px;font-weight:700}
 .character-moods button.on{background:#e6bd83;color:#1e2824;border-color:#e6bd83}
 @media(max-width:900px){.character-card{position:relative;right:auto;bottom:auto;margin:16px 20px;width:auto}}
+.den-dist{color:#cfd6d2!important}.den-dist b{color:#16c784}
+.den-vehicles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.den-vehicles button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px;border-radius:14px;border:1.5px solid #2a2d30;background:#111315;color:#f2f5f3;text-align:left}
+.den-vehicles button.on{border-color:#16c784;background:#0f2a1f}
+.den-veh-icon{font-size:22px}.den-vehicles b{font-size:13px}.den-vehicles small{font-size:10px;color:#9aa39f}.den-vehicles strong{font-size:15px;color:#16c784;margin-top:4px}

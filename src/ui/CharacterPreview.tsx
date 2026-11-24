@@ -2,7 +2,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Avatar } from '../game/Avatar';
-import type { Expression } from '../game/PlayerLook';
+import type { Expression } from '../game/PlayerModel';
 
 const EXPRESSIONS: { id: Expression; label: string }[] = [
   { id: 'neutral', label: 'Bình thường' },
@@ -14,7 +14,7 @@ function Turntable({ expression }: { expression: { current: Expression | null } 
   const group = useRef<THREE.Group>(null);
   const speed = useRef(0);
   useFrame((_, dt) => { if (group.current) group.current.rotation.y += dt * 0.6; });
-  return <group ref={group} position={[0, -1.05, 0]}><Avatar speed={speed} expressionOverride={expression} /></group>;
+  return <group ref={group} position={[0, -0.95, 0]}><Avatar speed={speed} expressionOverride={expression} /></group>;
 }
 
 /** Turntable preview of the player character on the destination screen. */
