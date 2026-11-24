@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { bridgeEnds, cameraBlocked, canWalk, groundHeight, type Point } from './geo';
 import { Avatar } from './Avatar';
 import { taxi } from './ride';
-import { CAR_PASSENGER } from './world/DenCar';
+import { CAR_DRIVER, CAR_PASSENGER } from './world/DenCar';
 import { bike, game, player, tickNeeds, view } from './state';
 import { WHEEL_R, WHEELBASE } from './world/Scooter';
 
@@ -163,32 +163,41 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
     // ---- Riding the delivery scooter: W/S throttle and brake, A/D steer, Shift for full throttle.
     if (bike.riding && !freeCamera) {
       sitting.current = false;
+      const car = bike.kind === 'dencar';
       const throttle = paused ? 0 : (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0);
       const steerIn = paused ? 0 : (k.has('KeyA') ? 1 : 0) - (k.has('KeyD') ? 1 : 0);
-      const vmax = k.has('ShiftLeft') || k.has('ShiftRight') ? 15 : 10.5; // ≈ 54 / 38 km/h
+      const vmax = (k.has('ShiftLeft') || k.has('ShiftRight') ? 15 : 10.5) * (car ? 1.15 : 1); // ≈ 54 / 38 km/h (car a bit faster)
       if (throttle > 0) bike.speed = Math.min(vmax, bike.speed + (bike.speed < 0 ? 9 : 3.4) * dt);
       else if (throttle < 0) bike.speed = bike.speed > 0.2 ? Math.max(0, bike.speed - 9 * dt) : Math.max(-2.2, bike.speed - 2.4 * dt);
       else bike.speed -= Math.sign(bike.speed) * Math.min(Math.abs(bike.speed), 1.5 * dt);
       if (bike.speed > vmax) bike.speed = Math.max(vmax, bike.speed - 4 * dt);
       const maxSteer = THREE.MathUtils.lerp(0.6, 0.2, Math.min(1, Math.abs(bike.speed) / 14));
       bike.steer = THREE.MathUtils.damp(bike.steer, steerIn * maxSteer, 7, dt);
-      bike.heading += (bike.speed * Math.tan(bike.steer) / WHEELBASE) * dt;
+      bike.heading += (bike.speed * Math.tan(bike.steer) / (car ? 2.7 : WHEELBASE)) * dt;
       const fwd = new THREE.Vector3(Math.sin(bike.heading), 0, Math.cos(bike.heading));
       const next = bike.position.clone().addScaledVector(fwd, bike.speed * dt);
       const dirSign = bike.speed >= 0 ? 1 : -1;
-      const nose: Point = [next.x + fwd.x * 0.95 * dirSign, next.z + fwd.z * 0.95 * dirSign];
+      const reachAhead = car ? 2.25 : 0.95;
+      const nose: Point = [next.x + fwd.x * reachAhead * dirSign, next.z + fwd.z * reachAhead * dirSign];
       if (canWalk([next.x, next.z]) && canWalk(nose)) { bike.position.x = next.x; bike.position.z = next.z; }
       else bike.speed *= -0.2; // bump
       bike.position.y = THREE.MathUtils.damp(bike.position.y, groundHeight([bike.position.x, bike.position.z]), 12, dt);
       bike.wheel += (bike.speed * dt) / WHEEL_R;
-      bike.lean = THREE.MathUtils.damp(bike.lean, -bike.steer * Math.min(1, Math.abs(bike.speed) / 7) * 0.5, 5, dt);
+      bike.lean = car ? 0 : THREE.MathUtils.damp(bike.lean, -bike.steer * Math.min(1, Math.abs(bike.speed) / 7) * 0.5, 5, dt);
       velocity.current.set(0, 0, 0);
       speed.current = 0;
       position.current.copy(bike.position);
-      if (avatar.current) { avatar.current.position.copy(bike.position); avatar.current.rotation.set(0, bike.heading, bike.lean, 'YXZ'); }
+      if (avatar.current) {
+        if (car) {
+          // in the driver's seat of the Đen Car
+          const h = bike.heading;
+          avatar.current.position.set(bike.position.x + CAR_DRIVER.x * Math.cos(h) + CAR_DRIVER.z * Math.sin(h), bike.position.y + CAR_DRIVER.y, bike.position.z - CAR_DRIVER.x * Math.sin(h) + CAR_DRIVER.z * Math.cos(h));
+          avatar.current.rotation.set(0, h, 0, 'YXZ');
+        } else { avatar.current.position.copy(bike.position); avatar.current.rotation.set(0, bike.heading, bike.lean, 'YXZ'); }
+      }
       chaseCamera(bike.heading, Math.abs(bike.speed), dt);
       const camFwd = new THREE.Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
-      const dist = Math.max(5, distance.current * 0.85);
+      const dist = Math.max(car ? 8 : 5, distance.current * (car ? 1.1 : 0.85));
       const eye = bike.position.clone().addScaledVector(camFwd, -Math.cos(pitch.current) * dist).add(new THREE.Vector3(0, 1.7 + Math.sin(pitch.current) * dist, 0));
       camera.position.lerp(eye, 1 - Math.exp(-7 * dt));
       camera.lookAt(bike.position.x, bike.position.y + 1.2, bike.position.z);

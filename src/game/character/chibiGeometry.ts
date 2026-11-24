@@ -206,7 +206,9 @@ function hairParts(o: Outfit, lod: Lod): CP[] {
   P.push({ g: cap, c: o.hair });
   const clumps = lod === 2 ? (st.far ?? [0, 3]).map((i) => st.clumps[i]).filter(Boolean) : st.clumps;
   for (const c of clumps) {
-    const cc = hatOn ? { ...c, tip: Math.min(c.tip ?? 0.012, 0.004) } : c;
+    // under a hat or helmet only the fringe, the sides and the nape show; the crown spikes are tucked in
+    if (hatOn && ((c.e0 > 1.4 && c.e1 > 0.6) || (c.e1 < 0.1 && !c.drop))) continue;
+    const cc = hatOn ? { ...c, tip: Math.min(c.tip ?? 0.012, 0.004), r: c.r * 0.7 } : c;
     P.push({ g: clumpGeometry(cc, q(lod, 5, 3, 2), q(lod, 5, 4, 4)), c: tones[c.tone ?? 0] });
   }
   if (st.tail) {
@@ -322,7 +324,7 @@ function torsoParts(o: Outfit, lod: Lod): CP[] {
     if (lod < 2) for (const s of [-1, 1]) {
       const a = s * gap / 2;
       // thick rounded front edge
-      P.push({ g: taperTube([edge(a, 0.172, -0.135), edge(a, 0.178, 0.0), edge(a, 0.184, 0.15), edge(a * 1.15, 0.168, 0.27), edge(a * 1.6, 0.13, 0.335)], 0.013, 0.012, { tubular: q(lod, 5, 3, 3), radial: q(lod, 4, 3, 3) }), c: shade(o.jacket, 0.93) });
+      P.push({ g: taperTube([edge(a, 0.172, -0.135), edge(a, 0.178, 0.0), edge(a, 0.184, 0.15), edge(a * 1.15, 0.168, 0.27), edge(a * 1.6, 0.13, 0.335)], 0.013, 0.012, { tubular: q(lod, 5, 3, 3), radial: q(lod, 4, 3, 3) }), c: o.logo ? o.jacketTrim : shade(o.jacket, 0.93) });
       // chest pocket with a flap
       const pa = s * 0.95; const fp = edge(pa, 0.192, 0.2);
       P.push({ g: softBox(0.046, 0.015, 0.011, 0.35, q(lod, 6, 4, 4), q(lod, 4, 3, 3)), c: o.jacketLight, t: T(fp.x, fp.y, fp.z, -0.12, pa, 0) });

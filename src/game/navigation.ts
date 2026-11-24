@@ -135,7 +135,8 @@ function distToRoute(p: Point, r: Point[]) {
 export function updateNav() {
   const job = game.get().job;
   const ride = game.get().ride;
-  const target = ride ? (ride.stage === 'riding' ? { x: ride.dest.x, z: ride.dest.z, label: ride.dest.name } : { x: taxi.position.x, z: taxi.position.z, label: `Xe Đen SM · ${ride.driver}` }) : !job ? null : job.stage === 'deliver' && job.delivery ? { ...job.delivery.dest, label: job.delivery.customer } : { ...pickupPoint(), label: 'Quán Bún chả Đức Anh' };
+  const drv = game.get().driver;
+  const target = drv ? (drv.fare ? (drv.stage === 'onboard' ? { x: drv.fare.dest.x, z: drv.fare.dest.z, label: `Trả khách · ${drv.fare.dest.street}` } : { x: drv.fare.pickup.x, z: drv.fare.pickup.z, label: `Đón ${drv.fare.passenger}` }) : null) : ride ? (ride.stage === 'riding' ? { x: ride.dest.x, z: ride.dest.z, label: ride.dest.name } : { x: taxi.position.x, z: taxi.position.z, label: `Xe Đen SM · ${ride.driver}` }) : !job ? null : job.stage === 'deliver' && job.delivery ? { ...job.delivery.dest, label: job.delivery.customer } : { ...pickupPoint(), label: 'Quán Bún chả Đức Anh' };
   nav.target = target;
   if (!target) { nav.route = null; nav.length = 0; nav.lastTarget = ''; return; }
   const from: Point = [player.position.x, player.position.z];

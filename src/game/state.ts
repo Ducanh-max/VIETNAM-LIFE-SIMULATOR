@@ -38,6 +38,8 @@ type State = {
   outfit: Outfit;
   /** Current Đen SM ride, if any. */
   ride: Ride | null;
+  /** Working as an Đen SM driver (Đen Bike or Đen Car), if hired. */
+  driver: DriverJob | null;
   /** Wallet history (newest first) and phone messages (newest first). */
   txns: Txn[];
   messages: Message[];
@@ -54,7 +56,7 @@ function load(): Pick<State, 'hunger' | 'thirst' | 'money'> {
   return { hunger: 72, thirst: 64, money: 300_000 };
 }
 
-let state: State = { ...load(), phase: 'none', order: {}, table: -1, eatProgress: 0, prompt: null, toast: null, dialog: null, job: null, phone: false, ride: null, txns: [], messages: [], outfit: loadPlayerOutfit() };
+let state: State = { ...load(), phase: 'none', order: {}, table: -1, eatProgress: 0, prompt: null, toast: null, dialog: null, job: null, phone: false, ride: null, driver: null, txns: [], messages: [], outfit: loadPlayerOutfit() };
 
 // One-time gift of 500.000đ for existing and new saves.
 const BONUS_KEY = 'doi-viet-bonus-500k';
@@ -174,6 +176,11 @@ export function tickNeeds(dt: number, running: boolean, moving: boolean) {
 export type Delivery = { customer: string; street: string; dest: { x: number; z: number }; facing: number; portions: number; pay: number; distance: number; startedAt: number; timeLimit: number };
 export type Job = { stage: 'pickup' | 'deliver'; delivery: Delivery | null; done: number; earned: number };
 
+// ---- Đen SM driver job ---------------------------------------------------------
+/** A ride request: a passenger waiting at the curb and where they want to go (real street distance, fare). */
+export type Fare = { passenger: string; seed: number; pickup: { x: number; z: number; facing: number; street: string }; dest: { x: number; z: number; street: string }; distance: number; fare: number; requestedAt: number };
+export type DriverJob = { vehicle: 'bike' | 'car'; stage: 'free' | 'pickup' | 'onboard'; fare: Fare | null; trips: number; earned: number; stars: number[]; nextAt: number };
+
 /** The shop's delivery scooter. Mutable pose, updated by the rider controller. */
 export const bike = {
   position: new THREE.Vector3(),
@@ -183,6 +190,8 @@ export const bike = {
   lean: 0,
   wheel: 0,
   riding: false,
+  /** Which vehicle this is: the shop's Wave, an Đen Bike or an Đen Car (the player drives it). */
+  kind: 'wave' as 'wave' | 'denbike' | 'dencar',
 };
 
 /** Camera heading, for the HUD compass arrow. */

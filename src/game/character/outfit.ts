@@ -19,6 +19,8 @@ export type Outfit = {
   glasses: boolean;
   build: number; // 0.92 slim … 1.1 broad
   height: number; // scale, 1 = 1.70 m
+  /** Printed logo on the chest and back (work uniforms). */
+  logo?: 'bcda' | 'densm' | null;
 };
 
 /** The main character, after the "Đời Việt – Nhân vật chính" sheet. */
@@ -32,6 +34,19 @@ export const PLAYER_OUTFIT: Outfit = {
   hat: 'none', hatColor: '#1d1d1f', glasses: false,
   build: 1, height: 1,
 };
+
+/**
+ * Work uniforms, put on automatically when hired and taken off when quitting (the player's own face,
+ * skin and hair are kept): the shop's red delivery jacket with a matching helmet and thermal backpack,
+ * the Đen SM black jacket with green trim and a black helmet (Đen Bike), or a black polo (Đen Car).
+ */
+export type Uniform = 'shipper' | 'denBike' | 'denCar';
+export function uniformFor(o: Outfit, u: Uniform): Outfit {
+  const base = { ...o, sling: false, apron: null, glasses: o.glasses, hood: null, cargo: false, shorts: false, skirt: false };
+  if (u === 'shipper') return { ...base, top: 'jacket', tee: '#F2EFE8', jacket: '#c8342b', jacketLight: '#e0554a', jacketDark: '#8f2119', jacketTrim: '#f2c14e', pants: '#2b2d33', pantsLight: '#3c3f47', pantsDark: '#1d1f24', pantsCuff: '#3c3f47', backpack: true, hat: 'helmet', hatColor: '#c8342b', logo: 'bcda' };
+  if (u === 'denBike') return { ...base, top: 'jacket', tee: '#1b1c1f', jacket: '#1b1c1f', jacketLight: '#16c784', jacketDark: '#0f1012', jacketTrim: '#16c784', pants: '#1f2024', pantsLight: '#2c2d32', pantsDark: '#141518', pantsCuff: '#2c2d32', backpack: false, hat: 'helmet', hatColor: '#151618', logo: 'densm' };
+  return { ...base, top: 'polo', tee: '#1b1c1f', pants: '#2b2d33', pantsLight: '#3c3f47', pantsDark: '#1d1f24', pantsCuff: '#3c3f47', backpack: false, hat: 'none', logo: 'densm' };
+}
 
 const KEY = 'doi-viet-outfit-v2'; // v2: chibi palette
 export function loadPlayerOutfit(): Outfit {

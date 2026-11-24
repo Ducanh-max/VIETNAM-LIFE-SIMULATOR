@@ -32,6 +32,8 @@ function pickDestination(): Omit<Delivery, 'startedAt'> {
 
 export const jobActions = {
   accept() {
+    if (game.get().driver) { game.set({ dialog: null }); game.toast('Bạn đang chạy Đen SM. Nghỉ ca Đen SM trong điện thoại trước rồi mới nhận ship được nhé.'); return; }
+    bike.kind = 'wave';
     parkBikeAtShop();
     game.set({ job: { stage: 'pickup', delivery: null, done: 0, earned: 0 }, dialog: null });
     game.toast('Ông chủ Đức Anh: "Tốt lắm! Xe Wave với thùng giữ nhiệt để ngoài cửa. Ra chỗ anh Đạt lấy túi bún chả nhé!"');

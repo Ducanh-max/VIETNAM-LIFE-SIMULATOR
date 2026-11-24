@@ -14,6 +14,7 @@ export type AnimContext = {
   sitBlend: number; // 0 standing … 1 seated (damped)
   seated: boolean; // has a seat
   onScooter: boolean; // riding own scooter (driver)
+  driving: boolean; // driving an Đen Car
   pillion: boolean; // passenger on an Đen SM bike
   inCar: boolean; // passenger in an Đen SM car
   meal: 'bite' | 'pour' | 'sip' | null; // current meal action while eating
@@ -29,6 +30,7 @@ export const GAIT = { idle: 0.3, run: 4.6, sprint: 6.6 };
 
 export function resolveAnimState(c: AnimContext): AnimState {
   if (c.inCar || c.pillion) return 'PASSENGER';
+  if (c.driving) return 'DRIVING';
   if (c.onScooter) return 'RIDING';
   if (c.seated) {
     if (c.sitBlend < 0.92) return 'SIT_DOWN';

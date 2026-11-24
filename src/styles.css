@@ -220,3 +220,10 @@
 .character-swatches button.on{border-color:#e6bd83;box-shadow:0 0 0 2px #e6bd8355}
 .character-swatches button.chip{width:auto;height:auto;border-radius:10px;padding:2px 8px;background:#0e2220;color:#c7d1cb;font-size:10px;font-weight:700;border-width:1px}
 .character-swatches button.chip.on{background:#e6bd83;color:#1e2824}
+
+/* Đen SM: rider / driver tabs */
+.den-tabs { display: flex; gap: 6px; margin: 4px 0 10px; }
+.den-tabs button { flex: 1; padding: 7px 0; border-radius: 10px; border: 1px solid #2b2d31; background: #17181b; color: #cfd3d6; font-weight: 700; font-size: 12px; }
+.den-tabs button.on { background: #16c784; color: #07140e; border-color: #16c784; }
+.den-warn { display: block; color: #ffb4a0; margin-top: 8px; }
+.den-trip > button + button { margin-top: 6px; }

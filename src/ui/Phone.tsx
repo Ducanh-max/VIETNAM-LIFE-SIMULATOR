@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { driverActions } from '../game/driver';
 import { jobActions } from '../game/job';
 import { nav, updateNav } from '../game/navigation';
 import { places, quote, rideActions, taxi, VEHICLES, type Vehicle } from '../game/ride';
@@ -164,7 +165,43 @@ function ContactsApp() {
 }
 
 /** Đen SM: pick a place, choose Đen Bike or Đen Car, pay 1.000đ per 100 m of the real route on arrival. */
+/** Đen SM for drivers: sign up for Đen Bike or Đen Car, see the current request, cancel it or end the shift. */
+function DenDriverPanel() {
+  const d = useGame((s) => s.driver);
+  const job = useGame((s) => s.job);
+  if (!d) return <div className="den-trip">
+    <h4>Chạy xe cùng Đen SM</h4>
+    <small>Nhận cuốc trong khu Hồ Gươm, giá theo quãng đường thật trên phố. Nhận việc là mặc đồng phục và nhận xe ngay cạnh bạn.</small>
+    {job ? <small className="den-warn">Bạn đang ship bún chả cho quán, nghỉ việc ship trước đã nhé.</small> : <div className="den-vehicles">
+      {(['bike', 'car'] as Vehicle[]).map((v) => <button key={v} onClick={() => driverActions.accept(v)}>
+        <span className="den-veh-icon">{v === 'bike' ? '🛵' : '🚗'}</span><b>Chạy {VEHICLES[v].name}</b><small>{VEHICLES[v].note}</small><strong>{formatVnd(VEHICLES[v].per100)}/100 m</strong>
+      </button>)}
+    </div>}
+  </div>;
+  const f = d.fare;
+  const avg = d.stars.length ? (d.stars.reduce((a, b) => a + b, 0) / d.stars.length).toFixed(1) : '–';
+  return <div className="den-trip">
+    <div className="den-status">Tài xế {VEHICLES[d.vehicle].name} · {d.trips} cuốc · {formatVnd(d.earned)} · {avg}★</div>
+    {!f ? <small>{d.stage === 'free' ? 'Đang chờ cuốc mới… (lên xe để nhận cuốc)' : ''}</small> : <>
+      <div className="den-driver"><span className="msg-avatar den-avatar">{f.passenger.split(' ').pop()![0]}</span><div><b>{f.passenger}</b><small>{d.stage === 'pickup' ? `Đang đợi ở ${f.pickup.street}` : 'Đang ngồi trên xe'}</small><small>{d.stage === 'pickup' ? `Cách bạn ${fmtDist(nav.length)}` : `Còn ${fmtDist(nav.length)}`}</small></div></div>
+      <div className="den-route"><span>📍 Điểm trả</span><b>{f.dest.street}</b><small>{fmtDist(f.distance)} theo đường phố</small></div>
+      <div className="den-fare"><span>Cước</span><b>{formatVnd(f.fare)}</b><small>{Math.ceil(f.distance / 100)} × 100 m × {formatVnd(VEHICLES[d.vehicle].per100)}</small></div>
+      <button className="danger-outline" onClick={() => driverActions.cancel()}>Huỷ cuốc</button>
+    </>}
+    <button className="danger-outline" onClick={() => driverActions.quit()}>Nghỉ việc (kết thúc ca)</button>
+  </div>;
+}
+
 function DenSMApp() {
+  const [tab, setTab] = useState<'rider' | 'driver'>(() => (game.get().driver ? 'driver' : 'rider'));
+  return <div className="app-page den-app">
+    <div className="den-header"><span className="den-logo">Đen<b>SM</b></span><small>Đen Bike 500đ · Đen Car 1.000đ mỗi 100 m</small></div>
+    <div className="den-tabs"><button className={tab === 'rider' ? 'on' : ''} onClick={() => setTab('rider')}>Đặt xe</button><button className={tab === 'driver' ? 'on' : ''} onClick={() => setTab('driver')}>Tài xế</button></div>
+    {tab === 'driver' ? <DenDriverPanel /> : <DenRiderPanel />}
+  </div>;
+}
+
+function DenRiderPanel() {
   const ride = useGame((s) => s.ride);
   const money = useGame((s) => s.money);
   const [pick, setPick] = useState<number | null>(null);
@@ -177,8 +214,7 @@ function DenSMApp() {
   // exact quote along the streets for the chosen place
   useEffect(() => { setQ(pick === null ? undefined : quote(list[pick])); }, [pick, list]);
   const taxiDist = Math.round(Math.hypot(taxi.position.x - here.x, taxi.position.z - here.z));
-  return <div className="app-page den-app">
-    <div className="den-header"><span className="den-logo">Đen<b>SM</b></span><small>Đen Bike 500đ · Đen Car 1.000đ mỗi 100 m</small></div>
+  return <div>
     {ride ? <div className="den-trip">
       <div className="den-status">{ride.stage === 'arriving' ? `${ride.driver} đang đến đón bạn` : ride.stage === 'waiting' ? `${ride.driver} đã tới, ra ${ride.vehicle === 'car' ? 'ô tô' : 'xe'} và bấm E` : `Đang tới ${ride.dest.name}`}</div>
       <div className="den-driver"><span className="msg-avatar den-avatar">{ride.driver.split(' ').pop()![0]}</span><div><b>{ride.driver}</b><small>{VEHICLES[ride.vehicle].name} · {VEHICLES[ride.vehicle].note} · {ride.plate}</small><small>★ 4.9 · {ride.stage === 'riding' ? `còn ${fmtDist(nav.length)}` : `cách bạn ${fmtDist(taxiDist)}`}</small></div></div>

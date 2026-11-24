@@ -220,6 +220,7 @@ export const ChibiModel = forwardRef<PlayerRig, Props>(function ChibiModel({ out
       <group ref={r.spine} position={[0, D.spineY, 0]}>
         <group ref={chest}>
           {m((g) => g.torso)}
+          {o.logo && <group ref={reg('face')}>{logoDecals(o)}</group>}
           {o.sling && <group ref={bag} position={[-0.16, 0.0, 0.142]} rotation={[0, -0.75, 0]}>{m((g) => g.bag)}</group>}
         </group>
         {arm(1, r.shoulderL, r.elbowL, r.handL, anchors.handL)}
@@ -257,6 +258,51 @@ export const ChibiModel = forwardRef<PlayerRig, Props>(function ChibiModel({ out
     </group>
   </group>;
 });
+
+// ---- uniform logos (own simple designs) ----------------------------------------------
+const LOGO_PLANE = new THREE.PlaneGeometry(1, 1);
+const logoMats = new Map<string, THREE.Material>();
+function logoMaterial(kind: 'bcda' | 'densm') {
+  let m = logoMats.get(kind);
+  if (m) return m;
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+  const ctx = c.getContext('2d')!;
+  const round = (x: number, y: number, w: number, h: number, r: number) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.fill(); };
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if (kind === 'bcda') {
+    // a cream badge: a steaming bowl on the left, the shop's name on the right
+    ctx.fillStyle = '#f6e7c1'; round(4, 4, 248, 120, 26);
+    ctx.fillStyle = '#c8342b'; ctx.beginPath(); ctx.arc(54, 70, 34, 0, Math.PI); ctx.fill(); ctx.fillRect(18, 66, 72, 6);
+    ctx.strokeStyle = '#c8342b'; ctx.lineWidth = 5; for (const x of [42, 54, 66]) { ctx.beginPath(); ctx.moveTo(x, 54); ctx.quadraticCurveTo(x - 8, 40, x, 26); ctx.stroke(); }
+    ctx.fillStyle = '#8f2119'; ctx.font = 'bold 34px Arial, sans-serif'; ctx.fillText('BÚN CHẢ', 172, 46);
+    ctx.fillStyle = '#c8342b'; ctx.font = 'bold 30px Arial, sans-serif'; ctx.fillText('ĐỨC ANH', 172, 88);
+  } else {
+    // a green lightning bolt in a ring and the app name
+    ctx.fillStyle = '#0f1012'; round(4, 4, 248, 120, 22);
+    ctx.strokeStyle = '#16c784'; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(56, 64, 38, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#16c784'; ctx.beginPath(); ctx.moveTo(62, 30); ctx.lineTo(40, 70); ctx.lineTo(56, 70); ctx.lineTo(48, 100); ctx.lineTo(74, 56); ctx.lineTo(58, 56); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 44px Arial, sans-serif'; ctx.fillText('Đen', 150, 64);
+    ctx.fillStyle = '#16c784'; ctx.fillText('SM', 222, 64);
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  m = new THREE.MeshStandardMaterial({ map: t, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2 });
+  logoMats.set(kind, m);
+  return m;
+}
+/** Chest badge on the left side and a big print on the back (or on the delivery backpack). */
+function logoDecals(o: Outfit) {
+  const mat = logoMaterial(o.logo!);
+  const jacket = o.top === 'jacket';
+  const r = jacket ? 0.181 : 0.163;
+  const cx = jacket ? 0.11 : 0.1; const a = Math.asin(cx / r);
+  const cz = Math.cos(a) * r * 0.8 + 0.005; const ny = Math.atan2(cx / (r * r), cz / (r * r * 0.64));
+  return <>
+    <mesh geometry={LOGO_PLANE} material={mat} position={[cx, jacket ? 0.12 : 0.2, cz]} rotation={[0, ny, 0]} scale={[0.08, 0.04, 1]} />
+    {o.backpack
+      ? <mesh geometry={LOGO_PLANE} material={mat} position={[0, 0.15, -0.272]} rotation={[0, Math.PI, 0]} scale={[0.2, 0.1, 1]} />
+      : <mesh geometry={LOGO_PLANE} material={mat} position={[0, 0.19, -(r * 0.8 + 0.006)]} rotation={[0, Math.PI, 0]} scale={[0.18, 0.09, 1]} />}
+  </>;
+}
 
 // ---- blob shadow ---------------------------------------------------------------------------
 const blobTexture = (() => {

@@ -5,6 +5,7 @@ import { AnimMachine, GAIT, type AnimState } from './character/animState';
 import { BlobShadow } from './character/ChibiModel';
 import { FACE, surf } from './character/chibiGeometry';
 import { Phone3D } from './character/Phone3D';
+import { uniformFor } from './character/outfit';
 import { CAN_OFFSET, drinkLevels, firstDrink, GLASS_OFFSET, lerpN, lerpV, mealAt, POUR, SEAT_DROP, SET, setToBody, track } from './meal';
 import { PLAYER_DIMENSIONS as PD, PlayerModel, type Expression, type HandPose, type PlayerRig } from './PlayerModel';
 import { taxi } from './ride';
@@ -77,7 +78,10 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
   const blob = useRef<THREE.Group>(null);
   const [expr, setExpr] = useState<Expression>('neutral');
   const shipping = useGame((s) => !!s.job);
-  const outfit = useGame((s) => s.outfit);
+  const driverVehicle = useGame((s) => s.driver?.vehicle ?? null);
+  const ownOutfit = useGame((s) => s.outfit);
+  // hired → wear the work uniform; quit → back to the outfit chosen in the character panel
+  const outfit = useMemo(() => (shipping ? uniformFor(ownOutfit, 'shipper') : driverVehicle ? uniformFor(ownOutfit, driverVehicle === 'car' ? 'denCar' : 'denBike') : ownOutfit), [ownOutfit, shipping, driverVehicle]);
   const [idleLook, setIdleLook] = useState(false);
   const sitBlend = useRef(0);
   const phone3d = useRef<THREE.Group>(null);
@@ -117,7 +121,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
     const k = sitBlend.current;
     const mealNow = s.phase === 'eating' ? mealAt(s.order, s.eatProgress) : null;
     const state = machine.update({
-      speed: speed.current, sitBlend: k, seated: !!player.seat, onScooter: bike.riding && !taxi.passenger, pillion: taxi.passenger && taxi.vehicle !== 'car', inCar: taxi.passenger && taxi.vehicle === 'car',
+      speed: speed.current, sitBlend: k, seated: !!player.seat, onScooter: bike.riding && !taxi.passenger && bike.kind !== 'dencar', driving: bike.riding && !taxi.passenger && bike.kind === 'dencar', pillion: taxi.passenger && taxi.vehicle !== 'car', inCar: taxi.passenger && taxi.vehicle === 'car',
       meal: mealNow?.action?.kind ?? null, ordering: s.phase === 'menu', dialog: !!s.dialog, dialogAge: c.dialogAt < 0 ? 0 : c.t - c.dialogAt, phone: s.phone, interactAge: c.t - c.interactAt,
     }, dt);
     avatarAnim.state = state;
@@ -139,9 +143,21 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
     R0.hips.position.set(0, HIP, 0); R0.hips.rotation.set(0, 0, 0);
     t.rotation.y = 0; t.rotation.z = 0;
     if (R0.bag) R0.bag.rotation.x = THREE.MathUtils.damp(R0.bag.rotation.x, 0, 4, dt);
-    if (blob.current) blob.current.visible = state !== 'PASSENGER' || taxi.vehicle !== 'car';
+    if (blob.current) blob.current.visible = state !== 'DRIVING' && (state !== 'PASSENGER' || taxi.vehicle !== 'car');
 
-    if (state === 'PASSENGER' && taxi.vehicle === 'car') {
+    if (state === 'DRIVING') {
+      // ---- driver's seat of the Đen Car (root at the hip point): feet to the pedals, hands on the wheel, turning with it
+      b.position.set(0, -HIP, 0);
+      leg(-1, -1.35, 1.2, 0.05); leg(1, -1.35, 1.25, -0.05);
+      const al = lean(0.02);
+      const turn = -bike.steer * 1.6;
+      for (const side of [R, L]) {
+        const a = (side < 0 ? Math.PI * 0.85 : Math.PI * 0.15) + turn; // hands at ~10 and 2 o'clock on the wheel
+        arm(side, toTorso(V(Math.cos(a) * 0.12, HIP + 0.27 + Math.sin(a) * 0.12, 0.3), al), V(side, -0.6, -0.3));
+      }
+      handPoseL = handPoseR = 'wheel';
+      headPitch = -0.05;
+    } else if (state === 'PASSENGER' && taxi.vehicle === 'car') {
       // ---- back seat of an Đen SM car: the avatar root sits at the hip point (placed by the controller)
       b.position.set(0, -HIP, 0);
       leg(-1, -1.45, 1.35, 0.06); leg(1, -1.45, 1.35, -0.06);
@@ -380,7 +396,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
   return <group>
     <group ref={blob}><BlobShadow size={0.62} /></group>
     <group ref={body}>
-      <PlayerModel ref={rig} expression={expr} shipperBag={shipping} outfit={outfit} idleLook={idleLook} />
+      <PlayerModel ref={rig} expression={expr} outfit={outfit} idleLook={idleLook} />
       {/* held props live in a frame that follows the spine */}
       <group ref={propSpace} position={[0, SPINE, 0]}>
         <group ref={sticks} visible={false}><Chopsticks spread={0.008} /></group>

@@ -33,7 +33,7 @@ export function Interaction({ paused }: { paused: boolean }) {
 }
 
 /** Glowing column and ring marking the customer's door, with a bobbing arrow. */
-function Waypoint() {
+export function Waypoint() {
   const arrow = useRef<THREE.Group>(null);
   const ring = useRef<THREE.Mesh>(null);
   useFrame((state) => {
