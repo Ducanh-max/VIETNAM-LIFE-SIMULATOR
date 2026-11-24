@@ -7,6 +7,9 @@ import { Landmarks } from './world/Historic';
 import { Landscape, type TimeOfDay } from './world/Landscape';
 import { Urban } from './world/Urban';
 import { mapAttribution, type Point } from './world/geo';
+import { NameEntry, VietnamMap } from './ui/Entry';
+import { loadPlayerName, savePlayerName } from './ui/player';
+import { vietnamTimeOfDay } from './ui/vietnamTime';
 
 type Quality = 'low' | 'medium' | 'high' | 'ultra';
 type Panel = 'settings' | 'about' | 'help' | null;
@@ -60,9 +63,11 @@ function Icon({ name }: { name: 'settings' | 'pause' | 'play' | 'close' | 'compa
 }
 
 function App() {
-  const [mode, setMode] = useState<ExplorerMode>(window.location.hash === '#play' ? 'game' : 'home');
+  const [mode, setMode] = useState<ExplorerMode>(window.location.hash === '#play' && loadPlayerName() ? 'game' : 'home');
   const [panel, setPanel] = useState<Panel>(null);
-  const [time, setTime] = useState<TimeOfDay>('day');
+  const [time, setTime] = useState<TimeOfDay>(() => vietnamTimeOfDay());
+  const [playerName, setPlayerName] = useState(loadPlayerName);
+  const [renaming, setRenaming] = useState(false);
   const [quality, setQuality] = useState<Quality>('high');
   const [freeCamera, setFreeCamera] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -117,7 +122,7 @@ function App() {
   };
 
   return <main className="app-shell text-stone-100" data-mode={mode}>
-    <div className="scene-wrap" onClick={lockPointer} role="presentation">
+    {mode === 'game' && <div className="scene-wrap" onClick={lockPointer} role="presentation">
       <Canvas key={quality} camera={{ position: [145, 84, -145], fov: 54, near: 0.1, far: 1500 }} dpr={Math.min(window.devicePixelRatio || 1, config.dpr)} shadows={config.shadow > 0}
         gl={{ antialias: config.antialias, powerPreference: 'high-performance' }} onCreated={({ gl }) => {
           gl.outputColorSpace = THREE.SRGBColorSpace;
@@ -126,33 +131,21 @@ function App() {
         }}>
         <MemoWorld mode={mode} paused={controlsPaused} time={time} quality={quality} freeCamera={freeCamera} onFps={setFps} onPosition={setPosition} />
       </Canvas>
-    </div>
+    </div>}
 
-    {mode === 'home' ? <>
-      <div className="hero-shade" />
-      <header className="site-header">
-        <div className="brand"><span className="brand-stamp">ĐV</span><span>ĐỜI VIỆT<small>VIETNAM LIFE SIMULATOR</small></span></div>
-        <nav aria-label="Điều hướng"><button onClick={() => openPanel('about')}>Dự án</button><button onClick={() => openPanel('settings')}>Cài đặt</button></nav>
-      </header>
-      <section className="hero-content">
-        <div className="eyebrow"><span className="eyebrow-line" /> MỘT VIỆT NAM THU NHỎ · CHƯƠNG I</div>
-        <h1>Chạm vào nhịp sống<br /><em>Hà Nội.</em></h1>
-        <p>Bước qua Cầu Thê Húc, dạo quanh Hồ Gươm và khám phá một góc thủ đô trong không gian 3D có thể tự do đi lại.</p>
-        <div className="hero-actions"><button className="primary-button" onClick={start}><Icon name="play" /> Bắt đầu khám phá <span>↗</span></button><button className="text-button" onClick={() => openPanel('about')}>Tìm hiểu dự án <span>→</span></button></div>
-        <div className="hero-meta"><span><b>01</b> KHU VỰC MỞ ĐẦU</span><i /><span><b>3D</b> KHÁM PHÁ TỰ DO</span></div>
-      </section>
-      <div className="hero-location"><span className="location-dot" /> HỒ HOÀN KIẾM · HÀ NỘI <span>21.0288° N · 105.8525° E</span></div>
-      <div className="hero-side-label">ĐỜI VIỆT · HÀ NỘI 3D</div>
-    </> : <>
+    {mode === 'home' ? (!playerName || renaming
+      ? <NameEntry initialName={playerName} onSubmit={(name) => { savePlayerName(name); setPlayerName(name); setRenaming(false); }} />
+      : <VietnamMap playerName={playerName} onEnter={start} onRename={() => setRenaming(true)} onAbout={() => openPanel('about')} />
+    ) : <>
       <header className="game-header">
         <div className="game-brand" onClick={returnHome} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') returnHome(); }}>ĐỜI VIỆT<span> / HÀ NỘI 3D</span></div>
         <div className="game-actions"><a className="game-review-link" href="/#heritage-review">So sánh mô hình ↗</a><button title="Trợ giúp" aria-label="Trợ giúp" onClick={() => openPanel('help')}>?</button><button title="Cài đặt" aria-label="Cài đặt" onClick={() => openPanel('settings')}><Icon name="settings" /></button><button title={paused ? 'Tiếp tục' : 'Tạm dừng'} aria-label={paused ? 'Tiếp tục' : 'Tạm dừng'} onClick={() => { if (document.pointerLockElement) document.exitPointerLock(); setPaused(!paused); }}><Icon name={paused ? 'play' : 'pause'} /></button></div>
       </header>
-      <div className="area-tag"><Icon name="compass" /><span>{freeCamera ? 'CHẾ ĐỘ DRONE' : 'ĐANG KHÁM PHÁ'}<strong>Hồ Hoàn Kiếm, Hà Nội</strong><small>Commit {buildLabel}</small></span></div>
+      <div className="area-tag"><Icon name="compass" /><span>{freeCamera ? 'CHẾ ĐỘ DRONE' : 'ĐANG KHÁM PHÁ'}<strong>Hồ Hoàn Kiếm, Hà Nội</strong>{playerName && <em className="area-player">{playerName}</em>}<small>Commit {buildLabel}</small></span></div>
       {freeCamera && <div className="drone-reticle" aria-hidden="true">+</div>}
       <div className="game-bottom"><span>W A S D <b>{freeCamera ? 'Bay ngang' : 'Di chuyển'}</b></span><span>← ↑ ↓ → <b>Xoay góc nhìn</b></span><span>{freeCamera ? 'SPACE / CTRL' : 'SHIFT'} <b>{freeCamera ? 'Lên / xuống' : 'Chạy'}</b></span><span>V <b>{freeCamera ? 'Về nhân vật' : 'Bật drone'}</b></span><span className="fps-pill">{position[0].toFixed(0)} : {position[1].toFixed(0)} · {fps || '—'} FPS</span></div>
       {!panel && !paused && <button className="capture-tip" onClick={lockPointer}>Nhấp vào cảnh để điều khiển camera</button>}
-      {paused && !panel && <div className="pause-scrim"><div className="pause-card"><span className="modal-kicker">TẠM DỪNG</span><h2>Dừng chân bên hồ.</h2><p>Thành phố vẫn ở đây khi bạn quay lại.</p><button className="primary-button" onClick={() => setPaused(false)}><Icon name="play" /> Tiếp tục</button><button className="text-button" onClick={returnHome}>Về trang chủ →</button></div></div>}
+      {paused && !panel && <div className="pause-scrim"><div className="pause-card"><span className="modal-kicker">TẠM DỪNG</span><h2>Dừng chân bên hồ.</h2><p>Thành phố vẫn ở đây khi bạn quay lại.</p><button className="primary-button" onClick={() => setPaused(false)}><Icon name="play" /> Tiếp tục</button><button className="text-button" onClick={returnHome}>Về bản đồ Việt Nam →</button></div></div>}
     </>}
 
     {panel && <div className="modal-scrim" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPanel(null); }}><section className="modal-card" role="dialog" aria-modal="true" aria-label={panel === 'settings' ? 'Cài đặt' : panel === 'about' ? 'Giới thiệu dự án' : 'Hướng dẫn chơi'}>
