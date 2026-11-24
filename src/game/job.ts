@@ -1,6 +1,6 @@
 import { canWalk, type Point } from './geo';
 import { deliverySpots, RESTAURANT, restaurantToWorld } from './osm';
-import { bike, formatVnd, game, player, type Delivery } from './state';
+import { addMoney, bike, formatVnd, game, player, pushMessage, type Delivery } from './state';
 
 /*
  * The shipper job at Bún chả Đức Anh: the owner hires you, you collect each bag from Đạt at the grill,
@@ -35,6 +35,7 @@ export const jobActions = {
     parkBikeAtShop();
     game.set({ job: { stage: 'pickup', delivery: null, done: 0, earned: 0 }, dialog: null });
     game.toast('Ông chủ Đức Anh: "Tốt lắm! Xe Wave với thùng giữ nhiệt để ngoài cửa. Ra chỗ anh Đạt lấy túi bún chả nhé!"');
+    pushMessage('Chú Đức Anh (chủ quán)', 'Chú gửi cháu xe Wave đỏ ở ngoài cửa quán. Mở app Bản đồ trên điện thoại để xem đường giao hàng nhé.');
   },
   quit() {
     const job = game.get().job;
@@ -48,6 +49,7 @@ export const jobActions = {
     const d = pickDestination();
     game.set({ job: { ...job, stage: 'deliver', delivery: { ...d, startedAt: performance.now() } } });
     game.toast(`Anh Đạt: "${d.portions} suất bún chả cho ${d.customer}, ${d.street}. Đi cẩn thận nhé!"`);
+    pushMessage(d.customer, `Em ơi chị/anh ở ${d.street}, giao giúp ${d.portions} suất bún chả nhé. Cảm ơn em!`);
   },
   deliver() {
     const job = game.get().job;
@@ -57,7 +59,10 @@ export const jobActions = {
     const onTime = seconds <= d.timeLimit;
     const tip = onTime ? (5 + Math.floor(Math.random() * 3) * 5) * 1000 : 0;
     const total = d.pay + tip;
-    game.set({ money: game.get().money + total, job: { ...job, stage: 'pickup', delivery: null, done: job.done + 1, earned: job.earned + total } });
+    addMoney(d.pay, `Tiền ship đơn của ${d.customer}`);
+    if (tip) addMoney(tip, `${d.customer} bo thêm`);
+    pushMessage(d.customer, onTime ? 'Nhận được rồi, còn nóng hổi. Cảm ơn em nhiều!' : 'Nhận được rồi nhé, lần sau nhanh hơn chút em nha.');
+    game.set({ job: { ...job, stage: 'pickup', delivery: null, done: job.done + 1, earned: job.earned + total } });
     game.toast(onTime
       ? `${d.customer}: "Nhanh thế, cảm ơn em!" · +${formatVnd(d.pay)} tiền ship, bo thêm ${formatVnd(tip)}. Về quán lấy đơn tiếp nhé.`
       : `${d.customer}: "Hơi lâu nhưng vẫn còn nóng." · +${formatVnd(d.pay)}. Về quán lấy đơn tiếp nhé.`);

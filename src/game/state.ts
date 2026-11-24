@@ -30,7 +30,14 @@ type State = {
   dialog: 'boss' | null;
   job: Job | null;
   toast: { text: string; id: number } | null;
+  /** Mini smartphone overlay. */
+  phone: boolean;
+  /** Wallet history (newest first) and phone messages (newest first). */
+  txns: Txn[];
+  messages: Message[];
 };
+export type Txn = { text: string; amount: number; at: number };
+export type Message = { from: string; text: string; at: number };
 
 const SAVE_KEY = 'doi-viet-needs-v1';
 function load(): Pick<State, 'hunger' | 'thirst' | 'money'> {
@@ -41,7 +48,25 @@ function load(): Pick<State, 'hunger' | 'thirst' | 'money'> {
   return { hunger: 72, thirst: 64, money: 300_000 };
 }
 
-let state: State = { ...load(), phase: 'none', order: {}, table: -1, eatProgress: 0, prompt: null, toast: null, dialog: null, job: null };
+let state: State = { ...load(), phase: 'none', order: {}, table: -1, eatProgress: 0, prompt: null, toast: null, dialog: null, job: null, phone: false, txns: [], messages: [] };
+
+// One-time gift of 500.000đ for existing and new saves.
+const BONUS_KEY = 'doi-viet-bonus-500k';
+if (!localStorage.getItem(BONUS_KEY)) {
+  localStorage.setItem(BONUS_KEY, '1');
+  state.money += 500_000;
+  state.txns = [{ text: 'Quà tặng từ Đời Việt', amount: 500_000, at: Date.now() }];
+  state.messages = [{ from: 'Đời Việt', text: 'Bạn vừa được tặng 500.000đ vào ví. Chúc bạn khám phá Hồ Gươm vui vẻ!', at: Date.now() }];
+  localStorage.setItem(SAVE_KEY, JSON.stringify({ hunger: state.hunger, thirst: state.thirst, money: state.money }));
+}
+
+/** Record money in/out (amount negative for spending) and keep the wallet history. */
+export function addMoney(amount: number, text: string) {
+  game.set({ money: state.money + amount, txns: [{ text, amount, at: Date.now() }, ...state.txns].slice(0, 60) });
+}
+export function pushMessage(from: string, text: string) {
+  game.set({ messages: [{ from, text, at: Date.now() }, ...state.messages].slice(0, 40) });
+}
 const pending: Prompt[] = [];
 const listeners = new Set<() => void>();
 let lastSave = 0;
@@ -100,7 +125,8 @@ export const actions = {
     const total = orderTotal(order);
     if (!orderCount(order)) return;
     if (total > state.money) { game.toast(`Không đủ tiền: cần ${formatVnd(total)}, bạn còn ${formatVnd(state.money)}.`); return; }
-    game.set({ phase: 'cooking', order, money: state.money - total, eatProgress: 0 });
+    addMoney(-total, `Ăn tại Bún chả Đức Anh (${orderCount(order)} món)`);
+    game.set({ phase: 'cooking', order, eatProgress: 0 });
     game.toast(`Đã gọi món · ${formatVnd(total)}. Chờ chút, chả đang nướng trên than hoa!`);
   },
   closeMenu() { if (state.phase === 'menu') actions.standUp(); },

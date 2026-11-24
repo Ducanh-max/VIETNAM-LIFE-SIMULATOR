@@ -6,6 +6,7 @@ import { qualityConfig, World, type Quality, type TimeOfDay } from './game/World
 import { actions, game, useGame } from './game/state';
 import { NameEntry, VietnamMap } from './ui/Entry';
 import { BossDialog, JobPanel, MenuPanel, NeedsHud, PromptAndToast } from './ui/Hud';
+import { Minimap, Phone } from './ui/Phone';
 import { loadPlayerName, savePlayerName } from './ui/player';
 import { vietnamTimeOfDay } from './ui/vietnamTime';
 
@@ -41,6 +42,7 @@ function App() {
   const config = qualityConfig[quality];
   const phase = useGame((s) => s.phase);
   const dialog = useGame((s) => s.dialog);
+  const phone = useGame((s) => s.phone);
   const menuOpen = phase === 'menu';
   const controlsPaused = paused || panel !== null || menuOpen || dialog !== null;
 
@@ -48,6 +50,7 @@ function App() {
     const onHash = () => setMode(window.location.hash === '#play' ? 'game' : 'home');
     const onEscape = () => {
       if (document.pointerLockElement) document.exitPointerLock();
+      else if (game.get().phone) game.set({ phone: false });
       else if (menuOpen) actions.closeMenu();
       else if (game.get().dialog) game.set({ dialog: null });
       else if (panel) setPanel(null);
@@ -55,6 +58,10 @@ function App() {
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.code === 'Escape') onEscape();
+      if (event.code === 'KeyP' && !event.repeat && mode === 'game' && !paused && panel === null && !menuOpen && !game.get().dialog) {
+        event.preventDefault();
+        game.set({ phone: !game.get().phone });
+      }
       if (event.code === 'KeyV' && !event.repeat && mode === 'game' && !paused && panel === null) {
         event.preventDefault();
         setFreeCamera((value) => !value);
@@ -109,17 +116,19 @@ function App() {
     ) : <>
       <header className="game-header">
         <div className="game-brand" onClick={returnHome} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') returnHome(); }}>ĐỜI VIỆT<span> / HÀ NỘI 3D</span></div>
-        <div className="game-actions"><button title="Trợ giúp" aria-label="Trợ giúp" onClick={() => openPanel('help')}>?</button><button title="Cài đặt" aria-label="Cài đặt" onClick={() => openPanel('settings')}><Icon name="settings" /></button><button title={paused ? 'Tiếp tục' : 'Tạm dừng'} aria-label={paused ? 'Tiếp tục' : 'Tạm dừng'} onClick={() => { if (document.pointerLockElement) document.exitPointerLock(); setPaused(!paused); }}><Icon name={paused ? 'play' : 'pause'} /></button></div>
+        <div className="game-actions"><button title="Điện thoại (P)" aria-label="Điện thoại" onClick={() => game.set({ phone: !phone })}>📱</button><button title="Trợ giúp" aria-label="Trợ giúp" onClick={() => openPanel('help')}>?</button><button title="Cài đặt" aria-label="Cài đặt" onClick={() => openPanel('settings')}><Icon name="settings" /></button><button title={paused ? 'Tiếp tục' : 'Tạm dừng'} aria-label={paused ? 'Tiếp tục' : 'Tạm dừng'} onClick={() => { if (document.pointerLockElement) document.exitPointerLock(); setPaused(!paused); }}><Icon name={paused ? 'play' : 'pause'} /></button></div>
       </header>
       <div className="area-tag"><Icon name="compass" /><span>{freeCamera ? 'CHẾ ĐỘ DRONE' : 'ĐANG KHÁM PHÁ'}<strong>Hồ Hoàn Kiếm, Hà Nội</strong>{playerName && <em className="area-player">{playerName}</em>}<small>Commit {buildLabel}</small></span></div>
       {freeCamera && <div className="drone-reticle" aria-hidden="true">+</div>}
-      <div className="game-bottom"><span>W A S D <b>{freeCamera ? 'Bay ngang' : 'Di chuyển'}</b></span><span>← ↑ ↓ → <b>Xoay góc nhìn</b></span><span>{freeCamera ? 'SPACE / CTRL' : 'SHIFT'} <b>{freeCamera ? 'Lên / xuống' : 'Chạy'}</b></span><span>V <b>{freeCamera ? 'Về nhân vật' : 'Bật drone'}</b></span>{!freeCamera && <span>E <b>Tương tác</b></span>}{!freeCamera && <span>F <b>Lên / xuống xe</b></span>}<span className="fps-pill">{position[0].toFixed(0)} : {position[1].toFixed(0)} · {fps || '—'} FPS</span></div>
+      <div className="game-bottom"><span>W A S D <b>{freeCamera ? 'Bay ngang' : 'Di chuyển'}</b></span><span>← ↑ ↓ → <b>Xoay góc nhìn</b></span><span>{freeCamera ? 'SPACE / CTRL' : 'SHIFT'} <b>{freeCamera ? 'Lên / xuống' : 'Chạy'}</b></span><span>V <b>{freeCamera ? 'Về nhân vật' : 'Bật drone'}</b></span>{!freeCamera && <span>E <b>Tương tác</b></span>}{!freeCamera && <span>F <b>Lên / xuống xe</b></span>}{!freeCamera && <span>P <b>Điện thoại</b></span>}<span className="fps-pill">{position[0].toFixed(0)} : {position[1].toFixed(0)} · {fps || '—'} FPS</span></div>
       <NeedsHud />
       <PromptAndToast />
       <JobPanel />
+      {!freeCamera && <Minimap onOpen={() => game.set({ phone: true })} />}
+      {phone && !paused && !panel && <Phone onClose={() => game.set({ phone: false })} />}
       {menuOpen && !paused && !panel && <MenuPanel />}
       {dialog === 'boss' && !paused && !panel && <BossDialog />}
-      {!panel && !paused && !menuOpen && !dialog && <button className="capture-tip" onClick={lockPointer}>Nhấp vào cảnh để điều khiển camera</button>}
+      {!panel && !paused && !menuOpen && !dialog && !phone && <button className="capture-tip" onClick={lockPointer}>Nhấp vào cảnh để điều khiển camera</button>}
       {paused && !panel && <div className="pause-scrim"><div className="pause-card"><span className="modal-kicker">TẠM DỪNG</span><h2>Dừng chân bên hồ.</h2><p>Thành phố vẫn ở đây khi bạn quay lại.</p><button className="primary-button" onClick={() => setPaused(false)}><Icon name="play" /> Tiếp tục</button><button className="text-button" onClick={returnHome}>Về bản đồ Việt Nam →</button></div></div>}
     </>}
 
@@ -130,7 +139,7 @@ function App() {
         <div className="setting-group"><label>Chất lượng đồ họa</label><div className="segmented quality">{(['low', 'medium', 'high', 'ultra'] as Quality[]).map((value) => <button key={value} className={quality === value ? 'selected' : ''} onClick={() => setQuality(value)}>{value.toUpperCase()}</button>)}</div></div>
         <div className="setting-group toggle-row"><div><label>Chế độ drone</label><small>Nhấn V để bật/tắt. Space/Ctrl để lên/xuống, Shift để bay nhanh.</small></div><button className={`toggle ${freeCamera ? 'on' : ''}`} role="switch" aria-checked={freeCamera} onClick={() => setFreeCamera(!freeCamera)}><span /></button></div>
         <button className="primary-button modal-primary" onClick={() => setPanel(null)}>Áp dụng</button>
-      </> : panel === 'about' ? <><span className="modal-kicker">VỀ ĐỜI VIỆT</span><h2>Một thế giới bắt đầu từ Hà Nội.</h2><p>ĐỜI VIỆT là bản thử nghiệm game web 3D mô phỏng Việt Nam. Phiên bản này tập trung vào cảnh quan Hồ Hoàn Kiếm, Cầu Thê Húc, Đền Ngọc Sơn và Tháp Rùa.</p><p>Bờ hồ, vị trí các đảo, toàn bộ đường phố và hơn 9.000 toà nhà quanh hồ lấy theo dữ liệu OpenStreetMap. Tháp Rùa, Cầu Thê Húc, Đền Ngọc Sơn, cây cối và phố xá đều được dựng hoàn toàn bằng Three.js, không dùng file mô hình ngoài.</p><p>Phiên bản triển khai: <strong>commit {buildLabel}</strong>.</p><div className="about-stats"><div><strong>01</strong><span>Khu vực</span></div><div><strong>03</strong><span>Chế độ ánh sáng</span></div><div><strong>04</strong><span>Mức đồ họa</span></div></div><button className="primary-button modal-primary" onClick={mode === 'home' ? start : () => setPanel(null)}>{mode === 'home' ? 'Bắt đầu khám phá' : 'Quay lại game'} <span>↗</span></button></> : <><span className="modal-kicker">HƯỚNG DẪN KHÁM PHÁ</span><h2>Dạo bước bên Hồ Gươm.</h2><div className="help-grid"><div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Di chuyển</span></div><div><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd><span>Xoay góc nhìn</span></div><div><kbd>SHIFT</kbd><span>Chạy / bay nhanh</span></div><div><kbd>V</kbd><span>Bật / tắt drone</span></div><div><kbd>SPACE</kbd><kbd>CTRL</kbd><span>Drone lên / xuống</span></div><div><kbd>ESC</kbd><span>Thoát con trỏ</span></div><div><kbd>E</kbd><span>Ngồi / gọi món / ăn</span></div><div><kbd>M</kbd><span>Gọi thêm món</span></div><div><kbd>F</kbd><span>Lên / xuống xe máy</span></div></div><p>Nhấp vào cảnh để khóa con trỏ và xoay camera bằng chuột, hoặc giữ chuột phải rồi kéo; cuộn chuột để phóng to, thu nhỏ. Bạn có thể đi qua Cầu Thê Húc vào thăm bên trong Đền Ngọc Sơn, hoặc dạo khắp các phố quanh hồ (dựng theo OpenStreetMap).</p><p>Thanh <b>No bụng</b> và <b>Nước</b> giảm dần khi bạn đi lại. Đói hoặc khát quá sẽ đi chậm hẳn! Quán <b>Bún chả Đức Anh</b> nằm ngay bên kia phố Đinh Tiên Hoàng, đối diện Cầu Thê Húc: vào ngồi một bàn trống, nhấn <kbd>E</kbd> để gọi món. Muốn kiếm tiền? Gặp <b>ông chủ Đức Anh</b> ở quầy thu ngân để nhận việc ship bún chả bằng xe máy.</p><button className="primary-button modal-primary" onClick={() => setPanel(null)}>Bắt đầu đi dạo <span>↗</span></button></>}
+      </> : panel === 'about' ? <><span className="modal-kicker">VỀ ĐỜI VIỆT</span><h2>Một thế giới bắt đầu từ Hà Nội.</h2><p>ĐỜI VIỆT là bản thử nghiệm game web 3D mô phỏng Việt Nam. Phiên bản này tập trung vào cảnh quan Hồ Hoàn Kiếm, Cầu Thê Húc, Đền Ngọc Sơn và Tháp Rùa.</p><p>Bờ hồ, vị trí các đảo, toàn bộ đường phố và hơn 9.000 toà nhà quanh hồ lấy theo dữ liệu OpenStreetMap. Tháp Rùa, Cầu Thê Húc, Đền Ngọc Sơn, cây cối và phố xá đều được dựng hoàn toàn bằng Three.js, không dùng file mô hình ngoài.</p><p>Phiên bản triển khai: <strong>commit {buildLabel}</strong>.</p><div className="about-stats"><div><strong>01</strong><span>Khu vực</span></div><div><strong>03</strong><span>Chế độ ánh sáng</span></div><div><strong>04</strong><span>Mức đồ họa</span></div></div><button className="primary-button modal-primary" onClick={mode === 'home' ? start : () => setPanel(null)}>{mode === 'home' ? 'Bắt đầu khám phá' : 'Quay lại game'} <span>↗</span></button></> : <><span className="modal-kicker">HƯỚNG DẪN KHÁM PHÁ</span><h2>Dạo bước bên Hồ Gươm.</h2><div className="help-grid"><div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Di chuyển</span></div><div><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd><span>Xoay góc nhìn</span></div><div><kbd>SHIFT</kbd><span>Chạy / bay nhanh</span></div><div><kbd>V</kbd><span>Bật / tắt drone</span></div><div><kbd>SPACE</kbd><kbd>CTRL</kbd><span>Drone lên / xuống</span></div><div><kbd>ESC</kbd><span>Thoát con trỏ</span></div><div><kbd>E</kbd><span>Ngồi / gọi món / ăn</span></div><div><kbd>M</kbd><span>Gọi thêm món</span></div><div><kbd>F</kbd><span>Lên / xuống xe máy</span></div><div><kbd>P</kbd><span>Điện thoại · bản đồ</span></div></div><p>Nhấp vào cảnh để khóa con trỏ và xoay camera bằng chuột, hoặc giữ chuột phải rồi kéo; cuộn chuột để phóng to, thu nhỏ. Bạn có thể đi qua Cầu Thê Húc vào thăm bên trong Đền Ngọc Sơn, hoặc dạo khắp các phố quanh hồ (dựng theo OpenStreetMap).</p><p>Thanh <b>No bụng</b> và <b>Nước</b> giảm dần khi bạn đi lại. Đói hoặc khát quá sẽ đi chậm hẳn! Quán <b>Bún chả Đức Anh</b> nằm ngay bên kia phố Đinh Tiên Hoàng, đối diện Cầu Thê Húc: vào ngồi một bàn trống, nhấn <kbd>E</kbd> để gọi món. Muốn kiếm tiền? Gặp <b>ông chủ Đức Anh</b> ở quầy thu ngân để nhận việc ship bún chả bằng xe máy.</p><button className="primary-button modal-primary" onClick={() => setPanel(null)}>Bắt đầu đi dạo <span>↗</span></button></>}
     </section></div>}
     <div className="attribution">Dữ liệu bản đồ © {mapAttribution}</div>
   </main>;
