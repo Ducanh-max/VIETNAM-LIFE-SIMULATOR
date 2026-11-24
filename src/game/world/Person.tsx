@@ -2,7 +2,24 @@ import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef, type ReactNode } from 'react';
 import * as THREE from 'three';
 
-export type PersonAnim = { mode: 'stand' | 'walk' | 'sit' | 'eat' | 'fan' | 'carry'; speed: number };
+/** Floating name label above an NPC ("Đạt · Nướng chả"). */
+export function NameTag({ name, role, y = 2.35, color = '#e6bd83' }: { name: string; role?: string; y?: number; color?: string }) {
+  const material = useMemo(() => {
+    const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = 'rgba(16,38,34,.82)';
+    const r = 26; ctx.beginPath(); ctx.moveTo(r, 8); ctx.arcTo(504, 8, 504, 120, r); ctx.arcTo(504, 120, 8, 120, r); ctx.arcTo(8, 120, 8, 8, r); ctx.arcTo(8, 8, 504, 8, r); ctx.fill();
+    ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.stroke();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 50px "Be Vietnam Pro", Arial, sans-serif'; ctx.fillText(name, 256, role ? 50 : 64, 470);
+    if (role) { ctx.fillStyle = color; ctx.font = '600 28px "Be Vietnam Pro", Arial, sans-serif'; ctx.fillText(role, 256, 96, 470); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.SpriteMaterial({ map: t, depthTest: true, transparent: true });
+  }, [name, role, color]);
+  return <sprite material={material} position={[0, y, 0]} scale={[1.1, 0.275, 1]} />;
+}
+
+export type PersonAnim = { mode: 'stand' | 'walk' | 'sit' | 'eat' | 'fan' | 'carry' | 'wave'; speed: number };
 
 /**
  * Low-poly Hà Nội local used for NPCs (waiter, grill cook, diners). Animation is driven through a
@@ -39,7 +56,8 @@ export function Person({ anim, shirt = '#f3efe6', pants = '#2d3442', skin = '#c9
       const swing = (a.mode === 'walk' || a.mode === 'carry') ? Math.min(1, a.speed / 4) * s * 0.55 : 0;
       L0.rotation.set(swing, 0, 0); L1.rotation.set(-swing, 0, 0);
     }
-    if (a.mode === 'carry') { A0.rotation.set(-1.25, 0, 0.25); A1.rotation.set(-1.25, 0, -0.25); }
+    if (a.mode === 'wave') { A0.rotation.set(-0.3, 0, -2.5 + Math.sin(phase.current * 3) * 0.35); A1.rotation.set(0, 0, -0.06); }
+    else if (a.mode === 'carry') { A0.rotation.set(-1.25, 0, 0.25); A1.rotation.set(-1.25, 0, -0.25); }
     else if (a.mode === 'fan') { A0.rotation.set(-0.9, 0, 0.3 + s * 0.35); A1.rotation.set(-0.6, 0, -0.1); }
     else if (a.mode === 'eat') { const bite = Math.max(0, s); A0.rotation.set(-0.9 - bite * 0.9, 0, 0.15); A1.rotation.set(-0.75, 0, -0.1); }
     else if (a.mode === 'sit') { A0.rotation.set(-0.5, 0, 0.1); A1.rotation.set(-0.5, 0, -0.1); }

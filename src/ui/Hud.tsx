@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { actions, formatVnd, MENU, orderCount, orderTotal, useGame, type MenuId, type Order } from '../game/state';
+import { useEffect, useRef, useState } from 'react';
+import { jobActions, pickupPoint } from '../game/job';
+import { actions, formatVnd, game, MENU, orderCount, orderTotal, player, useGame, view, type MenuId, type Order } from '../game/state';
 
 function Meter({ label, value, color, icon }: { label: string; value: number; color: string; icon: string }) {
   const low = value < 20;
@@ -38,10 +39,76 @@ export function PromptAndToast() {
     return () => clearTimeout(id);
   }, [toast]);
   return <>
-    {prompt && phase !== 'menu' && <div className="action-prompt">{prompt.key !== 'info' && <kbd>E</kbd>}<span>{prompt.text}</span></div>}
+    {prompt && phase !== 'menu' && <div className="action-prompt">{prompt.key && <kbd>{prompt.key}</kbd>}<span>{prompt.text}</span></div>}
     {phase === 'eating' && <div className="eat-bar"><span>Đang ăn…</span><div><i style={{ width: `${eat * 100}%` }} /></div></div>}
     {visibleToast && <div className="game-toast" key={toast?.id}>{visibleToast}</div>}
   </>;
+}
+
+/** Conversation with the owner, Đức Anh: take or quit the shipper job. */
+export function BossDialog() {
+  const job = useGame((s) => s.job);
+  const close = () => game.set({ dialog: null });
+  return <div className="modal-scrim" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) close(); }}>
+    <section className="modal-card dialog-card" role="dialog" aria-modal="true" aria-label="Nói chuyện với ông chủ Đức Anh">
+      <span className="modal-kicker">ÔNG CHỦ QUÁN · BÚN CHẢ ĐỨC ANH</span>
+      <h2>Đức Anh</h2>
+      {!job ? <>
+        <p className="dialog-line">“Chào cháu! Dạo này quán đông, khách gọi ship liên tục mà chú thiếu người. Cháu có muốn làm shipper cho quán không?”</p>
+        <p className="dialog-line">“Quán có sẵn con Wave đỏ với thùng giữ nhiệt. Cháu ra chỗ <b>anh Đạt</b> ở bếp than ngoài cửa lấy túi bún chả, chở đến tận nhà khách. Mỗi đơn chú trả <b>20.000–65.000đ</b> tuỳ xa gần, giao nhanh thì khách còn bo thêm.”</p>
+        <div className="dialog-tips"><span><kbd>F</kbd> lên / xuống xe</span><span><kbd>W</kbd><kbd>S</kbd> ga / phanh</span><span><kbd>A</kbd><kbd>D</kbd> rẽ</span><span><kbd>SHIFT</kbd> tăng tốc</span></div>
+        <button className="primary-button modal-primary" onClick={() => jobActions.accept()}>Dạ, cháu nhận việc!</button>
+        <button className="text-button dialog-secondary" onClick={close}>Để cháu suy nghĩ đã</button>
+      </> : <>
+        <p className="dialog-line">{job.done ? `“Hôm nay cháu giao được ${job.done} đơn rồi, ${formatVnd(job.earned)} đấy. Giỏi lắm!”` : '“Sao rồi cháu? Ra chỗ anh Đạt lấy đơn đi, khách đang chờ.”'}</p>
+        <p className="dialog-line">{job.stage === 'deliver' && job.delivery ? `“Đơn của ${job.delivery.customer} ở ${job.delivery.street} còn đang chờ đấy, đi nhanh kẻo nguội!”` : '“Đơn tiếp theo anh Đạt đang gói, cháu ra lấy nhé.”'}</p>
+        <button className="primary-button modal-primary" onClick={close}>Dạ, cháu đi ngay</button>
+        <button className="text-button dialog-secondary" onClick={() => jobActions.quit()}>Cháu xin nghỉ hôm nay</button>
+      </>}
+    </section>
+  </div>;
+}
+
+/** Current delivery: customer, street, distance, a compass arrow and the clock. */
+export function JobPanel() {
+  const job = useGame((s) => s.job);
+  const arrow = useRef<HTMLSpanElement>(null);
+  const dist = useRef<HTMLElement>(null);
+  const timer = useRef<HTMLElement>(null);
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const j = game.get().job;
+      const target = j?.stage === 'deliver' && j.delivery ? j.delivery.dest : pickupPoint();
+      if (!target) return;
+      const dx = target.x - player.position.x; const dz = target.z - player.position.z;
+      const d = Math.hypot(dx, dz);
+      if (dist.current) dist.current.textContent = d > 1000 ? `${(d / 1000).toFixed(1)} km` : `${Math.round(d)} m`;
+      // camera forward is (-sin yaw, -cos yaw); arrow angle relative to it
+      const bearing = Math.atan2(dx, dz); const camHeading = Math.atan2(-Math.sin(view.yaw), -Math.cos(view.yaw));
+      if (arrow.current) arrow.current.style.transform = `rotate(${(-(bearing - camHeading)) * 180 / Math.PI}deg)`;
+      if (timer.current && j?.delivery) {
+        const left = Math.round(j.delivery.timeLimit - (performance.now() - j.delivery.startedAt) / 1000);
+        timer.current.textContent = left >= 0 ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : 'Quá giờ';
+        timer.current.className = left < 0 ? 'late' : left < 20 ? 'hurry' : '';
+      }
+    };
+    tick();
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  if (!job) return null;
+  const d = job.delivery;
+  return <div className="job-panel">
+    <span className="job-arrow" ref={arrow} aria-hidden="true">➤</span>
+    <div className="job-body">
+      <span className="job-kicker">SHIPPER · BÚN CHẢ ĐỨC ANH</span>
+      {job.stage === 'deliver' && d
+        ? <><strong>{d.portions} suất cho {d.customer}</strong><small>{d.street} · <b ref={dist}>—</b> · còn <b ref={timer}>—</b></small><small>Tiền ship {formatVnd(d.pay)} · giao đúng giờ được bo</small></>
+        : <><strong>Về quán lấy đơn ở chỗ anh Đạt</strong><small>Bếp than trước cửa quán · <b ref={dist}>—</b></small></>}
+      <small className="job-stats">Đã giao {job.done} đơn · {formatVnd(job.earned)}</small>
+    </div>
+  </div>;
 }
 
 /** The order sheet at Bún chả Đức Anh. */

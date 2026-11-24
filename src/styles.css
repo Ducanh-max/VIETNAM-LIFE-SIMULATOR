@@ -94,3 +94,20 @@
 .qty{display:flex;align-items:center;gap:8px}.qty button{width:28px;height:28px;border:1px solid #e6bd8377;background:#18332e;color:#fff;font-size:16px;line-height:1}.qty button:hover{background:#25433b}.qty b{min-width:16px;text-align:center}
 .menu-total{display:flex;justify-content:space-between;align-items:baseline;margin-top:16px;padding-top:12px;border-top:1px solid #ffffff22;font-size:12px;color:#c7d1cb}.menu-total small{color:#9fb0a8}.menu-total strong{font-size:22px;color:#fff}
 @media(max-width:700px){.needs-hud{top:auto;bottom:62px;right:15px;width:180px}.action-prompt{bottom:150px}}
+/* Boss dialog and shipper job panel */
+.dialog-card .dialog-line{font-size:14px;color:#e4ebe6;line-height:1.75;margin:0 0 14px}
+.dialog-card .dialog-line b{color:#ffd77a}
+.dialog-tips{display:flex;flex-wrap:wrap;gap:10px 16px;margin:6px 0 4px;font-size:11px;color:#c7d1cb}
+.dialog-tips span{display:inline-flex;align-items:center;gap:4px}
+.dialog-tips kbd{font-family:inherit;font-size:10px;font-weight:800;padding:3px 7px;background:#344c45;border:1px solid #88a39166;color:#fff}
+.dialog-secondary{display:block;margin:14px auto 0}
+.job-panel{position:absolute;top:240px;right:28px;z-index:2;display:flex;align-items:center;gap:12px;width:280px;padding:12px 14px;background:#2a1c14e0;border:1px solid #ffd35c66;border-right:3px solid #ffd35c;backdrop-filter:blur(10px)}
+.job-arrow{flex:none;display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:#ffd35c;color:#2a1c14;font-size:22px;line-height:1;transition:transform .08s linear}
+.job-body{display:flex;flex-direction:column;gap:3px;min-width:0}
+.job-kicker{font-size:9px;font-weight:800;letter-spacing:.16em;color:#ffd35c}
+.job-body strong{font-size:14px;color:#fff}
+.job-body small{font-size:11px;color:#e6dccb}
+.job-body small b{color:#fff}
+.job-body small b.hurry{color:#ffb347}.job-body small b.late{color:#ff7a6a}
+.job-stats{color:#bfae8e!important}
+@media(max-width:700px){.job-panel{top:auto;bottom:200px;right:15px;width:230px}}

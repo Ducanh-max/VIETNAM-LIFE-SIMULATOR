@@ -25,7 +25,10 @@ type State = {
   order: Order;
   table: number; // index of the table the player sits at, -1 = standing
   eatProgress: number; // 0..1 while eating
-  prompt: { key: string; text: string } | null;
+  prompt: Prompt | null;
+  /** Open conversation with an NPC (pauses controls). */
+  dialog: 'boss' | null;
+  job: Job | null;
   toast: { text: string; id: number } | null;
 };
 
@@ -38,7 +41,8 @@ function load(): Pick<State, 'hunger' | 'thirst' | 'money'> {
   return { hunger: 72, thirst: 64, money: 300_000 };
 }
 
-let state: State = { ...load(), phase: 'none', order: {}, table: -1, eatProgress: 0, prompt: null, toast: null };
+let state: State = { ...load(), phase: 'none', order: {}, table: -1, eatProgress: 0, prompt: null, toast: null, dialog: null, job: null };
+const pending: Prompt[] = [];
 const listeners = new Set<() => void>();
 let lastSave = 0;
 
@@ -52,13 +56,25 @@ export const game = {
   },
   subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
   toast(text: string) { game.set({ toast: { text, id: Math.random() } }); },
-  /** Set the context prompt without re-rendering when nothing changed. */
-  prompt(key: string | null, text = '') {
-    const cur = state.prompt;
-    if (!key) { if (cur) game.set({ prompt: null }); return; }
-    if (cur?.key !== key || cur.text !== text) game.set({ prompt: { key, text } });
-  },
+  /**
+   * World components offer context actions every frame; the highest priority offer is committed once
+   * per frame (see commitPrompts) and its `run` fires on the matching key.
+   */
+  offer(prompt: Prompt) { pending.push(prompt); },
 };
+
+/** Context action shown above the bottom bar. key null = information only. */
+export type Prompt = { id: string; text: string; key: 'E' | 'F' | null; priority?: number; run?: () => void };
+/** Called once per frame before other world logic: shows last frame's best offer. */
+export function commitPrompts() {
+  let best: Prompt | null = null;
+  for (const p of pending) if (!best || (p.priority ?? 0) > (best.priority ?? 0)) best = p;
+  pending.length = 0;
+  const cur = state.prompt;
+  if (!best) { if (cur) game.set({ prompt: null }); return; }
+  if (!cur || cur.id !== best.id || cur.text !== best.text || cur.key !== best.key) game.set({ prompt: best });
+  else state.prompt = best; // keep the freshest callback without re-rendering
+}
 
 export function useGame<T>(select: (s: State) => T): T {
   return useSyncExternalStore(game.subscribe, () => select(state));
@@ -75,6 +91,7 @@ export const player = {
   seat: null as null | { position: THREE.Vector3; facing: number; look: THREE.Vector3 },
   /** Indoors the follow camera is pulled in so walls don't hide the avatar. */
   cameraMax: Infinity,
+  teleport: null as null | ((x: number, z: number) => void),
 };
 
 /** Restaurant flow, called from the menu UI and the in-world prompts. */
@@ -114,3 +131,24 @@ export function tickNeeds(dt: number, running: boolean, moving: boolean) {
     state.hunger = hunger; state.thirst = thirst;
   }
 }
+
+// ---- Shipper job ------------------------------------------------------------
+export type Delivery = { customer: string; street: string; dest: { x: number; z: number }; facing: number; portions: number; pay: number; distance: number; startedAt: number; timeLimit: number };
+export type Job = { stage: 'pickup' | 'deliver'; delivery: Delivery | null; done: number; earned: number };
+
+/** The shop's delivery scooter. Mutable pose, updated by the rider controller. */
+export const bike = {
+  position: new THREE.Vector3(),
+  heading: 0,
+  speed: 0,
+  steer: 0,
+  lean: 0,
+  wheel: 0,
+  riding: false,
+};
+
+/** Camera heading, for the HUD compass arrow. */
+export const view = { yaw: 0 };
+
+// Dev hook for test scripts.
+if (import.meta.env.DEV) (window as unknown as { __game?: unknown }).__game = { game, bike, player, actions };

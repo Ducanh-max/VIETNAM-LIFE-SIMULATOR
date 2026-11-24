@@ -107,7 +107,8 @@ function IslandGround() {
     const shape = new THREE.Shape(templeIsland.map(([x, z]) => new THREE.Vector2(x, -z)));
     const g = new THREE.ExtrudeGeometry(shape, { depth: ISLAND_HEIGHT + 0.6, bevelEnabled: true, bevelThickness: 0.2, bevelSize: 0.4, bevelSegments: 2 });
     g.rotateX(-Math.PI / 2);
-    g.translate(0, -0.6, 0);
+    // The bevel adds 0.2 m on top of the extrusion depth: drop it so the lawn sits exactly at ISLAND_HEIGHT.
+    g.translate(0, -0.8, 0);
     const r = rng(404);
     const list: THREE.Matrix4[] = [];
     const tint: THREE.Color[] = [];
@@ -168,6 +169,7 @@ export function NgocSonIsland() {
     const unheight = registerHeight((p) => {
       const [lx, lz] = toLocal(p);
       for (const h of HALLS) if (Math.abs(lx - h.x) < h.depth / 2 + 1.3 && Math.abs(lz) < h.width / 2 + 0.7) return ISLAND_HEIGHT + PLATFORM;
+      if (Math.abs(lx - 4.2) < 2.2 && Math.abs(lz) < 3.8) return ISLAND_HEIGHT + 0.4; // gatehouse floor
       return null;
     });
     return () => { unregister(); unheight(); };
@@ -198,8 +200,6 @@ export function NgocSonIsland() {
         <group position={[-0.5, PLATFORM, 0]}><Altar width={2.0} /></group>
         <pointLight position={[-0.4, PLATFORM + 2.4, 0]} color="#ffb067" intensity={5} distance={9} decay={1.6} />
       </TempleHall>
-      {/* incense burner in the courtyard */}
-      <mesh position={[11.5, 0.6, 0]} castShadow><cylinderGeometry args={[0.55, 0.45, 1.2, 12]} /><meshStandardMaterial color="#5b4a32" metalness={0.6} roughness={0.4} /></mesh>
       <Instances geometry={unitBox} material={materials().warmStone} matrices={courtyardWall} />
     </group>
   </group>;

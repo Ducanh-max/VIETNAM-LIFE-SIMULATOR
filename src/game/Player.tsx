@@ -2,52 +2,9 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { bridgeEnds, canWalk, groundHeight, type Point } from './geo';
-import { game, player, tickNeeds } from './state';
-
-/** Simple stylised Hà Nội resident: white shirt, dark trousers, animated limbs. */
-function Character({ speed, sitting }: { speed: { current: number }; sitting: { current: boolean } }) {
-  const legs = [useRef<THREE.Group>(null), useRef<THREE.Group>(null)];
-  const arms = [useRef<THREE.Group>(null), useRef<THREE.Group>(null)];
-  const body = useRef<THREE.Group>(null);
-  const phase = useRef(0);
-useFrame((_, dt) => {
-    phase.current += dt * (4 + speed.current * 1.25);
-    if (sitting.current) {
-      // Seated on a low plastic stool: thighs forward, shins down, one hand bringing food to the mouth while eating.
-      const eating = game.get().phase === 'eating';
-      const bite = eating ? (Math.sin(phase.current * 1.6) * 0.5 + 0.5) : 0;
-      legs[0].current?.rotation.set(-1.35, 0, 0.08);
-      legs[1].current?.rotation.set(-1.35, 0, -0.08);
-      arms[0].current?.rotation.set(-0.9 - bite * 0.9, 0, 0.15);
-      arms[1].current?.rotation.set(-0.7, 0, -0.1);
-      if (body.current) body.current.position.y = -0.52;
-      return;
-    }
-    const swing = Math.min(1, speed.current / 5) * Math.sin(phase.current) * 0.6;
-    legs[0].current?.rotation.set(swing, 0, 0);
-    legs[1].current?.rotation.set(-swing, 0, 0);
-    arms[0].current?.rotation.set(-swing * 0.8, 0, 0.05);
-    arms[1].current?.rotation.set(swing * 0.8, 0, -0.05);
-    if (body.current) body.current.position.y = Math.abs(Math.sin(phase.current)) * 0.05 * Math.min(1, speed.current / 5);
-  });
-  const skin = '#c99a78';
-  return <group ref={body}>
-    <mesh position={[0, 1.25, 0]} castShadow><capsuleGeometry args={[0.24, 0.5, 6, 12]} /><meshStandardMaterial color="#f3efe6" roughness={0.85} /></mesh>
-    <mesh position={[0, 0.98, 0]} castShadow><cylinderGeometry args={[0.25, 0.24, 0.16, 12]} /><meshStandardMaterial color="#2c2b2a" roughness={0.6} /></mesh>
-    <mesh position={[0, 1.66, 0]}><cylinderGeometry args={[0.07, 0.08, 0.12, 8]} /><meshStandardMaterial color={skin} /></mesh>
-    <mesh position={[0, 1.84, 0]} castShadow><sphereGeometry args={[0.17, 16, 12]} /><meshStandardMaterial color={skin} roughness={0.7} /></mesh>
-    <mesh position={[0, 1.92, -0.02]} castShadow><sphereGeometry args={[0.18, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2.1]} /><meshStandardMaterial color="#1b1715" roughness={0.9} /></mesh>
-    <mesh position={[0, 1.3, -0.22]} castShadow><boxGeometry args={[0.36, 0.42, 0.14]} /><meshStandardMaterial color="#2f5d50" roughness={0.8} /></mesh>
-    {[-1, 1].map((s, i) => <group key={`l${s}`} ref={legs[i]} position={[s * 0.12, 0.92, 0]}>
-      <mesh position={[0, -0.42, 0]} castShadow><capsuleGeometry args={[0.09, 0.62, 4, 8]} /><meshStandardMaterial color="#33415a" roughness={0.85} /></mesh>
-      <mesh position={[0, -0.86, 0.06]} castShadow><boxGeometry args={[0.15, 0.09, 0.3]} /><meshStandardMaterial color="#f2f2f2" roughness={0.6} /></mesh>
-    </group>)}
-    {[-1, 1].map((s, i) => <group key={`a${s}`} ref={arms[i]} position={[s * 0.31, 1.52, 0]}>
-      <mesh position={[0, -0.3, 0]} castShadow><capsuleGeometry args={[0.07, 0.45, 4, 8]} /><meshStandardMaterial color="#f3efe6" roughness={0.85} /></mesh>
-      <mesh position={[0, -0.6, 0]}><sphereGeometry args={[0.07, 8, 6]} /><meshStandardMaterial color={skin} /></mesh>
-    </group>)}
-  </group>;
-}
+import { Avatar } from './Avatar';
+import { bike, game, player, tickNeeds, view } from './state';
+import { WHEEL_R, WHEELBASE } from './world/Scooter';
 
 export type PlayerProps = { paused: boolean; freeCamera: boolean; onFps: (fps: number) => void; onPosition: (p: Point) => void; focus: THREE.Vector3 };
 
@@ -78,6 +35,11 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     (window as unknown as { __vlTeleport?: (x: number, z: number, yaw?: number) => void }).__vlTeleport = (x, z, y) => { position.current.set(x, groundHeight([x, z]), z); if (y !== undefined) yaw.current = y; };
+  }, []);
+  // Lets world logic (getting off the scooter) put the player down at a spot.
+  useEffect(() => {
+    player.teleport = (x, z) => { position.current.set(x, groundHeight([x, z]), z); velocity.current.set(0, 0, 0); };
+    return () => { player.teleport = null; };
   }, []);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -134,6 +96,53 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
       if (debugCam) { camera.position.set(debugCam[0], debugCam[1], debugCam[2]); camera.lookAt(debugCam[3], debugCam[4], debugCam[5]); focus.set(debugCam[3], 0, debugCam[5]); return; }
     }
     const k = keys.current;
+    // ---- Riding the delivery scooter: W/S throttle and brake, A/D steer, Shift for full throttle.
+    if (bike.riding && !freeCamera) {
+      sitting.current = false;
+      const throttle = paused ? 0 : (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0);
+      const steerIn = paused ? 0 : (k.has('KeyA') ? 1 : 0) - (k.has('KeyD') ? 1 : 0);
+      const vmax = k.has('ShiftLeft') || k.has('ShiftRight') ? 15 : 10.5; // ≈ 54 / 38 km/h
+      if (throttle > 0) bike.speed = Math.min(vmax, bike.speed + (bike.speed < 0 ? 9 : 3.4) * dt);
+      else if (throttle < 0) bike.speed = bike.speed > 0.2 ? Math.max(0, bike.speed - 9 * dt) : Math.max(-2.2, bike.speed - 2.4 * dt);
+      else bike.speed -= Math.sign(bike.speed) * Math.min(Math.abs(bike.speed), 1.5 * dt);
+      if (bike.speed > vmax) bike.speed = Math.max(vmax, bike.speed - 4 * dt);
+      const maxSteer = THREE.MathUtils.lerp(0.6, 0.2, Math.min(1, Math.abs(bike.speed) / 14));
+      bike.steer = THREE.MathUtils.damp(bike.steer, steerIn * maxSteer, 7, dt);
+      bike.heading += (bike.speed * Math.tan(bike.steer) / WHEELBASE) * dt;
+      const fwd = new THREE.Vector3(Math.sin(bike.heading), 0, Math.cos(bike.heading));
+      const next = bike.position.clone().addScaledVector(fwd, bike.speed * dt);
+      const dirSign = bike.speed >= 0 ? 1 : -1;
+      const nose: Point = [next.x + fwd.x * 0.95 * dirSign, next.z + fwd.z * 0.95 * dirSign];
+      if (canWalk([next.x, next.z]) && canWalk(nose)) { bike.position.x = next.x; bike.position.z = next.z; }
+      else bike.speed *= -0.2; // bump
+      bike.position.y = THREE.MathUtils.damp(bike.position.y, groundHeight([bike.position.x, bike.position.z]), 12, dt);
+      bike.wheel += (bike.speed * dt) / WHEEL_R;
+      bike.lean = THREE.MathUtils.damp(bike.lean, -bike.steer * Math.min(1, Math.abs(bike.speed) / 7) * 0.5, 5, dt);
+      velocity.current.set(0, 0, 0);
+      speed.current = 0;
+      position.current.copy(bike.position);
+      if (avatar.current) { avatar.current.position.copy(bike.position); avatar.current.rotation.set(0, bike.heading, bike.lean, 'YXZ'); }
+      // chase camera that swings back behind the bike while moving
+      if (Math.abs(bike.speed) > 1 && !dragging.current && document.pointerLockElement !== gl.domElement) {
+        let diff = bike.heading + Math.PI - yaw.current; diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+        yaw.current += diff * (1 - Math.exp(-2.5 * dt));
+      }
+      if (!paused) {
+        if (k.has('ArrowLeft')) yaw.current += 1.8 * dt;
+        if (k.has('ArrowRight')) yaw.current -= 1.8 * dt;
+      }
+      const camFwd = new THREE.Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
+      const dist = Math.max(5, distance.current * 0.85);
+      const eye = bike.position.clone().addScaledVector(camFwd, -Math.cos(pitch.current) * dist).add(new THREE.Vector3(0, 1.7 + Math.sin(pitch.current) * dist, 0));
+      camera.position.lerp(eye, 1 - Math.exp(-7 * dt));
+      camera.lookAt(bike.position.x, bike.position.y + 1.2, bike.position.z);
+      focus.copy(bike.position);
+      player.position.copy(bike.position);
+      player.yaw = yaw.current;
+      view.yaw = yaw.current;
+      if (!paused) tickNeeds(dt, false, true);
+      return;
+    }
     // Seated at a restaurant table: avatar on the stool, camera orbits a close-up of the food.
     const seat = player.seat;
     if (seat) {
@@ -147,10 +156,12 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
       if (avatar.current) { avatar.current.position.copy(seat.position); avatar.current.rotation.y = seat.facing; }
       // Mouse look (yaw) and arrows both orbit the camera around the dishes.
       const orbit = seatYaw.current + yaw.current;
-      const r = THREE.MathUtils.clamp(distance.current * 0.14, 0.6, 3.4);
-      const eye = new THREE.Vector3(seat.look.x + Math.sin(orbit) * r, seat.look.y + 0.2 + Math.max(0, pitch.current) * 1.5, seat.look.z + Math.cos(orbit) * r);
+      const r = THREE.MathUtils.clamp(distance.current * 0.2, 0.8, 3.4);
+      // aim between the dishes and the diner's face so every bite reaches the mouth on screen
+      const aim = seat.look.clone().lerp(seat.position, 0.3).setY(seat.look.y + 0.3);
+      const eye = new THREE.Vector3(aim.x + Math.sin(orbit) * r, aim.y + 0.25 + Math.max(0, pitch.current) * 1.2, aim.z + Math.cos(orbit) * r);
       camera.position.lerp(eye, 1 - Math.exp(-6 * dt));
-      camera.lookAt(seat.look);
+      camera.lookAt(aim);
       focus.copy(seat.look);
       player.position.copy(position.current);
       if (!paused) tickNeeds(dt, false, false);
@@ -214,6 +225,8 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
     focus.copy(p);
     player.position.copy(p);
     player.yaw = yaw.current;
+    view.yaw = yaw.current;
+    if (avatar.current && avatar.current.rotation.z !== 0) avatar.current.rotation.set(0, avatar.current.rotation.y, 0, 'XYZ');
     if (!paused) tickNeeds(dt, running && speed.current > 1, speed.current > 0.5);
     const dist = Math.min(distance.current, player.cameraMax);
     const desired = p.clone()
@@ -223,5 +236,5 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
     camera.lookAt(p.x, p.y + 1.5, p.z);
   });
 
-  return <group ref={avatar} position={position.current.toArray()}><Character speed={speed} sitting={sitting} /></group>;
+  return <group ref={avatar} position={position.current.toArray()}><Avatar speed={speed} /></group>;
 }

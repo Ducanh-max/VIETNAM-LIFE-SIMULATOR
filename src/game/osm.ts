@@ -213,5 +213,36 @@ export const parks: Park[] = (osm.parks as RawPark[])
 
 export const osmAttribution = osm.source;
 
+/**
+ * Doorsteps for bún chả deliveries: pavement spots on named streets right in front of a house,
+ * with the street name and the direction facing the road.
+ */
+export type DeliverySpot = { p: Point; street: string; facing: number };
+export const deliverySpots: DeliverySpot[] = (() => {
+  const list: DeliverySpot[] = [];
+  const kinds = new Set(['residential', 'tertiary', 'secondary', 'living_street', 'unclassified', 'primary']);
+  for (const road of roads) {
+    if (!road.name || !kinds.has(road.kind)) continue;
+    let carry = 12;
+    for (let i = 0; i < road.points.length - 1; i++) {
+      const a = road.points[i]; const b = road.points[i + 1];
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const d: Point = [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
+      for (let t = carry; t < len; t += 28) {
+        for (const side of [1, -1]) {
+          const n: Point = [-d[1] * side, d[0] * side];
+          const off = road.width / 2 + 1.5;
+          const q: Point = [a[0] + d[0] * t + n[0] * off, a[1] + d[1] * t + n[1] * off];
+          if (insideBuilding(q, 0.6) || roadClearance(q) < 0.6 || distanceToShore(q) < 12) continue;
+          if (!insideBuilding([q[0] + n[0] * 3, q[1] + n[1] * 3], 0)) continue; // a house right behind
+          list.push({ p: q, street: road.name, facing: Math.atan2(-n[0], -n[1]) });
+        }
+        carry = t + 28 - len;
+      }
+    }
+  }
+  return list;
+})();
+
 // Dev hook for screenshot scripts.
 if (import.meta.env.DEV) (window as unknown as { __restaurant?: unknown }).__restaurant = { ...RESTAURANT, toWorld: restaurantToWorld };

@@ -6,6 +6,7 @@ import type { Point } from './geo';
 import { Player } from './Player';
 import { TheHucBridge } from './world/Bridge';
 import { OsmBuildings } from './world/OsmBuildings';
+import { Interaction, Job } from './world/Job';
 import { Restaurant } from './world/Restaurant';
 import { Streets } from './world/Streets';
 import { NgocSonApproach } from './world/ThapBut';
@@ -66,7 +67,9 @@ export function World({ time, quality, paused, freeCamera, onFps, onPosition }: 
     <Lakeside time={time} reflections={q.reflections} sun={sunVector} />
     <Streets />
     <OsmBuildings />
+    <Interaction paused={paused} />
     <Restaurant paused={paused} />
+    <Job />
     <TheHucBridge />
     <TurtleIsland />
     <NgocSonIsland />

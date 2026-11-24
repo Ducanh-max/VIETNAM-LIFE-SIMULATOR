@@ -3,9 +3,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GROUND_HEIGHT, registerObstacles, type Obstacle, type Point } from '../geo';
 import { RESTAURANT, restaurantToWorld, worldToRestaurant } from '../osm';
-import { actions, game, MENU, player, useGame, type MenuId } from '../state';
-import { BunChaSet, DishStack, DrinkSet, GrillClamp, Tray } from './food';
-import { Person, type PersonAnim } from './Person';
+import { jobActions } from '../job';
+import { drinkLevels, firstDrink, mealDuration, SEAT_Z, SET, TABLE_D, TABLE_TOP, TABLE_W } from '../meal';
+import { actions, bike, game, MENU, player, useGame, type MenuId, type Order } from '../state';
+import { Bottle, BunChaSet, DishStack, DrinkSet, GrillClamp, Tray } from './food';
+import { NameTag, Person, type PersonAnim } from './Person';
 import { facadeTexture, rng } from './textures';
 
 /* Local frame: x along Phố Đinh Tiên Hoàng, +z out of the shopfront toward the lake. Units: metres. */
@@ -16,17 +18,18 @@ const HD = D / 2;
 const H1 = 3.6; // ground floor height
 const UPPER = 2; // upper storeys
 const STOREY = 3.3;
-const TABLE_TOP = 0.52;
 
 type Table = { x: number; z: number; npc?: { side: 1 | -1; shirt: string; pants: string; hair?: string; seed: number }; outside?: boolean };
 const TABLES: Table[] = [
   { x: -2.1, z: 4.4 }, { x: 2.1, z: 4.4, npc: { side: -1, shirt: '#3c6e9e', pants: '#2a2a2a', seed: 1 } },
   { x: -2.1, z: 1.2 }, { x: 2.1, z: 1.2 },
   { x: -2.1, z: -2.0, npc: { side: 1, shirt: '#b8433a', pants: '#3a3f4a', hair: '#2b1d14', seed: 2 } }, { x: 2.1, z: -2.0 },
-  { x: 2.7, z: HD + 1.6, outside: true },
+  { x: -0.6, z: HD + 1.5, outside: true },
 ];
 const HOME: Point = [1.0, -4.3];
-const GRILL: Point = [-3.2, HD + 1.4];
+const GRILL: Point = [-3.4, HD + 1.4];
+const DESK: Point = [-3.3, -3.8];
+const BOSS: Point = [-4.05, -3.8];
 
 function canvasTexture(w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void, repeat?: [number, number]) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -130,20 +133,23 @@ function useRestaurantMaterials() {
   }, []);
 }
 
-/** Low steel-topped table with condiments, and two blue plastic stools. */
-function DiningTable({ t, mats }: { t: Table; mats: ReturnType<typeof useRestaurantMaterials> }) {
+/** Wide, low steel-topped table (room for the whole bún chả spread) with two plastic stools. */
+function DiningTable({ t, mats, bare = false }: { t: Table; mats: ReturnType<typeof useRestaurantMaterials>; bare?: boolean }) {
   return <group position={[t.x, 0, t.z]}>
-    <mesh position={[0, TABLE_TOP - 0.015, 0]} material={mats.steel} castShadow receiveShadow><boxGeometry args={[0.85, 0.03, 0.62]} /></mesh>
-    {[-1, 1].flatMap((a) => [-1, 1].map((b) => <mesh key={`${a}${b}`} position={[a * 0.36, TABLE_TOP / 2, b * 0.25]} material={mats.steel}><cylinderGeometry args={[0.018, 0.018, TABLE_TOP, 6]} /></mesh>))}
-    {[-1, 1].map((s) => <group key={s} position={[0, 0, s * 0.56]}>
+    <mesh position={[0, TABLE_TOP - 0.015, 0]} material={mats.steel} castShadow receiveShadow><boxGeometry args={[TABLE_W, 0.03, TABLE_D]} /></mesh>
+    <mesh position={[0, TABLE_TOP - 0.04, 0]} material={mats.steel}><boxGeometry args={[TABLE_W - 0.06, 0.03, TABLE_D - 0.06]} /></mesh>
+    {[-1, 1].flatMap((a) => [-1, 1].map((b) => <mesh key={`${a}${b}`} position={[a * (TABLE_W / 2 - 0.06), TABLE_TOP / 2, b * (TABLE_D / 2 - 0.06)]} material={mats.steel}><cylinderGeometry args={[0.018, 0.018, TABLE_TOP, 6]} /></mesh>))}
+    {[-1, 1].map((s) => <group key={s} position={[0, 0, s * SEAT_Z]}>
       <mesh position={[0, 0.31, 0]} material={s > 0 ? mats.blue : mats.red} castShadow><cylinderGeometry args={[0.15, 0.17, 0.04, 16]} /></mesh>
       <mesh position={[0, 0.15, 0]} material={s > 0 ? mats.blue : mats.red}><cylinderGeometry args={[0.13, 0.17, 0.28, 12, 1, true]} /></mesh>
     </group>)}
-    {/* condiments: tissue box, chopstick tube, fish-sauce jar, chilli sauce */}
-    <mesh position={[0.3, TABLE_TOP + 0.04, -0.2]} material={mats.tissue} castShadow><boxGeometry args={[0.14, 0.08, 0.08]} /></mesh>
-    <mesh position={[0.32, TABLE_TOP + 0.08, 0.0]} material={mats.steel} castShadow><cylinderGeometry args={[0.035, 0.035, 0.16, 10]} /></mesh>
-    <mesh position={[-0.33, TABLE_TOP + 0.05, -0.2]} material={mats.sauce}><cylinderGeometry args={[0.03, 0.035, 0.1, 10]} /></mesh>
-    <mesh position={[-0.33, TABLE_TOP + 0.06, -0.08]} material={mats.red}><cylinderGeometry args={[0.022, 0.026, 0.12, 8]} /></mesh>
+    {/* condiments at the end of the table: tissues, chopstick tube, fish-sauce jar, chilli sauce */}
+    {!bare && <group position={[TABLE_W / 2 - 0.12, 0, 0]}>
+      <mesh position={[0, TABLE_TOP + 0.04, -0.2]} material={mats.tissue} castShadow><boxGeometry args={[0.14, 0.08, 0.08]} /></mesh>
+      <mesh position={[0, TABLE_TOP + 0.08, -0.04]} material={mats.steel} castShadow><cylinderGeometry args={[0.035, 0.035, 0.16, 10]} /></mesh>
+      <mesh position={[0, TABLE_TOP + 0.05, 0.1]} material={mats.sauce}><cylinderGeometry args={[0.03, 0.035, 0.1, 10]} /></mesh>
+      <mesh position={[0, TABLE_TOP + 0.06, 0.22]} material={mats.red}><cylinderGeometry args={[0.022, 0.026, 0.12, 8]} /></mesh>
+    </group>}
   </group>;
 }
 
@@ -229,7 +235,7 @@ function Building({ mats }: { mats: ReturnType<typeof useRestaurantMaterials> })
     </group>
     <Neighbours />
     {/* cashier desk and an altar to Thần Tài, as in most Hà Nội shops */}
-    <mesh position={[-3.6, 0.5, -3.8]} material={mats.wood} castShadow><boxGeometry args={[0.9, 1.0, 1.4]} /></mesh>
+    <mesh position={[DESK[0], 0.5, DESK[1]]} material={mats.wood} castShadow><boxGeometry args={[0.9, 1.0, 1.4]} /></mesh>
     <mesh position={[-HW + 0.45, 1.9, -5.0]} material={mats.red}><boxGeometry args={[0.5, 0.45, 0.6]} /></mesh>
   </group>;
 }
@@ -252,6 +258,29 @@ function Neighbours() {
 /** One waiter state for the whole restaurant. */
 type WaiterTask = { route: Point[]; leg: number; mode: 'out' | 'back' | 'idle' | 'wait'; wait: number };
 
+/** What the player ordered, laid out on the table in the set frame (see meal.ts). */
+function TableSpread({ order, progress, inHand }: { order: Order; progress: number; inHand: boolean }) {
+  const lv = drinkLevels(order, progress);
+  const first = firstDrink(order);
+  const bowls = order.buncha ?? 0;
+  const others = (Object.keys(order) as MenuId[]).filter((id) => id !== 'buncha').flatMap((id) => Array.from({ length: order[id] ?? 0 }, () => id as Exclude<MenuId, 'buncha'>)).slice(first ? 1 : 0, 4);
+  return <group>
+    {bowls > 0 && <BunChaSet eaten={lv.food} showChopsticks={!inHand} />}
+    {bowls > 1 && <group position={[SET.extra[0], 0, SET.extra[1]]} rotation={[0, Math.PI, 0]} scale={0.62}><BunChaSet steam={false} /></group>}
+    {first && <group position={[bowls ? SET.drink[0] : 0, 0, bowls ? SET.drink[1] : 0]}><DrinkSet id={first} glassLevel={lv.glass} canHeld={inHand && lv.canHeld} glassHeld={inHand && lv.glassHeld} /></group>}
+    {others.map((id, i) => <group key={i} position={[0.42 - i * 0.1, 0, -0.3]}><Bottle id={id} /></group>)}
+  </group>;
+}
+
+/** Bún chả and drinks on the waiter's tray. */
+function TrayLoad({ order }: { order: Order }) {
+  const drinks = (Object.keys(order) as MenuId[]).filter((id) => id !== 'buncha') as Exclude<MenuId, 'buncha'>[];
+  return <group>
+    {(order.buncha ?? 0) > 0 && <group scale={0.62} position={[0.03, 0, 0]}><BunChaSet steam={false} /></group>}
+    {drinks.slice(0, 3).map((id, i) => <group key={id} position={[-0.17, 0, -0.08 + i * 0.08]}><Bottle id={id} /></group>)}
+  </group>;
+}
+
 export function Restaurant({ paused }: { paused: boolean }) {
   const mats = useRestaurantMaterials();
   const phase = useGame((s) => s.phase);
@@ -262,86 +291,81 @@ export function Restaurant({ paused }: { paused: boolean }) {
   const waiter = useRef<THREE.Group>(null);
   const waiterAnim = useRef<PersonAnim>({ mode: 'stand', speed: 0 });
   const cookAnim = useRef<PersonAnim>({ mode: 'fan', speed: 0 });
+  const bossAnim = useRef<PersonAnim>({ mode: 'stand', speed: 0 });
   const dinerAnims = useRef<PersonAnim[]>(TABLES.map(() => ({ mode: 'eat', speed: 0 })));
   const task = useRef<WaiterTask>({ route: [HOME], leg: 0, mode: 'idle', wait: 0 });
-  const timer = useRef(0);
-  const near = useRef(-1);
 
-  // Walls, counter, fridge, tables and the grill block the player.
+  // Walls, counter, fridge, desk, tables and the grill block the player.
   useEffect(() => {
     const local: [number, number, number, number][] = [
       [-(HW - 0.08), 0, 0.12, HD], [HW - 0.08, 0, 0.12, HD], [0, -HD + 0.08, HW, 0.12],
-      [1.6, -5.3, 2.3, 0.4], [-3.6, -6.4, 0.45, 0.35], [-3.6, -3.8, 0.45, 0.7],
-      [GRILL[0], GRILL[1], 0.45, 0.4], [GRILL[0] + 0.6, GRILL[1], 0.2, 0.2],
-      ...TABLES.map((t): [number, number, number, number] => [t.x, t.z, 0.42, 0.3]),
+      [1.6, -5.3, 2.3, 0.4], [-3.6, -6.4, 0.45, 0.35], [DESK[0], DESK[1], 0.45, 0.7], [BOSS[0], BOSS[1], 0.25, 0.25],
+      [GRILL[0], GRILL[1], 0.45, 0.4], [GRILL[0] + 0.6, GRILL[1], 0.2, 0.2], [GRILL[0] - 0.65, GRILL[1], 0.25, 0.25],
+      ...TABLES.map((t): [number, number, number, number] => [t.x, t.z, TABLE_W / 2, TABLE_D / 2]),
       ...NEIGHBOURS.map((n): [number, number, number, number] => [n.x, 0, n.w / 2, HD]),
     ];
     const list = local.map(([x, z, hx, hz]): Obstacle => { const [wx, wz] = restaurantToWorld(x, z); return { x: wx, z: wz, hx, hz, angle: RESTAURANT.angle }; });
     return registerObstacles(list);
   }, []);
 
-  // Keyboard: E to sit / eat / stand up, M to order more.
+  // M orders more once the meal is finished.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (paused || e.repeat) return;
-      const s = game.get();
-      if (e.code === 'KeyE') {
-        if (s.phase === 'none' && near.current >= 0) {
-          const t = TABLES[near.current];
-          const local = worldToRestaurant([player.position.x, player.position.z]);
-          const side = local[1] > t.z ? 1 : -1; // sit on the stool nearest to where the player stands
-          const [sx, sz] = restaurantToWorld(t.x, t.z + side * 0.56);
-          const [lx, lz] = restaurantToWorld(t.x, t.z);
-          player.seat = { position: new THREE.Vector3(sx, GROUND_HEIGHT, sz), facing: RESTAURANT.angle + (side > 0 ? Math.PI : 0), look: new THREE.Vector3(lx, GROUND_HEIGHT + TABLE_TOP + 0.05, lz) };
-          if (document.pointerLockElement) document.exitPointerLock();
-          game.set({ phase: 'menu', table: near.current, order: {} });
-        } else if (s.phase === 'served') {
-          game.set({ phase: 'eating', eatProgress: 0 });
-        } else if (s.phase === 'finished') {
-          actions.standUp();
-        }
-      }
-      if (e.code === 'KeyM' && s.phase === 'finished') { if (document.pointerLockElement) document.exitPointerLock(); actions.orderMore(); }
+      if (paused || e.repeat || e.code !== 'KeyM' || game.get().phase !== 'finished') return;
+      if (document.pointerLockElement) document.exitPointerLock();
+      actions.orderMore();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [paused]);
 
-  // Order flow: cooking → waiter walks the tray over → served.
+  // Order flow: cooking → Khánh walks the tray over → served.
   useEffect(() => {
-    timer.current = 0;
     if (phase === 'cooking') task.current = { route: [HOME], leg: 0, mode: 'wait', wait: order.buncha ? 6 : 2.5 };
   }, [phase, order]);
+
+  const sitAt = (i: number) => {
+    const t = TABLES[i];
+    const local = worldToRestaurant([player.position.x, player.position.z]);
+    const side = local[1] > t.z ? 1 : -1; // the stool nearest to where the player stands
+    const [sx, sz] = restaurantToWorld(t.x, t.z + side * SEAT_Z);
+    const [lx, lz] = restaurantToWorld(t.x, t.z);
+    player.seat = { position: new THREE.Vector3(sx, GROUND_HEIGHT, sz), facing: RESTAURANT.angle + (side > 0 ? Math.PI : 0), look: new THREE.Vector3(lx, GROUND_HEIGHT + TABLE_TOP + 0.05, lz) };
+    if (document.pointerLockElement) document.exitPointerLock();
+    game.set({ phase: 'menu', table: i, order: {} });
+  };
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
     const s = game.get();
-    // ---- prompts and table detection
     const local = worldToRestaurant([player.position.x, player.position.z]);
     const inside = Math.abs(local[0]) < HW && local[1] > -HD && local[1] < HD + 0.3;
-    player.cameraMax = inside ? 3.4 : Infinity;
-    near.current = -1;
-    if (s.phase === 'none') {
-      let best = 1.25;
-      TABLES.forEach((t, i) => { if (t.npc) return; const d = Math.hypot(local[0] - t.x, local[1] - t.z); if (d < best) { best = d; near.current = i; } });
-      if (near.current >= 0) game.prompt('sit', 'Ngồi xuống & gọi món');
-      else if (Math.abs(local[0]) < HW + 4 && local[1] > -HD && local[1] < HD + 6) game.prompt('info', 'Bún chả Đức Anh — vào ngồi một bàn trống để gọi món');
-      else game.prompt(null);
-    } else if (s.phase === 'cooking') game.prompt('info', 'Bếp đang nướng chả trên than hoa…');
-    else if (s.phase === 'serving') game.prompt('info', 'Anh phục vụ đang bưng món ra bàn…');
-    else if (s.phase === 'served') game.prompt('eat', 'Ăn ngay');
-    else if (s.phase === 'eating') game.prompt('info', 'Đang thưởng thức…');
-    else if (s.phase === 'finished') game.prompt('done', 'Đứng dậy  ·  M: Gọi thêm');
-    else game.prompt(null);
+    player.cameraMax = inside && !bike.riding ? 3.4 : Infinity;
+    const near = (p: Point, r: number) => Math.hypot(local[0] - p[0], local[1] - p[1]) < r;
 
-    // ---- eating progress
-    if (s.phase === 'eating' && !paused) {
-      const duration = s.order.buncha ? 8 : 4;
-      const next = Math.min(1, s.eatProgress + dt / duration);
+    // ---- context actions
+    if (!bike.riding) {
+      if (s.phase === 'none') {
+        let best = -1; let bestD = 1.4;
+        TABLES.forEach((t, i) => { if (t.npc) return; const d = Math.hypot(local[0] - t.x, local[1] - t.z); if (d < bestD) { bestD = d; best = i; } });
+        if (best >= 0) game.offer({ id: `sit${best}`, text: 'Ngồi xuống & gọi món', key: 'E', priority: 5, run: () => sitAt(best) });
+        else if (near([BOSS[0] + 1.4, BOSS[1]], 1.7)) game.offer({ id: 'boss', text: 'Nói chuyện với ông chủ Đức Anh', key: 'E', priority: 6, run: () => { if (document.pointerLockElement) document.exitPointerLock(); game.set({ dialog: 'boss' }); } });
+        else if (s.job?.stage === 'pickup' && near([GRILL[0] - 0.2, GRILL[1] + 0.9], 2.0)) game.offer({ id: 'pickup', text: 'Nhận túi bún chả từ anh Đạt', key: 'E', priority: 6, run: () => jobActions.pickup() });
+        else if (Math.abs(local[0]) < HW + 4 && local[1] > -HD && local[1] < HD + 6 && !s.job) game.offer({ id: 'info-shop', text: 'Bún chả Đức Anh — ngồi bàn trống để gọi món, hoặc gặp ông chủ ở quầy để xin việc ship', key: null, priority: 1 });
+      } else if (s.phase === 'cooking') game.offer({ id: 'cooking', text: 'Anh Đạt đang nướng chả trên than hoa…', key: null, priority: 4 });
+      else if (s.phase === 'serving') game.offer({ id: 'serving', text: 'Anh Khánh đang bưng món ra bàn…', key: null, priority: 4 });
+      else if (s.phase === 'served') game.offer({ id: 'eat', text: 'Ăn ngay', key: 'E', priority: 5, run: () => game.set({ phase: 'eating', eatProgress: 0 }) });
+      else if (s.phase === 'eating') game.offer({ id: 'eating', text: 'Đang thưởng thức…', key: null, priority: 4 });
+      else if (s.phase === 'finished') game.offer({ id: 'done', text: 'Đứng dậy  ·  M: Gọi thêm', key: 'E', priority: 5, run: () => actions.standUp() });
+    }
+
+    // ---- eating progress (follows the scripted bites and sips)
+    if (s.phase === 'eating' && !paused && !(window as unknown as { __freezeMeal?: boolean }).__freezeMeal) {
+      const next = Math.min(1, s.eatProgress + dt / mealDuration(s.order));
       if (next >= 1) actions.finishMeal(); else game.set({ eatProgress: next });
     }
 
-    // ---- waiter
+    // ---- Khánh, the waiter
     const w = waiter.current;
     const tk = task.current;
     if (w) {
@@ -351,8 +375,7 @@ export function Restaurant({ paused }: { paused: boolean }) {
         if (tk.wait <= 0 && s.phase === 'cooking' && s.table >= 0) {
           const t = TABLES[s.table];
           const side = t.x > 0 ? 1 : -1;
-          const aisle = side * 1.05;
-          const route: Point[] = t.outside ? [HOME, [1.05, -4.0], [1.05, HD + 0.9], [t.x - 0.75, t.z]] : [HOME, [aisle, -4.0], [aisle, t.z]];
+          const route: Point[] = t.outside ? [HOME, [1.05, -4.0], [1.05, HD + 0.5], [t.x + TABLE_W / 2 + 0.35, t.z]] : [HOME, [side * 1.0, -4.0], [side * 1.0, t.z]];
           task.current = { route, leg: 0, mode: 'out', wait: 0 };
           setCarrying(true);
           game.set({ phase: 'serving' });
@@ -387,34 +410,39 @@ export function Restaurant({ paused }: { paused: boolean }) {
   const served = (phase === 'served' || phase === 'eating' || phase === 'finished') && table >= 0;
   const t = table >= 0 ? TABLES[table] : null;
   const playerSide = t && player.seat ? (worldToRestaurant([player.seat.position.x, player.seat.position.z])[1] > t.z ? 1 : -1) : 1;
-  const drinks = (Object.keys(order) as MenuId[]).filter((id) => id !== 'buncha').flatMap((id) => Array.from({ length: order[id] ?? 0 }, () => id as Exclude<MenuId, 'buncha'>));
-  const bowls = order.buncha ?? 0;
-  const tableFood = (eaten: number) => <group>
-    {Array.from({ length: Math.min(2, bowls) }, (_, i) => <group key={`b${i}`} position={[i ? 0.2 : (bowls > 1 ? -0.2 : 0), 0, 0]} scale={bowls > 1 ? 0.8 : 1}><BunChaSet eaten={eaten} /></group>)}
-    {drinks.slice(0, 4).map((id, i) => <group key={`d${i}`} position={(bowls ? [[-0.34, 0, 0.16], [0.37, 0, 0.17], [-0.37, 0, -0.04], [0.06, 0, -0.2]] : [[-0.15, 0, 0], [0.15, 0, 0], [-0.15, 0, -0.18], [0.15, 0, -0.18]])[i] as [number, number, number]}><DrinkSet id={id} drunk={eaten} /></group>)}
-  </group>;
+  const inHand = phase === 'eating' || phase === 'finished';
 
   return <group position={[RESTAURANT.center[0], GROUND_HEIGHT, RESTAURANT.center[1]]} rotation={[0, RESTAURANT.angle, 0]}>
     <Building mats={mats} />
-    {TABLES.map((tb, i) => <DiningTable key={i} t={tb} mats={mats} />)}
+    {TABLES.map((tb, i) => <DiningTable key={i} t={tb} mats={mats} bare={served && i === table} />)}
     <Grill mats={mats} />
-    {/* grill cook fanning the coals with a palm-leaf fan, wearing a nón lá */}
+    {/* Đạt, the grill cook, fanning the coals in a nón lá */}
     <group position={[GRILL[0] - 0.65, 0, GRILL[1]]} rotation={[0, Math.PI / 2, 0]}>
       <Person anim={cookAnim.current} shirt="#5a7d5a" pants="#3a3226" hat="#d9c38a" skin="#b98a68" seed={4} />
       <mesh position={[0, 0.17, 0]} material={mats.red}><cylinderGeometry args={[0.13, 0.15, 0.32, 12]} /></mesh>
+      <NameTag name="Đạt" role="Nướng chả" y={1.95} />
+    </group>
+    {/* Đức Anh, the owner, behind the cashier desk */}
+    <group position={[BOSS[0], 0, BOSS[1]]} rotation={[0, Math.PI / 2, 0]}>
+      <Person anim={bossAnim.current} shirt="#2f4f7a" pants="#2a2a2a" hair="#3a3a3a" skin="#c4946f" seed={9} />
+      <NameTag name="Đức Anh" role="Ông chủ quán" y={2.4} color="#ffd35c" />
     </group>
     {/* diners already eating */}
     {TABLES.map((tb, i) => tb.npc ? <group key={`n${i}`}>
-      <group position={[tb.x, 0, tb.z + tb.npc.side * 0.56]} rotation={[0, tb.npc.side > 0 ? Math.PI : 0, 0]}>
+      <group position={[tb.x, 0, tb.z + tb.npc.side * SEAT_Z]} rotation={[0, tb.npc.side > 0 ? Math.PI : 0, 0]}>
         <Person anim={dinerAnims.current[i]} shirt={tb.npc.shirt} pants={tb.npc.pants} hair={tb.npc.hair} seed={tb.npc.seed} />
       </group>
-      <group position={[tb.x, TABLE_TOP, tb.z]} rotation={[0, tb.npc.side > 0 ? 0 : Math.PI, 0]}><BunChaSet eaten={0.35} /><group position={[-0.3, 0, -0.2]}><DrinkSet id={i % 2 ? 'coca' : 'lavie'} drunk={0.5} /></group></group>
+      <group position={[tb.x, TABLE_TOP, tb.z]} rotation={[0, tb.npc.side > 0 ? 0 : Math.PI, 0]}>
+        <BunChaSet eaten={0.35} steam={false} />
+        <group position={[SET.drink[0], 0, SET.drink[1]]}><DrinkSet id={i % 2 ? 'coca' : 'lavie'} glassLevel={0.5} /></group>
+      </group>
     </group> : null)}
-    {/* waiter in a white shirt and black apron */}
+    {/* Khánh, the waiter, in a white shirt and black apron */}
     <group ref={waiter} position={[HOME[0], 0, HOME[1]]}>
       <Person anim={waiterAnim.current} shirt="#ffffff" pants="#1d1d1f" apron="#1d1d1f" seed={7} />
-      {carrying && <group position={[0, 1.12, 0.42]}><Tray>{tableFood(0)}</Tray></group>}
+      <NameTag name="Khánh" role="Phục vụ" />
+      {carrying && <group position={[0, 1.12, 0.42]}><Tray><TrayLoad order={order} /></Tray></group>}
     </group>
-    {served && t && <group position={[t.x, TABLE_TOP, t.z]} rotation={[0, playerSide > 0 ? 0 : Math.PI, 0]}>{tableFood(eatProgress)}</group>}
+    {served && t && <group position={[t.x, TABLE_TOP, t.z]} rotation={[0, playerSide > 0 ? 0 : Math.PI, 0]}><TableSpread order={order} progress={phase === 'finished' ? 1 : eatProgress} inHand={inHand} /></group>}
   </group>;
 }
