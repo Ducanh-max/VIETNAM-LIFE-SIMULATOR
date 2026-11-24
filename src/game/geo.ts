@@ -174,6 +174,15 @@ function distanceField() {
   }
   return (field = { x0, z0, cell, nx, nz, values });
 }
+/** Signed distance to the lake shore (negative on the water), from the cached 3 m field. */
+export function distanceToShore([x, z]: Point): number {
+  const { x0, z0, cell, nx, nz, values } = distanceField();
+  const fx = (x - x0) / cell; const fz = (z - z0) / cell;
+  if (fx < 0 || fz < 0 || fx >= nx - 1 || fz >= nz - 1) return 200;
+  const i = Math.floor(fx); const j = Math.floor(fz); const tx = fx - i; const tz = fz - j;
+  const v = (a: number, b: number) => values[b * nx + a];
+  return (v(i, j) * (1 - tx) + v(i + 1, j) * tx) * (1 - tz) + (v(i, j + 1) * (1 - tx) + v(i + 1, j + 1) * tx) * tz;
+}
 export function streetRing(meters: number): Point[] {
   const key = Math.round(meters * 100);
   if (contourCache.has(key)) return contourCache.get(key)!;
@@ -244,7 +253,14 @@ export function registerObstacles(list: Obstacle[]) {
   obstacles.push(...list);
   return () => { for (const o of list) { const i = obstacles.indexOf(o); if (i >= 0) obstacles.splice(i, 1); } };
 }
+/** Extra walk blockers (e.g. OSM building footprints) registered by world components. */
+const blockers: ((p: Point) => boolean)[] = [];
+export function registerBlocker(test: (p: Point) => boolean) {
+  blockers.push(test);
+  return () => { const i = blockers.indexOf(test); if (i >= 0) blockers.splice(i, 1); };
+}
 function hitsObstacle([px, pz]: Point) {
+  for (const test of blockers) if (test([px, pz])) return true;
   for (const o of obstacles) {
     const dx = px - o.x;
     const dz = pz - o.z;
@@ -258,7 +274,8 @@ function hitsObstacle([px, pz]: Point) {
   return false;
 }
 
-export const WORLD_LIMIT = { x: 240, z: 420 };
+/** Walkable extent: the OSM street map covers roughly ±820 m around the lake. */
+export const WORLD_LIMIT = { x: 780, z: 780 };
 
 const templeWalk = offsetRing(templeIsland, -0.6);
 const bridgeShore = offsetRing(shore, 1.5);
@@ -266,12 +283,21 @@ const bridgeShore = offsetRing(shore, 1.5);
 export function canWalk(point: Point): boolean {
   if (Math.abs(point[0]) > WORLD_LIMIT.x || Math.abs(point[1]) > WORLD_LIMIT.z) return false;
   if (hitsObstacle(point)) return false;
-  if (!insidePolygon(point, shore)) return insidePolygon(point, buildingLine);
+  if (!insidePolygon(point, shore)) return true;
   if (insidePolygon(point, templeWalk)) return true;
   return distanceToSegment(point, bridgeEnds[0], bridgeEnds[1]) < 1.05;
 }
 
+/** Raised floors (temple platforms, steps) registered by world components; the highest wins. */
+const heightProviders: ((p: Point) => number | null)[] = [];
+export function registerHeight(provider: (p: Point) => number | null) {
+  heightProviders.push(provider);
+  return () => { const i = heightProviders.indexOf(provider); if (i >= 0) heightProviders.splice(i, 1); };
+}
 export function groundHeight(point: Point): number {
+  let raised: number | null = null;
+  for (const provider of heightProviders) { const h = provider(point); if (h !== null && (raised === null || h > raised)) raised = h; }
+  if (raised !== null) return raised;
   if (distanceToSegment(point, bridgeEnds[0], bridgeEnds[1]) < 1.6 && insidePolygon(point, bridgeShore)) {
     const t = bridgeT(point);
     return BRIDGE_DECK_BASE + Math.sin(Math.PI * t) * BRIDGE_ARCH;
@@ -281,3 +307,6 @@ export function groundHeight(point: Point): number {
 }
 
 export const mapAttribution = map.source;
+
+// Dev hook for test scripts.
+if (import.meta.env.DEV) (window as unknown as { __geo?: unknown }).__geo = { canWalk, groundHeight };

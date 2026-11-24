@@ -72,3 +72,25 @@
 @keyframes city-pulse{0%{box-shadow:0 0 0 0 #f0c27a99}70%{box-shadow:0 0 0 14px #f0c27a00}100%{box-shadow:0 0 0 0 #f0c27a00}}
 @keyframes toast-in{from{opacity:0;transform:translate(-50%,4px)}to{opacity:1;transform:translate(-50%,0)}}
 @media(max-width:900px){.entry-top{padding:16px 20px}.entry-top .vn-clock.compact{display:none}.map-screen{overflow-y:auto}.map-panel{position:relative;top:auto;left:auto;transform:none;width:auto;padding:96px 20px 0}.map-panel h1{font-size:36px;margin:14px 0 10px}.map-stage{position:relative;top:auto;left:auto;right:auto;bottom:auto;height:110vw;max-height:900px;padding:10px 10px 30px}.name-card{padding:32px 24px}}
+/* Needs HUD, prompts and the restaurant menu */
+.needs-hud{position:absolute;top:78px;right:28px;z-index:2;display:flex;flex-direction:column;gap:8px;width:220px;padding:12px 14px;background:#15302bcc;border:1px solid #ffffff22;border-right:2px solid #e4bd83;backdrop-filter:blur(10px)}
+.need{display:flex;align-items:center;gap:10px}.need-icon{font-size:18px;width:22px;text-align:center}.need-body{flex:1}
+.need-label{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.08em;color:#e0c395;margin-bottom:4px}.need-label b{font-weight:700}.need-label span{color:#f4f0e6}
+.need-track{height:7px;background:#0b1d1a;border-radius:4px;overflow:hidden}.need-track i{display:block;height:100%;border-radius:4px;transition:width .4s}
+.need.low .need-label span{color:#ff8a7a}.need.low .need-track{animation:need-blink 1s infinite}
+@keyframes need-blink{50%{box-shadow:0 0 0 2px #ff5a4a88}}
+.wallet{display:flex;justify-content:space-between;align-items:baseline;padding-top:7px;border-top:1px solid #ffffff1c;font-size:10px;letter-spacing:.1em;color:#e0c395}.wallet strong{font-size:15px;color:#fff;letter-spacing:0}
+.action-prompt{position:absolute;left:50%;bottom:118px;transform:translateX(-50%);z-index:2;display:flex;align-items:center;gap:10px;padding:10px 16px;background:#102622e6;border:1px solid #e6bd8377;color:#fff;font-size:13px;font-weight:600;white-space:nowrap;box-shadow:0 10px 30px #0006}
+.action-prompt kbd{font-family:inherit;font-size:12px;font-weight:800;padding:4px 9px;background:#e6bd83;color:#1e2824;border-radius:3px}
+.eat-bar{position:absolute;left:50%;bottom:170px;transform:translateX(-50%);z-index:2;width:260px;text-align:center;font-size:11px;letter-spacing:.12em;color:#f2d7a6}.eat-bar div{margin-top:6px;height:8px;background:#0b1d1acc;border-radius:5px;overflow:hidden}.eat-bar i{display:block;height:100%;background:linear-gradient(90deg,#e0892f,#f2c14e)}
+.game-toast{position:absolute;top:130px;left:50%;transform:translateX(-50%);z-index:3;max-width:min(560px,calc(100% - 40px));padding:11px 18px;background:#f4f0e6;color:#1e2824;font-size:13px;font-weight:600;line-height:1.5;text-align:center;box-shadow:0 14px 40px #0008;animation:toast-in .25s ease-out}
+.menu-card{width:min(620px,calc(100% - 30px))}.menu-card h2{color:#ffe08a}
+.menu-list{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.menu-list li{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:14px;padding:12px 14px;background:#102522;border:1px solid #ffffff18}
+.menu-list li.signature{background:linear-gradient(90deg,#4a1a12,#2a1c14);border-color:#e6bd8388}
+.menu-info strong{display:flex;align-items:center;gap:8px;font-size:15px}.menu-info strong em{font-style:normal;font-size:9px;letter-spacing:.12em;padding:2px 6px;background:#e6bd83;color:#2a1c14}
+.menu-info small{display:block;font-size:11px;color:#bccbc2;margin-top:3px;line-height:1.4}.menu-info .menu-effect{color:#8fd19e}
+.menu-price{font-weight:800;color:#ffd77a;font-size:14px;white-space:nowrap}
+.qty{display:flex;align-items:center;gap:8px}.qty button{width:28px;height:28px;border:1px solid #e6bd8377;background:#18332e;color:#fff;font-size:16px;line-height:1}.qty button:hover{background:#25433b}.qty b{min-width:16px;text-align:center}
+.menu-total{display:flex;justify-content:space-between;align-items:baseline;margin-top:16px;padding-top:12px;border-top:1px solid #ffffff22;font-size:12px;color:#c7d1cb}.menu-total small{color:#9fb0a8}.menu-total strong{font-size:22px;color:#fff}
+@media(max-width:700px){.needs-hud{top:auto;bottom:62px;right:15px;width:180px}.action-prompt{bottom:150px}}

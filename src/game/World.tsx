@@ -5,7 +5,10 @@ import * as THREE from 'three';
 import type { Point } from './geo';
 import { Player } from './Player';
 import { TheHucBridge } from './world/Bridge';
-import { City } from './world/City';
+import { OsmBuildings } from './world/OsmBuildings';
+import { Restaurant } from './world/Restaurant';
+import { Streets } from './world/Streets';
+import { NgocSonApproach } from './world/ThapBut';
 import { Lakeside, type TimeOfDay } from './world/Lakeside';
 import { materials } from './world/materials';
 import { NgocSonIsland } from './world/NgocSon';
@@ -61,10 +64,13 @@ export function World({ time, quality, paused, freeCamera, onFps, onPosition }: 
     <hemisphereLight args={[cfg.sky, cfg.ground, cfg.hemi]} />
     <Sun time={time} shadow={q.shadow} focus={focus} />
     <Lakeside time={time} reflections={q.reflections} sun={sunVector} />
-    <City />
+    <Streets />
+    <OsmBuildings />
+    <Restaurant paused={paused} />
     <TheHucBridge />
     <TurtleIsland />
     <NgocSonIsland />
+    <NgocSonApproach />
     <Player paused={paused} freeCamera={freeCamera} onFps={onFps} onPosition={onPosition} focus={focus} />
   </>;
 }

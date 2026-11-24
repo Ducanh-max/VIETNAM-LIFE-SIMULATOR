@@ -2,15 +2,27 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { bridgeEnds, canWalk, groundHeight, type Point } from './geo';
+import { game, player, tickNeeds } from './state';
 
 /** Simple stylised Hà Nội resident: white shirt, dark trousers, animated limbs. */
-function Character({ speed }: { speed: { current: number } }) {
+function Character({ speed, sitting }: { speed: { current: number }; sitting: { current: boolean } }) {
   const legs = [useRef<THREE.Group>(null), useRef<THREE.Group>(null)];
   const arms = [useRef<THREE.Group>(null), useRef<THREE.Group>(null)];
   const body = useRef<THREE.Group>(null);
   const phase = useRef(0);
-  useFrame((_, dt) => {
+useFrame((_, dt) => {
     phase.current += dt * (4 + speed.current * 1.25);
+    if (sitting.current) {
+      // Seated on a low plastic stool: thighs forward, shins down, one hand bringing food to the mouth while eating.
+      const eating = game.get().phase === 'eating';
+      const bite = eating ? (Math.sin(phase.current * 1.6) * 0.5 + 0.5) : 0;
+      legs[0].current?.rotation.set(-1.35, 0, 0.08);
+      legs[1].current?.rotation.set(-1.35, 0, -0.08);
+      arms[0].current?.rotation.set(-0.9 - bite * 0.9, 0, 0.15);
+      arms[1].current?.rotation.set(-0.7, 0, -0.1);
+      if (body.current) body.current.position.y = -0.52;
+      return;
+    }
     const swing = Math.min(1, speed.current / 5) * Math.sin(phase.current) * 0.6;
     legs[0].current?.rotation.set(swing, 0, 0);
     legs[1].current?.rotation.set(-swing, 0, 0);
@@ -44,7 +56,8 @@ export type PlayerProps = { paused: boolean; freeCamera: boolean; onFps: (fps: n
  * to orbit, wheel to zoom, V toggles a free drone camera.
  */
 export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerProps) {
-  const { camera, gl } = useThree();
+  const { camera, gl, scene } = useThree();
+  if (import.meta.env.DEV) (window as unknown as { __vlScene?: THREE.Scene }).__vlScene = scene;
   const start = bridgeEnds[0];
   const away = new THREE.Vector2(start[0] - bridgeEnds[1][0], start[1] - bridgeEnds[1][1]).normalize();
   const position = useRef(new THREE.Vector3(start[0] + away.x * 7, 0.32, start[1] + away.y * 7));
@@ -58,8 +71,14 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
   const drone = useRef(new THREE.Vector3());
   const fps = useRef({ time: 0, frames: 0 });
   const dragging = useRef(false);
+  const sitting = useRef(false);
+  const seatYaw = useRef(0);
 
   useEffect(() => { if (freeCamera) drone.current.copy(camera.position); }, [freeCamera, camera]);
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    (window as unknown as { __vlTeleport?: (x: number, z: number, yaw?: number) => void }).__vlTeleport = (x, z, y) => { position.current.set(x, groundHeight([x, z]), z); if (y !== undefined) yaw.current = y; };
+  }, []);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
@@ -115,6 +134,29 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
       if (debugCam) { camera.position.set(debugCam[0], debugCam[1], debugCam[2]); camera.lookAt(debugCam[3], debugCam[4], debugCam[5]); focus.set(debugCam[3], 0, debugCam[5]); return; }
     }
     const k = keys.current;
+    // Seated at a restaurant table: avatar on the stool, camera orbits a close-up of the food.
+    const seat = player.seat;
+    if (seat) {
+      // Start from a three-quarter view across the table so the dishes, not the avatar's back, fill the frame.
+      if (!sitting.current) { sitting.current = true; seatYaw.current = seat.facing + 0.6 - yaw.current; pitch.current = 0.45; distance.current = 7.5; }
+      if (!paused && k.has('ArrowLeft')) seatYaw.current += 1.2 * dt;
+      if (!paused && k.has('ArrowRight')) seatYaw.current -= 1.2 * dt;
+      velocity.current.set(0, 0, 0);
+      speed.current = 0;
+      position.current.copy(seat.position);
+      if (avatar.current) { avatar.current.position.copy(seat.position); avatar.current.rotation.y = seat.facing; }
+      // Mouse look (yaw) and arrows both orbit the camera around the dishes.
+      const orbit = seatYaw.current + yaw.current;
+      const r = THREE.MathUtils.clamp(distance.current * 0.14, 0.6, 3.4);
+      const eye = new THREE.Vector3(seat.look.x + Math.sin(orbit) * r, seat.look.y + 0.2 + Math.max(0, pitch.current) * 1.5, seat.look.z + Math.cos(orbit) * r);
+      camera.position.lerp(eye, 1 - Math.exp(-6 * dt));
+      camera.lookAt(seat.look);
+      focus.copy(seat.look);
+      player.position.copy(position.current);
+      if (!paused) tickNeeds(dt, false, false);
+      return;
+    }
+    if (sitting.current) { sitting.current = false; }
     if (!paused) {
       if (k.has('ArrowLeft')) yaw.current += 1.8 * dt;
       if (k.has('ArrowRight')) yaw.current -= 1.8 * dt;
@@ -131,7 +173,9 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
       if (k.has('KeyA')) input.sub(right);
     }
     if (input.lengthSq()) input.normalize();
-    const running = k.has('ShiftLeft') || k.has('ShiftRight');
+    const { hunger, thirst } = game.get();
+    const exhausted = hunger <= 0 || thirst <= 0;
+    const running = (k.has('ShiftLeft') || k.has('ShiftRight')) && !exhausted;
 
     if (freeCamera) {
       const s = (running ? 45 : 18) * dt;
@@ -148,7 +192,7 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
     }
 
     // Smooth acceleration so movement does not feel twitchy.
-    const target = input.multiplyScalar(running ? 8.5 : 4.2);
+    const target = input.multiplyScalar(running ? 8.5 : exhausted ? 2.4 : 4.2);
     velocity.current.lerp(target, 1 - Math.exp(-10 * dt));
     speed.current = velocity.current.length();
     const p = position.current;
@@ -168,12 +212,16 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
       }
     }
     focus.copy(p);
+    player.position.copy(p);
+    player.yaw = yaw.current;
+    if (!paused) tickNeeds(dt, running && speed.current > 1, speed.current > 0.5);
+    const dist = Math.min(distance.current, player.cameraMax);
     const desired = p.clone()
-      .addScaledVector(forward, -Math.cos(pitch.current) * distance.current)
-      .add(new THREE.Vector3(0, 1.6 + Math.sin(pitch.current) * distance.current, 0));
+      .addScaledVector(forward, -Math.cos(pitch.current) * dist)
+      .add(new THREE.Vector3(0, 1.6 + Math.sin(pitch.current) * dist, 0));
     camera.position.lerp(desired, 1 - Math.exp(-8 * dt));
     camera.lookAt(p.x, p.y + 1.5, p.z);
   });
 
-  return <group ref={avatar} position={position.current.toArray()}><Character speed={speed} /></group>;
+  return <group ref={avatar} position={position.current.toArray()}><Character speed={speed} sitting={sitting} /></group>;
 }

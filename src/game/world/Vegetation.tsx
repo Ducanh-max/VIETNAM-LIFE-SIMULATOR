@@ -8,11 +8,11 @@ export type TreeKind = 'shade' | 'willow' | 'blossom' | 'banyan';
 export type Tree = { x: number; z: number; y?: number; scale?: number; kind: TreeKind };
 
 /** Canopy blob: a few merged, slightly squashed icosahedra so silhouettes are not perfect spheres. */
-function canopyGeometry(seed: number) {
+function canopyGeometry(seed: number, low = false) {
   const r = rng(seed);
   const parts: THREE.BufferGeometry[] = [];
-  for (let i = 0; i < 6; i++) {
-    const g = new THREE.IcosahedronGeometry(0.45 + r() * 0.3, 1);
+  for (let i = 0; i < (low ? 4 : 6); i++) {
+    const g = new THREE.IcosahedronGeometry(0.45 + r() * 0.3, low ? 0 : 1);
     g.scale(1, 0.75 + r() * 0.2, 1);
     g.translate((r() - 0.5) * 0.9, (r() - 0.3) * 0.5, (r() - 0.5) * 0.9);
     parts.push(g.toNonIndexed());
@@ -48,10 +48,11 @@ strandGeometry.translate(0, -0.5, 0);
  * All lakeside trees in a handful of draw calls: trunks, two canopy shapes and
  * willow strands are each one InstancedMesh, tinted per instance.
  */
-export function Trees({ trees, seed = 1 }: { trees: Tree[]; seed?: number }) {
+/** low uses ~80-triangle canopies for the thousands of street and garden trees away from the lake. */
+export function Trees({ trees, seed = 1, low = false }: { trees: Tree[]; seed?: number; low?: boolean }) {
   const m = materials();
-  const canopyA = useMemo(() => canopyGeometry(seed * 3 + 1), [seed]);
-  const canopyB = useMemo(() => canopyGeometry(seed * 3 + 2), [seed]);
+  const canopyA = useMemo(() => canopyGeometry(seed * 3 + 1, low), [seed, low]);
+  const canopyB = useMemo(() => canopyGeometry(seed * 3 + 2, low), [seed, low]);
   const data = useMemo(() => {
     const r = rng(seed * 97 + 5);
     const trunks: THREE.Matrix4[] = [];

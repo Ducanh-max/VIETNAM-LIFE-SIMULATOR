@@ -3,12 +3,13 @@ import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { Water } from 'three/examples/jsm/objects/Water.js';
 import {
-  bridgeEnds, BUILDING_LINE, buildingLine, distanceToSegment, promenadeEdge, streetRing, GROUND_HEIGHT, offsetRing, roadInner, roadOuter, sampleRing, shore,
+  bridgeEnds, distanceToSegment, promenadeEdge, streetRing, GROUND_HEIGHT, offsetRing, roadInner, sampleRing, shore,
   templeIsland, turtleIsland, type Point,
 } from '../geo';
 import { Instances, trs, unitBox } from './Instances';
 import { materials } from './materials';
-import { asphaltTexture, grassTexture, pavingTexture, rng, waterNormals } from './textures';
+import { roadClearance } from '../osm';
+import { grassTexture, pavingTexture, rng, waterNormals } from './textures';
 import { Trees, type Tree } from './Vegetation';
 
 export type TimeOfDay = 'day' | 'sunset' | 'night';
@@ -91,37 +92,31 @@ function Lake({ reflections, time, sun }: { reflections: boolean; time: TimeOfDa
   </>;
 }
 
-/** Lake wall, promenade, green verge, the ring road and the outer pavement. */
+/** Lake wall, promenade and green verge; the streets beyond come from OpenStreetMap (Streets.tsx). */
 function Ground() {
   const m = materials();
   const mats = useMemo(() => ({
     paving: new THREE.MeshStandardMaterial({ map: repeated(pavingTexture(), 1 / 3, 1 / 3), roughness: 0.9 }),
     sidewalk: new THREE.MeshStandardMaterial({ map: repeated(pavingTexture(), 1 / 3, 1 / 3), color: '#d8d2c8', roughness: 0.9 }),
     grass: new THREE.MeshStandardMaterial({ map: repeated(grassTexture(), 1 / 6, 1 / 6), roughness: 0.95 }),
-    asphalt: new THREE.MeshStandardMaterial({ map: repeated(asphaltTexture(), 1 / 6, 1 / 6), roughness: 0.92 }),
     granite: m.granite,
     curb: new THREE.MeshStandardMaterial({ color: '#b9b4a8', roughness: 0.85 }),
-    line: new THREE.MeshStandardMaterial({ color: '#f0ece0', roughness: 0.7 }),
     outer: new THREE.MeshStandardMaterial({ map: repeated(pavingTexture(), 1 / 3, 1 / 3), color: '#bdb6aa', roughness: 0.95 }),
   }), [m.granite]);
   const geometry = useMemo(() => {
     const coping = offsetRing(shore, 0.55);
     const verge = promenadeEdge;
-    const sidewalkOuter = buildingLine;
     return {
       wall: wallRibbon(shore, -1.2, GROUND_HEIGHT + 0.12),
       coping: ringBand(shore, coping, GROUND_HEIGHT + 0.12),
       promenade: ringBand(coping, verge, GROUND_HEIGHT),
       grass: ringBand(verge, roadInner, GROUND_HEIGHT + 0.02),
-      road: ringBand(roadInner, roadOuter, GROUND_HEIGHT - 0.12),
-      curbIn: wallRibbon(roadInner, GROUND_HEIGHT - 0.12, GROUND_HEIGHT + 0.02),
-      curbOut: wallRibbon(roadOuter, GROUND_HEIGHT - 0.12, GROUND_HEIGHT),
-      sidewalk: ringBand(roadOuter, sidewalkOuter, GROUND_HEIGHT),
+      curbIn: wallRibbon(roadInner, GROUND_HEIGHT - 0.05, GROUND_HEIGHT + 0.02),
     };
   }, []);
   const outerGround = useMemo(() => {
     const shape = new THREE.Shape([new THREE.Vector2(-700, -800), new THREE.Vector2(700, -800), new THREE.Vector2(700, 800), new THREE.Vector2(-700, 800)]);
-    shape.holes.push(new THREE.Path(streetRing(BUILDING_LINE - 0.3).map(([x, z]) => new THREE.Vector2(x, -z))));
+    shape.holes.push(new THREE.Path(streetRing(12 - 0.3).map(([x, z]) => new THREE.Vector2(x, -z))));
     const g = new THREE.ShapeGeometry(shape, 1);
     g.rotateX(-Math.PI / 2);
     const uv = g.getAttribute('uv');
@@ -129,21 +124,13 @@ function Ground() {
     for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i), pos.getZ(i));
     return g;
   }, []);
-  const dashes = useMemo(() => {
-    const middle = streetRing(18);
-    return sampleRing(middle, 6).map(({ point, angle }) => trs(point[0], GROUND_HEIGHT - 0.1, point[1], -angle, 3, 0.02, 0.15));
-  }, []);
   return <group>
     <mesh geometry={geometry.wall} material={mats.granite} receiveShadow />
     <mesh geometry={geometry.coping} material={mats.curb} receiveShadow />
     <mesh geometry={geometry.promenade} material={mats.paving} receiveShadow />
     <mesh geometry={geometry.grass} material={mats.grass} receiveShadow />
-    <mesh geometry={geometry.road} material={mats.asphalt} receiveShadow />
     <mesh geometry={geometry.curbIn} material={mats.curb} />
-    <mesh geometry={geometry.curbOut} material={mats.curb} />
-    <mesh geometry={geometry.sidewalk} material={mats.sidewalk} receiveShadow />
-    <Instances geometry={unitBox} material={mats.line} matrices={dashes} castShadow={false} />
-    {/* city ground beyond the buildings */}
+    {/* pavement under the whole district; OSM roads and buildings sit on top */}
     <mesh geometry={outerGround} position={[0, GROUND_HEIGHT - 0.02, 0]} receiveShadow><primitive object={mats.outer} attach="material" /></mesh>
   </group>;
 }
@@ -156,7 +143,7 @@ function StreetLife({ time }: { time: TimeOfDay }) {
     const list: Tree[] = [];
     const nearBridge = (p: Point) => distanceToSegment(p, bridgeEnds[0], [bridgeEnds[0][0] + (bridgeEnds[0][0] - bridgeEnds[1][0]) * 0.4, bridgeEnds[0][1] + (bridgeEnds[0][1] - bridgeEnds[1][1]) * 0.4]) < 7;
     for (const { point } of sampleRing(offsetRing(shore, 1.6), 17)) if (!nearBridge(point) && r() < 0.85) list.push({ x: point[0] + (r() - 0.5), z: point[1] + (r() - 0.5), y: GROUND_HEIGHT, kind: 'willow', scale: 0.9 + r() * 0.3 });
-    for (const { point } of sampleRing(streetRing(10.5), 11)) if (!nearBridge(point)) list.push({ x: point[0], z: point[1], y: GROUND_HEIGHT, kind: r() < 0.12 ? 'blossom' : r() < 0.2 ? 'banyan' : 'shade', scale: 0.9 + r() * 0.35 });
+    for (const { point } of sampleRing(streetRing(10.5), 11)) if (!nearBridge(point) && roadClearance(point) > 1.5) list.push({ x: point[0], z: point[1], y: GROUND_HEIGHT, kind: r() < 0.12 ? 'blossom' : r() < 0.2 ? 'banyan' : 'shade', scale: 0.9 + r() * 0.35 });
     const pole: THREE.Matrix4[] = [];
     const lamp: THREE.Matrix4[] = [];
     for (const { point } of sampleRing(offsetRing(shore, 4.2), 22)) {

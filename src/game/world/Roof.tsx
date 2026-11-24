@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+﻿import { useMemo } from 'react';
 import * as THREE from 'three';
 import { materials } from './materials';
-import { cornerCurlGeometry, curvedRoofGeometry, ridgeDragonGeometry } from './roof';
+import { cornerCurlGeometry, curvedRoofGeometry, ridgeDragonGeometry } from './roofGeometry';
 
 /** A complete tiled roof: curved surface, ridge beam, corner curls and ridge dragons. */
 export function Roof({ width, depth, rise, y = 0, ridge, curl = 0.7, dragons = true, pearl = false }: {

@@ -1,10 +1,11 @@
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
-import { bridgeEnds, insidePolygon, ISLAND_HEIGHT, offsetRing, registerObstacles, sampleRing, templeCenter, templeIsland, type Obstacle, type Point } from '../geo';
+import { bridgeEnds, insidePolygon, ISLAND_HEIGHT, offsetRing, registerHeight, registerObstacles, sampleRing, templeCenter, templeIsland, type Obstacle, type Point } from '../geo';
 import { Instances, trs, unitBox } from './Instances';
 import { materials } from './materials';
 import { Roof } from './Roof';
 import { grassTexture, limeStoneTexture, pavingTexture, plaqueTexture, rng } from './textures';
+import { Altar, DrumAndBell, Lantern, PLATFORM, Shrine, TempleHall, TurtleSpecimen } from './TempleInterior';
 import { Trees, type Tree } from './Vegetation';
 
 /** Temple axis: origin at the bridge landing, local +X points into the temple. */
@@ -17,34 +18,6 @@ function toWorld(x: number, z: number): Point {
   return [landing[0] + x * c - z * s, landing[1] + x * s + z * c];
 }
 
-/** Red timber hall on a stone platform: front colonnade, lattice walls and a curved tiled roof. */
-function Hall({ x, z = 0, width, depth, height, roofRise = 2.4, double = false, label }: { x: number; z?: number; width: number; depth: number; height: number; roofRise?: number; double?: boolean; label?: string }) {
-  const m = materials();
-  const plaque = useMemo(() => label ? new THREE.MeshStandardMaterial({ map: plaqueTexture(label), roughness: 0.5 }) : null, [label]);
-  const columns = useMemo(() => {
-    const list: THREE.Matrix4[] = [];
-    const n = Math.max(4, Math.round(width / 2.2));
-    for (let i = 0; i <= n; i++) for (const row of [-1, 1]) list.push(trs(row * (depth / 2 + 0.7), 0.5 + height / 2, -width / 2 + (width * i) / n, 0, 0.36, height, 0.36));
-    return list;
-  }, [width, depth, height]);
-  return <group position={[x, 0, z]}>
-    <mesh position={[0, 0.25, 0]} castShadow receiveShadow><boxGeometry args={[depth + 2.6, 0.5, width + 1.4]} /><primitive object={m.warmStone} attach="material" /></mesh>
-    <mesh position={[0, 0.5 + height / 2, 0]} castShadow receiveShadow material={[m.lattice, m.lattice, m.darkRed, m.darkRed, m.darkRed, m.darkRed]}>
-      <boxGeometry args={[depth, height, width]} />
-    </mesh>
-    <Instances geometry={columnGeometry} material={m.red} matrices={columns} />
-    {/* beams over the colonnade */}
-    {[-1, 1].map((row) => <mesh key={row} position={[row * (depth / 2 + 0.7), 0.5 + height + 0.1, 0]} castShadow><boxGeometry args={[0.4, 0.35, width + 0.4]} /><primitive object={m.darkRed} attach="material" /></mesh>)}
-    <group rotation={[0, Math.PI / 2, 0]}>
-      {double && <Roof width={width + 3.4} depth={depth + 4.2} rise={0.7} y={0.5 + height + 0.25} ridge={width * 0.9} curl={0.55} dragons={false} />}
-      <Roof width={width + 2.6} depth={depth + 3.4} rise={roofRise} y={0.5 + height + (double ? 1.2 : 0.3)} ridge={width * 0.6} curl={0.75} pearl />
-      {double && <mesh position={[0, 0.5 + height + 0.75, 0]} castShadow material={[m.darkRed, m.darkRed, m.darkRed, m.darkRed, m.lattice, m.lattice]}><boxGeometry args={[width - 0.6, 0.9, depth - 0.6]} /></mesh>}
-    </group>
-    {plaque && <mesh position={[-(depth / 2 + 0.02), 0.5 + height - 0.55, 0]} rotation={[0, -Math.PI / 2, 0]}><planeGeometry args={[Math.min(4, width * 0.4), 1]} /><primitive object={plaque} attach="material" /></mesh>}
-  </group>;
-}
-
-const columnGeometry = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
 
 /** Đắc Nguyệt Lầu style entrance: stone gatehouse with an arched door, a name plaque, couplets, two-tier roof and red side wings. */
 function Gate({ x }: { x: number }) {
@@ -183,11 +156,21 @@ export function NgocSonIsland() {
     const local: [number, number, number, number][] = [
       [4.2, -2.25, 1.6, 1.0], [4.2, 2.25, 1.6, 1.0], // gate piers either side of the door
       [5.0, -6.6, 1.8, 3.0], [5.0, 6.6, 1.8, 3.0], // side wings
-      [18, 0, 3.4, 7.5], [24.5, 0, 3.4, 7.5], [31, 0, 3.0, 6.0], // halls
+      ...HALLS.flatMap(hallWalls), // hall walls (the halls themselves are walk-in)
+      [18 + 1.4, 0, 0.55, 1.5], [18, -5.0, 0.5, 1.9], // Bái đường altar, drum and bell
+      [24.5, 4.6, 1.4, 0.85], // turtle specimen case
+      [31 + 1.2, 0, 0.85, 1.85], [31 - 0.5, 0, 0.55, 1.5], // Hậu cung shrine and altar
       [10, 9.5, 2.0, 2.0], // pavilion
     ];
     const list: Obstacle[] = local.map(([x, z, hx, hz]) => { const [wx, wz] = toWorld(x, z); return { x: wx, z: wz, hx, hz, angle: rotationY }; });
-    return registerObstacles(list);
+    const unregister = registerObstacles(list);
+    // Hall platforms raise the floor so the player walks up into the halls.
+    const unheight = registerHeight((p) => {
+      const [lx, lz] = toLocal(p);
+      for (const h of HALLS) if (Math.abs(lx - h.x) < h.depth / 2 + 1.3 && Math.abs(lz) < h.width / 2 + 0.7) return ISLAND_HEIGHT + PLATFORM;
+      return null;
+    });
+    return () => { unregister(); unheight(); };
   }, []);
   return <group>
     <IslandGround />
@@ -197,9 +180,24 @@ export function NgocSonIsland() {
       <BannerPole x={1.8} z={-4.6} />
       <BannerPole x={1.8} z={4.6} />
       <Pavilion x={10} z={9.5} />
-      <Hall x={18} width={14} depth={5.6} height={3.4} label="Ngọc Sơn Từ" />
-      <Hall x={24.5} width={14} depth={5.6} height={3.6} double />
-      <Hall x={31} width={11} depth={5} height={3.2} />
+      {/* Bái đường (front hall): name board, couplets, altar with crane pair, drum and bell */}
+      <TempleHall {...HALLS[0]} label="Ngọc Sơn Từ" couplet={['文章千古在', '山水一廳中']} openBack>
+        <group position={[1.4, PLATFORM, 0]}><Altar /></group>
+        <group position={[0, PLATFORM, -5.0]}><DrumAndBell /></group>
+        {[-1.6, 0, 1.6].map((x) => <group key={x} position={[x, PLATFORM + 3.0, 0]}><Lantern /></group>)}
+        <pointLight position={[0, PLATFORM + 2.6, 0]} color="#ffbe7a" intensity={6} distance={11} decay={1.6} />
+      </TempleHall>
+      {/* Trung đường (middle hall, double roof): the preserved Hồ Gươm turtle */}
+      <TempleHall {...HALLS[1]} double openBack>
+        <group position={[0, PLATFORM, 4.6]}><TurtleSpecimen /></group>
+        {[-4, 4].map((z) => <group key={z} position={[0, PLATFORM + 3.2, z]}><Lantern /></group>)}
+      </TempleHall>
+      {/* Hậu cung (rear sanctuary): gilded shrine with seated statues behind the main altar */}
+      <TempleHall {...HALLS[2]}>
+        <group position={[1.2, PLATFORM, 0]}><Shrine /></group>
+        <group position={[-0.5, PLATFORM, 0]}><Altar width={2.0} /></group>
+        <pointLight position={[-0.4, PLATFORM + 2.4, 0]} color="#ffb067" intensity={5} distance={9} decay={1.6} />
+      </TempleHall>
       {/* incense burner in the courtyard */}
       <mesh position={[11.5, 0.6, 0]} castShadow><cylinderGeometry args={[0.55, 0.45, 1.2, 12]} /><meshStandardMaterial color="#5b4a32" metalness={0.6} roughness={0.4} /></mesh>
       <Instances geometry={unitBox} material={materials().warmStone} matrices={courtyardWall} />
@@ -207,7 +205,33 @@ export function NgocSonIsland() {
   </group>;
 }
 
+/** Walk-in halls on the temple axis (local x), front toward the gate. */
+const HALLS = [
+  { x: 18, width: 14, depth: 5.6, height: 3.4 },
+  { x: 24.5, width: 14, depth: 5.6, height: 3.6 },
+  { x: 31, width: 11, depth: 5, height: 3.2 },
+];
+/** Side walls and the solid bays of the front/back walls, as [x, z, hx, hz] in temple coordinates. */
+function hallWalls(h: typeof HALLS[number], i: number): [number, number, number, number][] {
+  const walls: [number, number, number, number][] = [[h.x, -h.width / 2, h.depth / 2, 0.15], [h.x, h.width / 2, h.depth / 2, 0.15]];
+  const frontOpen = (h.width / 5) * 3;
+  const backOpen = i < 2 ? 3.0 : 0;
+  for (const [x, open] of [[h.x - h.depth / 2, frontOpen], [h.x + h.depth / 2, backOpen]]) {
+    const solid = (h.width - open) / 2;
+    for (const s of [-1, 1]) walls.push([x, s * (open / 2 + solid / 2), 0.15, solid / 2]);
+  }
+  return walls;
+}
+function toLocal([wx, wz]: Point): Point {
+  const dx = wx - landing[0]; const dz = wz - landing[1];
+  const c = Math.cos(axisAngle); const s = Math.sin(axisAngle);
+  return [dx * c + dz * s, -dx * s + dz * c];
+}
+
 /** Low perimeter wall around the courtyard. */
 const courtyardWall: THREE.Matrix4[] = [
   trs(20, 0.45, -11, 0, 26, 0.9, 0.35), trs(20, 0.45, 11, 0, 26, 0.9, 0.35),
 ];
+
+// Dev hook for screenshot scripts.
+if (import.meta.env.DEV) (window as unknown as { __temple?: unknown }).__temple = { toWorld };
