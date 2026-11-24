@@ -1,6 +1,7 @@
 import { distanceToShore, type Point } from './geo';
 import { pickupPoint } from './job';
 import { insideBuilding, roadClearance } from './osm';
+import { taxi } from './ride';
 import { game, player } from './state';
 
 /*
@@ -133,11 +134,12 @@ function distToRoute(p: Point, r: Point[]) {
 /** Call a few times a second. */
 export function updateNav() {
   const job = game.get().job;
-  const target = !job ? null : job.stage === 'deliver' && job.delivery ? { ...job.delivery.dest, label: job.delivery.customer } : { ...pickupPoint(), label: 'Quán Bún chả Đức Anh' };
+  const ride = game.get().ride;
+  const target = ride ? (ride.stage === 'riding' ? { x: ride.dest.x, z: ride.dest.z, label: ride.dest.name } : { x: taxi.position.x, z: taxi.position.z, label: `Xe Đen SM · ${ride.driver}` }) : !job ? null : job.stage === 'deliver' && job.delivery ? { ...job.delivery.dest, label: job.delivery.customer } : { ...pickupPoint(), label: 'Quán Bún chả Đức Anh' };
   nav.target = target;
   if (!target) { nav.route = null; nav.length = 0; nav.lastTarget = ''; return; }
   const from: Point = [player.position.x, player.position.z];
-  const key = `${target.x.toFixed(1)},${target.z.toFixed(1)}`;
+  const key = `${Math.round(target.x / 12)},${Math.round(target.z / 12)}`; // a moving target (the Đen SM driver) only reroutes every ~12 m
   const strayed = nav.route ? distToRoute(from, nav.route) > 10 : true;
   if (key !== nav.lastTarget || strayed) {
     nav.route = findRoute(from, [target.x, target.z]);

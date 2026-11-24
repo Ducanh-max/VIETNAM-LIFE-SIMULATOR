@@ -163,3 +163,36 @@
 .phone-homebar button{width:120px;height:5px;border-radius:3px;border:0;background:#1d2622aa}
 .phone-home + .phone-homebar button{background:#ffffffcc}
 @media(max-width:900px){.phone{right:50%;transform:translate(50%,-50%);animation:none}.minimap{width:140px;height:140px;bottom:96px;right:15px}}
+/* Phone: order actions and Đen SM */
+.order-actions{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.order-actions button,.den-trip .danger-outline{padding:11px 14px;border-radius:12px;font-weight:700;font-size:13px}
+.danger{border:0;background:#e5372a;color:#fff}
+.danger-outline{border:1.5px solid #e5372a;background:#fff;color:#e5372a}
+.confirm-box{padding:12px;border-radius:14px;background:#fff;box-shadow:0 2px 12px #0002}
+.confirm-box p{margin:0 0 10px;font-size:12.5px;line-height:1.5;color:#3c4440}
+.confirm-box div{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.confirm-box button{padding:10px;border-radius:10px;border:1px solid #d9d4ca;background:#f6f4ef;font-weight:700}
+.confirm-box button.danger{border:0;background:#e5372a;color:#fff}
+.den-app{background:#0b0b0c;color:#f2f5f3}
+.den-header{display:flex;flex-direction:column;gap:2px;margin-bottom:10px}
+.den-logo{font-size:30px;font-weight:900;letter-spacing:-.02em}.den-logo b{color:#16c784;margin-left:3px}
+.den-header small{color:#9aa39f;font-size:11px}
+.den-app h4{color:#cfd6d2}
+.den-places{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.den-places li{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:#17191b;cursor:pointer;border:1.5px solid transparent}
+.den-places li.picked{border-color:#16c784;background:#102a20}
+.den-places li div{flex:1;min-width:0}.den-places b{display:block;font-size:13px}.den-places small{font-size:10.5px;color:#9aa39f}
+.den-places em{font-style:normal;font-weight:800;font-size:12px;color:#16c784;white-space:nowrap}
+.den-book{position:sticky;bottom:0;margin-top:10px;padding:12px;border-radius:16px;background:#17191b;display:flex;flex-direction:column;gap:8px;box-shadow:0 -6px 20px #0008}
+.den-book b{font-size:14px}.den-book small{display:block;font-size:11px;color:#9aa39f}
+.den-button{border:0;border-radius:24px;padding:12px;background:#16c784;color:#0b0b0c;font-weight:900;font-size:14px}
+.den-button:disabled{opacity:.4}
+.den-note{text-align:center}
+.den-trip{display:flex;flex-direction:column;gap:10px}
+.den-status{padding:12px;border-radius:14px;background:#16c784;color:#0b0b0c;font-weight:800;font-size:14px}
+.den-driver{display:flex;gap:10px;align-items:center;padding:12px;border-radius:14px;background:#17191b}
+.den-driver b{display:block;font-size:14px}.den-driver small{display:block;font-size:11px;color:#9aa39f}
+.den-avatar{background:#16c784;color:#0b0b0c}
+.den-route,.den-fare{display:flex;flex-direction:column;gap:2px;padding:12px;border-radius:14px;background:#17191b}
+.den-route span,.den-fare span{font-size:11px;color:#9aa39f}.den-route b,.den-fare b{font-size:15px}.den-route small,.den-fare small{font-size:11px;color:#9aa39f}
+.den-fare b{color:#16c784;font-size:20px}

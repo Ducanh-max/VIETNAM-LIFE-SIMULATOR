@@ -37,10 +37,21 @@ export const jobActions = {
     game.toast('Ông chủ Đức Anh: "Tốt lắm! Xe Wave với thùng giữ nhiệt để ngoài cửa. Ra chỗ anh Đạt lấy túi bún chả nhé!"');
     pushMessage('Chú Đức Anh (chủ quán)', 'Chú gửi cháu xe Wave đỏ ở ngoài cửa quán. Mở app Bản đồ trên điện thoại để xem đường giao hàng nhé.');
   },
+  /** Drop the current order (from the phone): the customer is told, you go back for a new one. */
+  cancel() {
+    const job = game.get().job;
+    const d = job?.delivery;
+    if (!job || !d) return;
+    game.set({ job: { ...job, stage: 'pickup', delivery: null } });
+    pushMessage(d.customer, 'Ơ, đơn bún chả của mình bị huỷ rồi à? Thôi để lần sau vậy.');
+    game.toast(`Đã huỷ đơn của ${d.customer}. Về quán gặp anh Đạt nhận đơn mới nhé.`);
+  },
   quit() {
     const job = game.get().job;
+    if (bike.riding) jobActions.dismount();
     bike.riding = false;
     game.set({ job: null, dialog: null });
+    pushMessage('Chú Đức Anh (chủ quán)', job?.done ? `Cảm ơn cháu hôm nay, ${job.done} đơn là giỏi lắm. Mai lại qua nhé!` : 'Ừ, lúc nào rảnh lại qua quán làm với chú nhé.');
     game.toast(job && job.done ? `Hôm nay giao ${job.done} đơn, kiếm được ${formatVnd(job.earned)}. Cảm ơn cháu!` : 'Lúc nào rảnh cứ quay lại làm nhé!');
   },
   pickup() {

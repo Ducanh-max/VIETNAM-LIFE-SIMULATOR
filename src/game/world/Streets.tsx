@@ -95,7 +95,7 @@ function Roads() {
       if (!road.oneway && road.width >= 8 && road.kind !== 'service') {
         along(road.points, 7, 3, (p, d) => {
           if (roadClearance(p, road) < -1) return; // keep junctions clean
-          dashes.push(trs(p[0], ROAD_Y + 0.01, p[1], -Math.atan2(d[1], d[0]), 3.2, 0.02, 0.16));
+          dashes.push(trs(p[0], ROAD_Y + 0.02, p[1], -Math.atan2(d[1], d[0]), 3.2, 0.02, 0.16));
         });
       }
       // Zebra crossings at both ends of the bigger streets.
@@ -109,7 +109,7 @@ function Roads() {
           const c: Point = [a[0] + d[0] * 9, a[1] + d[1] * 9];
           const nx = -d[1], nz = d[0];
           const angle = -Math.atan2(d[1], d[0]);
-          for (let s = -half + 0.5; s <= half - 0.5; s += 1.0) zebra.push(trs(c[0] + nx * s, ROAD_Y + 0.012, c[1] + nz * s, angle, 3, 0.02, 0.5));
+          for (let s = -half + 0.5; s <= half - 0.5; s += 1.0) zebra.push(trs(c[0] + nx * s, ROAD_Y + 0.022, c[1] + nz * s, angle, 3, 0.02, 0.5));
         }
       }
     }
@@ -118,7 +118,8 @@ function Roads() {
   const mats = useMemo(() => ({
     asphalt: new THREE.MeshStandardMaterial({ map: repeated(asphaltTexture(), 1, 1), roughness: 0.92, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
     kerb: new THREE.MeshStandardMaterial({ color: '#c3bdb1', roughness: 0.85, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
-    paint: new THREE.MeshStandardMaterial({ color: '#f1eee4', roughness: 0.6 }),
+    // paint sits above the asphalt's polygon offset so stripes are never partly swallowed by an overlapping street
+    paint: new THREE.MeshStandardMaterial({ color: '#f1eee4', roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 }),
   }), []);
   return <group>
     <mesh geometry={data.kerb} material={mats.kerb} receiveShadow />

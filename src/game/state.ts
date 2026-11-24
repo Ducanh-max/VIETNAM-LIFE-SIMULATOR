@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import * as THREE from 'three';
+import type { Ride } from './ride';
 
 /** Menu of Bún chả Đức Anh. Prices in VND. */
 export type MenuId = 'buncha' | 'pepsi' | 'coca' | 'sevenup' | 'lavie';
@@ -32,6 +33,8 @@ type State = {
   toast: { text: string; id: number } | null;
   /** Mini smartphone overlay. */
   phone: boolean;
+  /** Current Đen SM ride, if any. */
+  ride: Ride | null;
   /** Wallet history (newest first) and phone messages (newest first). */
   txns: Txn[];
   messages: Message[];
@@ -48,7 +51,7 @@ function load(): Pick<State, 'hunger' | 'thirst' | 'money'> {
   return { hunger: 72, thirst: 64, money: 300_000 };
 }
 
-let state: State = { ...load(), phase: 'none', order: {}, table: -1, eatProgress: 0, prompt: null, toast: null, dialog: null, job: null, phone: false, txns: [], messages: [] };
+let state: State = { ...load(), phase: 'none', order: {}, table: -1, eatProgress: 0, prompt: null, toast: null, dialog: null, job: null, phone: false, ride: null, txns: [], messages: [] };
 
 // One-time gift of 500.000đ for existing and new saves.
 const BONUS_KEY = 'doi-viet-bonus-500k';

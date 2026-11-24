@@ -18,7 +18,9 @@ const HEAD = new THREE.Vector3(0, 0.84, 0.47); // steering head
 const FORK_LEN = Math.hypot(HEAD.y - WHEEL_R, FRONT_Z - HEAD.z);
 const RAKE = Math.atan2(FRONT_Z - HEAD.z, HEAD.y - WHEEL_R); // fork leans forward at the bottom
 /** Where the rider's hips sit (top of the seat, bike space). */
-export const SEAT = new THREE.Vector3(0, 0.82, -0.27);
+export const SEAT = new THREE.Vector3(0, 0.82, -0.33);
+/** Passenger (pillion) seat, behind the rider. */
+export const PILLION = new THREE.Vector3(0, 0.86, -0.66);
 const BAR = new THREE.Vector3(0, 0.17, -0.06); // handlebar centre in the steering (fork) frame
 
 /** Handlebar grip position in bike space for a given steering angle (side −1 = right grip). */
@@ -139,8 +141,11 @@ function Shock({ from, to }: { from: THREE.Vector3; to: THREE.Vector3 }) {
 
 export type BikePose = { position: THREE.Vector3; heading: number; steer: number; lean: number; wheel: number; riding: boolean };
 
-export function ScooterModel({ pose }: { pose: BikePose }) {
-  const m = M();
+export function ScooterModel({ pose, livery = 'shop', children }: { pose: BikePose; livery?: 'shop' | 'den'; children?: React.ReactNode }) {
+  const base = M();
+  // Đen SM bikes: gloss black body with green trim, electric (no exhaust, no delivery box)
+  const m = livery === 'den' ? { ...base, red: denMats().body, box: denMats().body } : base;
+  const den = livery === 'den';
   const root = useRef<THREE.Group>(null);
   const steerGroup = useRef<THREE.Group>(null);
   const front = useRef<THREE.Group>(null);
@@ -193,12 +198,12 @@ export function ScooterModel({ pose }: { pose: BikePose }) {
     {/* rear rack and grab rail */}
     {[-1, 1].map((s) => <mesh key={`rk${s}`} material={m.alloy} position={[s * 0.12, 0.79, -0.72]}><boxGeometry args={[0.018, 0.018, 0.34]} /></mesh>)}
     {[-0.58, -0.72, -0.86].map((z) => <mesh key={`rb${z}`} material={m.alloy} position={[0, 0.79, z]}><boxGeometry args={[0.26, 0.014, 0.014]} /></mesh>)}
-    {/* insulated delivery box */}
-    <group position={[0, 0.8 + 0.215, -0.73]}>
+    {/* insulated delivery box (shop bike) or a green Đen SM decal stripe */}
+    {den ? <>{[-1, 1].map((s) => <mesh key={`dn${s}`} material={denMats().decal} position={[s * 0.158, 0.6, -0.45]} rotation={[0, s * Math.PI / 2, 0]}><planeGeometry args={[0.42, 0.11]} /></mesh>)}</> : <group position={[0, 0.8 + 0.215, -0.73]}>
       <RoundedBox args={[0.44, 0.43, 0.42]} radius={0.04} smoothness={4} material={m.box} castShadow />
       <mesh position={[0, 0.16, 0]} material={m.black}><boxGeometry args={[0.452, 0.012, 0.432]} /></mesh>
       <mesh position={[0, 0.1, -0.215]} material={m.chrome}><boxGeometry args={[0.07, 0.03, 0.012]} /></mesh>
-    </group>
+    </group>}
     {/* engine: crankcase, finned cylinder angled forward, carburettor, kick lever */}
     <RoundedBox args={[0.25, 0.22, 0.32]} radius={0.04} smoothness={3} position={[0, 0.25, -0.08]} material={m.engine} castShadow />
     <group position={[0, 0.27, 0.12]} rotation={[1.25, 0, 0]}>
@@ -207,11 +212,13 @@ export function ScooterModel({ pose }: { pose: BikePose }) {
     </group>
     <mesh material={m.engine} position={[0.08, 0.36, 0.0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.03, 0.03, 0.08, 12]} /></mesh>
     <mesh material={m.chrome} position={[0.14, 0.24, -0.16]} rotation={[0.9, 0, 0]}><boxGeometry args={[0.015, 0.16, 0.02]} /></mesh>
-    {/* exhaust with muffler and chrome heat shield */}
+    {/* exhaust with muffler and chrome heat shield (petrol shop bike only) */}
+    {!den && <>
     <mesh geometry={geo.pipe} material={m.exhaust} />
     <mesh material={m.exhaust} position={[0.17, 0.29, -0.55]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.05, 0.045, 0.36, 18]} /></mesh>
     <mesh material={m.chrome} position={[0.185, 0.3, -0.52]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.058, 0.058, 0.24, 18, 1, true, -Math.PI * 0.15, Math.PI * 0.8]} /></mesh>
     <mesh material={m.chrome} position={[0.17, 0.29, -0.74]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.02, 0.02, 0.04, 10]} /></mesh>
+    </>}
     {/* foot pegs: rider (folded into the floor) and passenger */}
     {[-1, 1].map((s) => <mesh key={`pp${s}`} material={m.matte} position={[s * 0.19, 0.31, -0.36]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.014, 0.014, 0.09, 8]} /></mesh>)}
     {/* side stand */}
@@ -257,5 +264,21 @@ export function ScooterModel({ pose }: { pose: BikePose }) {
         </group>
       </group>
     </group>
+    {children}
   </group>;
+}
+
+let denCache: { body: THREE.Material; decal: THREE.Material } | null = null;
+function denMats() {
+  if (denCache) return denCache;
+  const decal = canvasTexture(256, 64, (ctx) => {
+    ctx.fillStyle = '#16c784'; ctx.fillRect(0, 0, 256, 64);
+    ctx.fillStyle = '#0b0b0c'; ctx.font = 'bold 40px "Be Vietnam Pro", Arial, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('Đen SM', 128, 34);
+  });
+  denCache = {
+    body: new THREE.MeshPhysicalMaterial({ color: '#111214', roughness: 0.22, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.06 }),
+    decal: new THREE.MeshStandardMaterial({ map: decal, roughness: 0.4, side: THREE.DoubleSide }),
+  };
+  return denCache;
 }

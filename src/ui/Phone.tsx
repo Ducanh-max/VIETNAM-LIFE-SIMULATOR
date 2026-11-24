@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { jobActions } from '../game/job';
 import { nav, updateNav } from '../game/navigation';
+import { fareFor, places, rideActions, taxi, type Place } from '../game/ride';
 import { formatVnd, game, player, useGame } from '../game/state';
 import { drawMap, headingUpRotation, mapBase } from './mapCanvas';
 import { useVietnamClock, VIETNAM_TZ } from './vietnamTime';
@@ -35,7 +37,7 @@ export function Minimap({ onOpen }: { onOpen: () => void }) {
   </button>;
 }
 
-type App = 'home' | 'map' | 'orders' | 'wallet' | 'messages' | 'contacts';
+type App = 'home' | 'map' | 'orders' | 'wallet' | 'messages' | 'contacts' | 'den';
 
 /** Full map app: north-up, drag to pan, wheel or buttons to zoom, follows the player until dragged. */
 function MapApp() {
@@ -83,6 +85,7 @@ function OrdersApp() {
   const job = useGame((s) => s.job);
   const txns = useGame((s) => s.txns);
   const [left, setLeft] = useState('');
+  const [confirm, setConfirm] = useState<'cancel' | 'quit' | null>(null);
   useEffect(() => {
     const id = setInterval(() => {
       const d = game.get().job?.delivery;
@@ -106,6 +109,16 @@ function OrdersApp() {
       <span>💵 Tiền ship {formatVnd(d.pay)} · giao đúng giờ được bo</span>
     </div>}
     {job && <div className="order-stats"><div><strong>{job.done}</strong><span>đơn đã giao</span></div><div><strong>{formatVnd(job.earned)}</strong><span>thu nhập hôm nay</span></div></div>}
+    {job && <div className="order-actions">
+      {confirm === null && <>
+        {d && <button className="danger-outline" onClick={() => setConfirm('cancel')}>Huỷ đơn này</button>}
+        <button className="danger" onClick={() => setConfirm('quit')}>Nghỉ việc shipper</button>
+      </>}
+      {confirm && <div className="confirm-box">
+        <p>{confirm === 'cancel' ? `Huỷ đơn của ${d?.customer}? Khách sẽ không nhận được hàng và bạn không được trả tiền ship.` : `Nghỉ việc hôm nay? Xe Wave sẽ được trả lại quán. Bạn đã giao ${job.done} đơn, kiếm ${formatVnd(job.earned)}.`}</p>
+        <div><button onClick={() => setConfirm(null)}>Không</button><button className="danger" onClick={() => { if (confirm === 'cancel') jobActions.cancel(); else jobActions.quit(); setConfirm(null); }}>{confirm === 'cancel' ? 'Huỷ đơn' : 'Nghỉ việc'}</button></div>
+      </div>}
+    </div>}
     {earnings.length > 0 && <><h4>Lịch sử</h4><ul className="txn-list">{earnings.slice(0, 8).map((t, i) => <li key={i}><span>{t.text}<small>{hhmm.format(t.at)}</small></span><b className="plus">+{formatVnd(t.amount)}</b></li>)}</ul></>}
   </div>;
 }
@@ -150,12 +163,46 @@ function ContactsApp() {
   </div>;
 }
 
+/** Đen SM: book an electric bike ride to a landmark; follow the driver; pay from the wallet on arrival. */
+function DenSMApp() {
+  const ride = useGame((s) => s.ride);
+  const money = useGame((s) => s.money);
+  const [pick, setPick] = useState<number | null>(null);
+  const list = places();
+  const here = { x: player.position.x, z: player.position.z };
+  const quote = (p: Place) => { const straight = Math.hypot(p.x - here.x, p.z - here.z) * 1.3; return { dist: straight, fare: fareFor(straight) }; };
+  const [, force] = useState(0);
+  useEffect(() => { const id = setInterval(() => force((n) => n + 1), 1000); return () => clearInterval(id); }, []);
+  const taxiDist = Math.round(Math.hypot(taxi.position.x - here.x, taxi.position.z - here.z));
+  return <div className="app-page den-app">
+    <div className="den-header"><span className="den-logo">Đen<b>SM</b></span><small>Di chuyển xanh · giá minh bạch</small></div>
+    {ride ? <div className="den-trip">
+      <div className="den-status">{ride.stage === 'arriving' ? `${ride.driver} đang đến đón bạn` : ride.stage === 'waiting' ? `${ride.driver} đã tới, ra xe và bấm E` : `Đang tới ${ride.dest.name}`}</div>
+      <div className="den-driver"><span className="msg-avatar den-avatar">{ride.driver.split(' ').pop()![0]}</span><div><b>{ride.driver}</b><small>Đen Bike · xe máy điện · {ride.plate}</small><small>★ 4.9 · {ride.stage === 'riding' ? `còn ${fmtDist(nav.length)}` : `cách bạn ${fmtDist(taxiDist)}`}</small></div></div>
+      <div className="den-route"><span>📍 Điểm đến</span><b>{ride.dest.name}</b><small>{ride.dest.note}</small></div>
+      <div className="den-fare"><span>Giá cước</span><b>{formatVnd(ride.fare)}</b><small>Trả qua ví khi tới nơi</small></div>
+      {ride.stage !== 'riding' && <button className="danger-outline" onClick={() => rideActions.cancel()}>Huỷ chuyến</button>}
+    </div> : <>
+      <h4>Bạn muốn đi đâu?</h4>
+      <ul className="den-places">{list.map((p, i) => { const q = quote(p); return <li key={p.name} className={pick === i ? 'picked' : ''} onClick={() => setPick(i)}>
+        <span className="den-pin">📍</span><div><b>{p.name}</b><small>{p.note} · ~{fmtDist(q.dist)}</small></div><em>{formatVnd(q.fare)}</em>
+      </li>; })}</ul>
+      {pick !== null && <div className="den-book">
+        <div><b>Đen Bike</b><small>Xe máy điện · 1 khách · tài xế tới trong ~30 giây</small></div>
+        <button className="den-button" disabled={quote(list[pick]).fare > money} onClick={() => rideActions.book(list[pick])}>Đặt xe · {formatVnd(quote(list[pick]).fare)}</button>
+        <small className="den-note">Giá ước tính theo đường đi thực tế, chốt khi đặt.</small>
+      </div>}
+    </>}
+  </div>;
+}
+
 /** The mini smartphone: status bar with Vietnam time and battery, a home screen and five apps. */
 export function Phone({ onClose }: { onClose: () => void }) {
   const [app, setApp] = useState<App>('home');
   const { now, date } = useVietnamClock();
   const unread = useGame((s) => s.messages.length);
   const job = useGame((s) => s.job);
+  const ride = useGame((s) => s.ride);
   useEffect(() => { if (document.pointerLockElement) document.exitPointerLock(); }, []);
   const battery = 87 - Math.floor((now.getMinutes() % 60) / 6);
   const apps: { id: App; name: string; icon: string; color: string; badge?: number | string }[] = [
@@ -164,6 +211,7 @@ export function Phone({ onClose }: { onClose: () => void }) {
     { id: 'wallet', name: 'Ví tiền', icon: '💰', color: '#1f9d55' },
     { id: 'messages', name: 'Tin nhắn', icon: '💬', color: '#7a4ff0', badge: unread || undefined },
     { id: 'contacts', name: 'Danh bạ', icon: '📞', color: '#f0a020' },
+    { id: 'den', name: 'Đen SM', icon: '⚡', color: '#0b0b0c', badge: ride ? '•' : undefined },
   ];
   return <div className="phone" role="dialog" aria-label="Điện thoại">
     <div className="phone-screen">
@@ -180,6 +228,7 @@ export function Phone({ onClose }: { onClose: () => void }) {
             {app === 'wallet' && <WalletApp />}
             {app === 'messages' && <MessagesApp />}
             {app === 'contacts' && <ContactsApp />}
+            {app === 'den' && <DenSMApp />}
           </div>}
       <div className="phone-homebar"><button onClick={() => (app === 'home' ? onClose() : setApp('home'))} aria-label={app === 'home' ? 'Cất điện thoại' : 'Màn hình chính'} /></div>
     </div>

@@ -67,9 +67,13 @@ function App() {
         setFreeCamera((value) => !value);
       }
     };
+    // right-drag orbits the camera: never open the browser menu while playing
+    const noMenu = (event: MouseEvent) => { if (mode === 'game') event.preventDefault(); };
+    window.addEventListener('contextmenu', noMenu);
     window.addEventListener('hashchange', onHash);
     window.addEventListener('keydown', onKeyDown);
     return () => {
+      window.removeEventListener('contextmenu', noMenu);
       window.removeEventListener('hashchange', onHash);
       window.removeEventListener('keydown', onKeyDown);
     };

@@ -19,10 +19,10 @@ export const SET = {
   broth: [0.04, 0.13],
   bun: [0.27, 0.0],
   herbs: [-0.19, -0.04],
-  pickle: [-0.22, 0.2],
+  pickle: [-0.15, 0.21],
   chili: [-0.02, -0.14],
   chopsticks: [0.2, 0.27],
-  drink: [-0.46, 0.1], // can at +0.05, glass at −0.045 from here
+  drink: [-0.36, 0.18], // can at +0.05, glass at −0.045 from here (within the left hand's reach)
   extra: [0.02, -0.3], // a second portion, pushed to the far side
 } as const;
 export const CAN_OFFSET = 0.05;

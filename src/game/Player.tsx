@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { bridgeEnds, canWalk, groundHeight, type Point } from './geo';
 import { Avatar } from './Avatar';
+import { taxi } from './ride';
 import { bike, game, player, tickNeeds, view } from './state';
 import { WHEEL_R, WHEELBASE } from './world/Scooter';
 
@@ -30,6 +31,8 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
   const dragging = useRef(false);
   const sitting = useRef(false);
   const seatYaw = useRef(0);
+  const lookOffset = useRef(0);
+  const lastChaseYaw = useRef(0);
 
   useEffect(() => { if (freeCamera) drone.current.copy(camera.position); }, [freeCamera, camera]);
   useEffect(() => {
@@ -96,6 +99,41 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
       if (debugCam) { camera.position.set(debugCam[0], debugCam[1], debugCam[2]); camera.lookAt(debugCam[3], debugCam[4], debugCam[5]); focus.set(debugCam[3], 0, debugCam[5]); return; }
     }
     const k = keys.current;
+    /**
+     * Chase camera locked behind a vehicle's heading. Mouse / arrow look only adds a temporary offset
+     * that eases back to zero, so the bike is always seen from behind in its direction of travel.
+     */
+    const chaseCamera = (heading: number, vehicleSpeed: number, dtc: number) => {
+      lookOffset.current += yaw.current - lastChaseYaw.current; // mouse movement since last frame
+      if (!paused) {
+        if (k.has('ArrowLeft')) lookOffset.current += 1.8 * dtc;
+        if (k.has('ArrowRight')) lookOffset.current -= 1.8 * dtc;
+      }
+      lookOffset.current = Math.atan2(Math.sin(lookOffset.current), Math.cos(lookOffset.current));
+      if (vehicleSpeed > 1.5) lookOffset.current *= Math.exp(-1.6 * dtc);
+      yaw.current = heading + Math.PI + lookOffset.current;
+      lastChaseYaw.current = yaw.current;
+      pitch.current = THREE.MathUtils.clamp(pitch.current, 0.12, 0.7);
+    };
+    // ---- Pillion on an Đen SM bike: the driver rides, the camera follows.
+    if (taxi.passenger && !freeCamera) {
+      sitting.current = false;
+      velocity.current.set(0, 0, 0); speed.current = 0;
+      position.current.copy(taxi.position);
+      if (avatar.current) { avatar.current.position.copy(taxi.position); avatar.current.rotation.set(0, taxi.heading, taxi.lean, 'YXZ'); }
+      chaseCamera(taxi.heading, 9, dt);
+      const camFwd = new THREE.Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
+      const dist = Math.max(5, distance.current * 0.85);
+      const eye = taxi.position.clone().addScaledVector(camFwd, -Math.cos(pitch.current) * dist).add(new THREE.Vector3(0, 1.7 + Math.sin(pitch.current) * dist, 0));
+      camera.position.lerp(eye, 1 - Math.exp(-7 * dt));
+      camera.lookAt(taxi.position.x, taxi.position.y + 1.2, taxi.position.z);
+      focus.copy(taxi.position);
+      player.position.copy(taxi.position);
+      player.yaw = yaw.current; view.yaw = yaw.current;
+      if (!paused) tickNeeds(dt, false, false);
+      return;
+    }
+    if (!bike.riding) { lastChaseYaw.current = yaw.current; lookOffset.current = 0; }
     // ---- Riding the delivery scooter: W/S throttle and brake, A/D steer, Shift for full throttle.
     if (bike.riding && !freeCamera) {
       sitting.current = false;
@@ -122,15 +160,7 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
       speed.current = 0;
       position.current.copy(bike.position);
       if (avatar.current) { avatar.current.position.copy(bike.position); avatar.current.rotation.set(0, bike.heading, bike.lean, 'YXZ'); }
-      // chase camera that swings back behind the bike while moving
-      if (Math.abs(bike.speed) > 1 && !dragging.current && document.pointerLockElement !== gl.domElement) {
-        let diff = bike.heading + Math.PI - yaw.current; diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-        yaw.current += diff * (1 - Math.exp(-2.5 * dt));
-      }
-      if (!paused) {
-        if (k.has('ArrowLeft')) yaw.current += 1.8 * dt;
-        if (k.has('ArrowRight')) yaw.current -= 1.8 * dt;
-      }
+      chaseCamera(bike.heading, Math.abs(bike.speed), dt);
       const camFwd = new THREE.Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
       const dist = Math.max(5, distance.current * 0.85);
       const eye = bike.position.clone().addScaledVector(camFwd, -Math.cos(pitch.current) * dist).add(new THREE.Vector3(0, 1.7 + Math.sin(pitch.current) * dist, 0));

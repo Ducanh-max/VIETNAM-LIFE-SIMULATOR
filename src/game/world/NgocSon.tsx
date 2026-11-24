@@ -40,8 +40,8 @@ function Gate({ x }: { x: number }) {
     {/* steps and platform */}
     <mesh position={[0, 0.2, 0]} receiveShadow castShadow><boxGeometry args={[7.6, 0.4, 4.4]} /><primitive object={m.warmStone} attach="material" /></mesh>
     <mesh geometry={body} material={stone} position={[0, 0.4, 0]} castShadow receiveShadow />
-    {/* dark passage seen through the door */}
-    <mesh position={[0, 1.8, 0]}><boxGeometry args={[2.2, 2.8, 3.1]} /><primitive object={m.dark} attach="material" /></mesh>
+    {/* open passage through the gatehouse: stone floor under the arch */}
+    <mesh position={[0, 0.41, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow><planeGeometry args={[2.3, 3.2]} /><primitive object={m.warmStone} attach="material" /></mesh>
     <mesh position={[0, 0.4 + 4.35, 1.62]}><planeGeometry args={[3.4, 0.9]} /><primitive object={plaque} attach="material" /></mesh>
     <mesh position={[-2.25, 0.4 + 2.6, 1.62]}><planeGeometry args={[0.55, 2.8]} /><primitive object={coupletL} attach="material" /></mesh>
     <mesh position={[2.25, 0.4 + 2.6, 1.62]}><planeGeometry args={[0.55, 2.8]} /><primitive object={coupletR} attach="material" /></mesh>

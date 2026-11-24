@@ -69,11 +69,12 @@ export function Person({ anim, shirt = '#f3efe6', pants = '#2d3442', skin = '#c9
     <mesh position={[0, 1.25, 0]} castShadow material={mats.shirt}><capsuleGeometry args={[0.23, 0.5, 6, 12]} /></mesh>
     {mats.apron && <mesh position={[0, 1.08, 0.2]} castShadow material={mats.apron}><boxGeometry args={[0.42, 0.62, 0.04]} /></mesh>}
     <mesh position={[0, 0.98, 0]} castShadow material={mats.pants}><cylinderGeometry args={[0.24, 0.23, 0.16, 12]} /></mesh>
-    <group ref={head}>
-      <mesh position={[0, 1.66, 0]} material={mats.skin}><cylinderGeometry args={[0.07, 0.08, 0.12, 8]} /></mesh>
-      <mesh position={[0, 1.84, 0]} castShadow material={mats.skin}><sphereGeometry args={[0.17, 16, 12]} /></mesh>
-      <mesh position={[0, 1.92, -0.02]} castShadow material={mats.hair}><sphereGeometry args={[0.18, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2.1]} /></mesh>
-      {mats.hat && <mesh position={[0, 2.0, 0]} castShadow material={mats.hat}><coneGeometry args={[0.36, 0.2, 18]} /></mesh>}
+    {/* head pivots at the base of the neck, so nodding never detaches it */}
+    <group ref={head} position={[0, 1.64, 0]}>
+      <mesh position={[0, 0.13, 0]} material={mats.skin}><cylinderGeometry args={[0.065, 0.075, 0.2, 10]} /></mesh>
+      <mesh position={[0, 0.31, 0.01]} castShadow material={mats.skin}><sphereGeometry args={[0.17, 16, 12]} /></mesh>
+      <mesh position={[0, 0.39, -0.01]} castShadow material={mats.hair}><sphereGeometry args={[0.18, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2.1]} /></mesh>
+      {mats.hat && <mesh position={[0, 0.48, 0]} castShadow material={mats.hat}><coneGeometry args={[0.36, 0.2, 18]} /></mesh>}
     </group>
     {[-1, 1].map((side, i) => <group key={`l${side}`} ref={legs[i]} position={[side * 0.12, 0.92, 0]}>
       <mesh position={[0, -0.42, 0]} castShadow material={mats.pants}><capsuleGeometry args={[0.09, 0.62, 4, 8]} /></mesh>
