@@ -166,7 +166,7 @@ function StreetLife({ time }: { time: TimeOfDay }) {
   const wood = useMemo(() => new THREE.MeshStandardMaterial({ color: '#7a5233', roughness: 0.8 }), []);
   return <group>
     <Trees trees={trees} seed={3} />
-    <Instances geometry={unitCylinder} material={m.iron} matrices={poles} />
+    <Instances geometry={unitCylinder} material={m.iron} matrices={poles} castShadow={false} /> {/* thin poles: their sub-texel shadows shimmer as streaks */}
     <Instances geometry={lampGeometry} material={glow} matrices={lanterns} castShadow={false} />
     <Instances geometry={unitBox} material={wood} matrices={benches} />
     <Instances geometry={unitBox} material={m.iron} matrices={benchLegs} />

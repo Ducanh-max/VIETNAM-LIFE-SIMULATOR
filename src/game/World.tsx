@@ -32,21 +32,35 @@ const lighting: Record<TimeOfDay, { sun: [number, number, number]; color: string
   night: { sun: [60, 90, -70], color: '#9fb6d8', intensity: 0.45, sky: '#16222c', hemi: 0.4, ground: '#1c1d22' },
 };
 
-/** Sun that follows the player so a small shadow map stays sharp. */
+/**
+ * Sun that follows the player so a small shadow map stays sharp. The followed point is snapped to the
+ * shadow map's texel grid in light space, so shadow edges don't crawl or flicker as the player moves
+ * (the striped, shimmering streaks of thin poles on the pavement), and the biases keep acne off the ground.
+ */
+const SHADOW_HALF = 45; // half size of the shadow camera (m)
 function Sun({ time, shadow, focus }: { time: TimeOfDay; shadow: number; focus: THREE.Vector3 }) {
   const light = useRef<THREE.DirectionalLight>(null);
   const cfg = lighting[time];
   const offset = useMemo(() => new THREE.Vector3(...cfg.sun).normalize().multiplyScalar(120), [cfg.sun]);
+  const basis = useMemo(() => {
+    const m = new THREE.Matrix4().lookAt(offset, new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
+    return { m, inv: m.clone().invert(), p: new THREE.Vector3() };
+  }, [offset]);
   useFrame(() => {
     const l = light.current;
     if (!l) return;
-    l.position.copy(focus).add(offset);
-    l.target.position.copy(focus);
+    // snap the focus to whole shadow texels in light space
+    const texel = (SHADOW_HALF * 2) / Math.max(1, shadow);
+    const p = basis.p.copy(focus).applyMatrix4(basis.inv);
+    p.x = Math.round(p.x / texel) * texel; p.y = Math.round(p.y / texel) * texel;
+    p.applyMatrix4(basis.m);
+    l.position.copy(p).add(offset);
+    l.target.position.copy(p);
     l.target.updateMatrixWorld();
   });
   return <directionalLight ref={light} color={cfg.color} intensity={cfg.intensity} castShadow={shadow > 0}
-    shadow-mapSize={[shadow || 1, shadow || 1]} shadow-camera-left={-70} shadow-camera-right={70} shadow-camera-top={70} shadow-camera-bottom={-70}
-    shadow-camera-near={10} shadow-camera-far={300} shadow-bias={-0.0004} shadow-normalBias={0.04} />;
+    shadow-mapSize={[shadow || 1, shadow || 1]} shadow-camera-left={-SHADOW_HALF} shadow-camera-right={SHADOW_HALF} shadow-camera-top={SHADOW_HALF} shadow-camera-bottom={-SHADOW_HALF}
+    shadow-camera-near={20} shadow-camera-far={260} shadow-bias={-0.0006} shadow-normalBias={0.06} shadow-radius={3} />;
 }
 
 export function World({ time, quality, paused, freeCamera, onFps, onPosition }: {

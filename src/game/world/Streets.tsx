@@ -193,7 +193,7 @@ function StreetSigns() {
   }, []);
   return <group>
     <mesh geometry={data.geometry} material={data.material} />
-    <Instances geometry={unitCylinder} material={materials().iron} matrices={data.posts} />
+    <Instances geometry={unitCylinder} material={materials().iron} matrices={data.posts} castShadow={false} />
   </group>;
 }
 

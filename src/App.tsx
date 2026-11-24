@@ -31,7 +31,7 @@ function Icon({ name }: { name: 'settings' | 'pause' | 'play' | 'close' | 'compa
 function App() {
   const [mode, setMode] = useState<ExplorerMode>(window.location.hash === '#play' && loadPlayerName() ? 'game' : 'home');
   const [panel, setPanel] = useState<Panel>(null);
-  const [time, setTime] = useState<TimeOfDay>(() => vietnamTimeOfDay());
+  const [time, setTime] = useState<TimeOfDay>(() => (import.meta.env.DEV && (new URLSearchParams(location.search).get('time') as TimeOfDay | null)) || vietnamTimeOfDay()); // ?time=day for tests
   const [playerName, setPlayerName] = useState(loadPlayerName);
   const [renaming, setRenaming] = useState(false);
   const [quality, setQuality] = useState<Quality>('medium');
