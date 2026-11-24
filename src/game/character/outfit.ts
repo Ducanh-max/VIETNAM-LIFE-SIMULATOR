@@ -24,7 +24,7 @@ export type Outfit = {
 /** The main character, after the "Đời Việt – Nhân vật chính" sheet. */
 export const PLAYER_OUTFIT: Outfit = {
   skin: '#F1B98B',
-  hairStyle: 'swept', hair: '#302A29', hairLight: '#49403D', hairDark: '#211D1C',
+  hairStyle: 'swept', hair: '#2a2524', hairLight: '#3d3533', hairDark: '#1c1817',
   top: 'jacket', tee: '#F2EFE8', jacket: '#78836A', jacketLight: '#929D82', jacketDark: '#515C48', jacketTrim: '#444F3F', hood: '#E5DCCC',
   pants: '#35363C', pantsLight: '#484951', pantsDark: '#24252A', pantsCuff: '#616269', cargo: true, shorts: false, skirt: false,
   shoe: '#F2EFE8', shoeSole: '#DDD8CF', shoeStripe: '#35363C',
@@ -49,7 +49,7 @@ export const JACKET_PRESETS: { name: string; jacket: string; light: string; dark
   { name: 'Đỏ đô', jacket: '#7a3434', light: '#944848', dark: '#562323', trim: '#3f1919' },
 ];
 export const HAIR_PRESETS: { name: string; hair: string; light: string; dark: string }[] = [
-  { name: 'Đen nâu', hair: '#302A29', light: '#49403D', dark: '#211D1C' },
+  { name: 'Đen nâu', hair: '#2a2524', light: '#3d3533', dark: '#1c1817' },
   { name: 'Nâu hạt dẻ', hair: '#5a3d2b', light: '#7a5640', dark: '#3b281c' },
   { name: 'Đen tuyền', hair: '#1c1a1a', light: '#2f2b2a', dark: '#0f0e0e' },
   { name: 'Nâu sáng', hair: '#8a6545', light: '#a8805c', dark: '#5f4430' },

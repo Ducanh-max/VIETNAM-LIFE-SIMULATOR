@@ -79,7 +79,7 @@ const dirAE = (a: number, e: number) => V3(Math.sin(a) * Math.cos(e), Math.sin(e
 function headPoint(d: THREE.Vector3, off: number) {
   return V3(d.x * (HEAD.a + off), d.y * (HEAD.b + off), d.z * ((d.z > 0 ? HEAD.c : HEAD.back) + off));
 }
-const CAP = 0.032; // hair cap offset above the scalp (volume)
+const CAP = 0.036; // hair cap offset above the scalp (volume)
 
 /**
  * A rounded hair clump: a flattened tube that hugs the head along a path from (a0, e0) to (a1, e1)
@@ -115,7 +115,7 @@ function clumpGeometry(c: Clump, segs: number, radial: number) {
     const r = Math.max(0, radius(t));
     for (let j = 0; j < radial; j++) {
       const a = (j / radial) * Math.PI * 2;
-      const p = pts[i].clone().addScaledVector(side, Math.cos(a) * r).addScaledVector(out, Math.sin(a) * r * 0.72);
+      const p = pts[i].clone().addScaledVector(side, Math.cos(a) * r).addScaledVector(out, Math.sin(a) * r * 0.8);
       pos.push(p.x, p.y, p.z);
     }
   }
@@ -131,7 +131,7 @@ function clumpGeometry(c: Clump, segs: number, radial: number) {
 }
 
 /** Hair styles: the cap's coverage and the clumps that give the silhouette (5–10 per style). */
-function hairStyle(style: HairStyle): { cap: number; clumps: Clump[]; tail?: boolean; bun?: boolean } {
+function hairStyle(style: HairStyle): { cap: number; clumps: Clump[]; tail?: boolean; bun?: boolean; far?: number[] } {
   const P = Math.PI;
   const sides = (a1: number, e1: number, r: number, drop = 0): Clump[] => [1, -1].map((s) => ({ a0: s * 1.0, e0: 0.8, a1: s * a1, e1, r, drop, tone: 0 }));
   const back = (e1: number, r: number, drop = 0): Clump[] => [
@@ -174,20 +174,22 @@ function hairStyle(style: HairStyle): { cap: number; clumps: Clump[]; tail?: boo
       ...sides(1.3, -0.02, 0.058), ...back(-0.25, 0.075).slice(0, 1),
     ] };
     case 'swept':
-    default: return { cap: 1.55, clumps: [
-      // messy chibi fringe: three chunky clumps from the crown falling over the forehead, stopping above the brows
-      { a0: 0.05, e0: 1.45, a1: -0.1, e1: 0.36, r: 0.1, tip: 0.02, tone: 1 },
-      { a0: 0.45, e0: 1.35, a1: 0.66, e1: 0.38, r: 0.094, tip: 0.024 },
-      { a0: -0.45, e0: 1.35, a1: -0.68, e1: 0.4, r: 0.094, tip: 0.026 },
-      // the back, layered down to the nape with the tips flicking out
-      { a0: Math.PI, e0: 1.3, a1: Math.PI, e1: -0.42, r: 0.105, tip: 0.026, tone: 2 },
-      { a0: 2.3, e0: 1.25, a1: 2.15, e1: -0.28, r: 0.1, tip: 0.03, tone: 2 },
-      { a0: -2.3, e0: 1.25, a1: -2.15, e1: -0.28, r: 0.1, tip: 0.03, tone: 2 },
-      // sides over the top of the ears, and two fuller tufts behind them
-      { a0: 1.0, e0: 1.2, a1: 1.32, e1: 0.06, r: 0.088, tip: 0.02 },
-      { a0: -1.0, e0: 1.2, a1: -1.32, e1: 0.06, r: 0.088, tip: 0.02 },
-      { a0: 1.75, e0: 1.45, a1: 1.8, e1: 0.5, r: 0.1, tip: 0.034, tone: 1 },
-      { a0: -1.75, e0: 1.45, a1: -1.8, e1: 0.5, r: 0.1, tip: 0.034, tone: 1 },
+    default: return { cap: 1.5, far: [5, 6, 9], clumps: [
+      // the player's anime-chibi hair: a big, tousled mass of thick leaf-shaped spikes swept up and out
+      // from the crown; the fringe parts at the top and falls diagonally to both sides, with one spike
+      // pointing down between the eyes; short above the ears (ears show); the nape spikes point down.
+      { a0: 0.0, e0: 1.2, a1: 0.0, e1: 0.27, r: 0.085, tip: 0.006 },
+      { a0: 0.18, e0: 1.32, a1: 0.8, e1: 0.46, r: 0.12, tip: 0.045 },
+      { a0: -0.18, e0: 1.32, a1: -0.8, e1: 0.46, r: 0.12, tip: 0.045 },
+      { a0: 0.35, e0: 1.46, a1: 1.15, e1: 0.8, r: 0.13, tip: 0.1, tone: 1 },
+      { a0: -0.35, e0: 1.46, a1: -1.15, e1: 0.8, r: 0.13, tip: 0.1, tone: 1 },
+      { a0: 0.2, e0: 1.52, a1: 2.5, e1: 0.95, r: 0.14, tip: 0.11, tone: 1 },
+      { a0: -0.2, e0: 1.52, a1: -2.5, e1: 0.95, r: 0.14, tip: 0.11 },
+      { a0: 1.15, e0: 1.05, a1: 1.42, e1: 0.26, r: 0.085, tip: 0.03 },
+      { a0: -1.15, e0: 1.05, a1: -1.42, e1: 0.26, r: 0.085, tip: 0.03 },
+      { a0: Math.PI, e0: 1.2, a1: Math.PI, e1: -0.45, r: 0.12, tip: 0.035, tone: 2 },
+      { a0: 2.4, e0: 1.15, a1: 2.2, e1: -0.3, r: 0.115, tip: 0.05, tone: 2 },
+      { a0: -2.4, e0: 1.15, a1: -2.2, e1: -0.3, r: 0.115, tip: 0.05, tone: 2 },
     ] };
   }
 }
@@ -202,10 +204,10 @@ function hairParts(o: Outfit, lod: Lod): CP[] {
   cap.rotateX(-0.5);
   deform(cap, (v) => { v.set(v.x * (HEAD.a + CAP), v.y * (HEAD.b + CAP), v.z * ((v.z > 0 ? HEAD.c : HEAD.back) + CAP)); });
   P.push({ g: cap, c: o.hair });
-  const clumps = lod === 2 ? [st.clumps[0], st.clumps[3]].filter(Boolean) : st.clumps;
+  const clumps = lod === 2 ? (st.far ?? [0, 3]).map((i) => st.clumps[i]).filter(Boolean) : st.clumps;
   for (const c of clumps) {
     const cc = hatOn ? { ...c, tip: Math.min(c.tip ?? 0.012, 0.004) } : c;
-    P.push({ g: clumpGeometry(cc, q(lod, 4, 3, 2), q(lod, 5, 4, 4)), c: tones[c.tone ?? 0] });
+    P.push({ g: clumpGeometry(cc, q(lod, 5, 3, 2), q(lod, 5, 4, 4)), c: tones[c.tone ?? 0] });
   }
   if (st.tail) {
     P.push({ g: taperTube([V3(0, 0.06, -0.24), V3(0, 0.02, -0.3), V3(0, -0.08, -0.31), V3(0, -0.2, -0.27)], 0.05, 0.012, { tubular: q(lod, 6, 4, 3), radial: q(lod, 7, 5, 4), bulge: 0.35 }), c: o.hair });
