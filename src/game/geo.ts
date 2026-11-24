@@ -312,4 +312,4 @@ export function groundHeight(point: Point): number {
 export const mapAttribution = map.source;
 
 // Dev hook for test scripts.
-if (import.meta.env.DEV) (window as unknown as { __geo?: unknown }).__geo = { canWalk, groundHeight };
+if (import.meta.env.DEV) (window as unknown as { __geo?: unknown }).__geo = { canWalk, groundHeight, streetRing };

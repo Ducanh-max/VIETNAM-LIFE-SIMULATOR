@@ -164,6 +164,11 @@ const restaurantRect = (() => {
 
 // ---- Buildings --------------------------------------------------------------
 const FLOOR = 3.4;
+/** Building footprints closer than this to the water (m) are dropped: that band is promenade and ring road. */
+const LAKESIDE_CLEAR = 18;
+/** Footprints removed by the lakeside rule (for checks). */
+export const droppedNearLake: { center: Point; name?: string; kind?: string }[] = [];
+const HAND_MODELLED = new Set(['Tháp Bút', 'Đài Nghiên', 'Cầu Thê Húc', 'Đền Ngọc Sơn', 'Tháp Rùa', 'Đắc Nguyệt Lâu']);
 function overlapsRect(ring: Point[], rect: Point[]) {
   return ring.some((p) => insidePolygon(p, rect)) || rect.some((p) => insidePolygon(p, ring)) || insidePolygon(centroid(ring), rect);
 }
@@ -172,6 +177,12 @@ export const buildings: Building[] = (osm.buildings as RawBuilding[]).flatMap((b
   const center = centroid(ring);
   // Landmarks on the lake are modelled by hand.
   if (insidePolygon(center, shore)) return [];
+  // Nothing stands on the lakeside promenade or the ring road round the lake (the gate, Tháp Bút and Đài
+  // Nghiên are hand-modelled; OSM footprints there only block the path and trap the player).
+  // Real named places there (Thủy Tạ, Tháp Hòa Phong, kem Tràng Tiền kiosks…) stay; unnamed blocks and duplicates of
+  // the hand-modelled landmarks go.
+  const nearLake = ring.some((p) => distanceToShore(p) < LAKESIDE_CLEAR) || distanceToShore(center) < LAKESIDE_CLEAR + 4;
+  if (nearLake && (!b.n || HAND_MODELLED.has(b.n))) { droppedNearLake.push({ center, name: b.n, kind: b.k }); return []; }
   if (overlapsRect(ring, restaurantRect)) return [];
   const area = polygonArea(ring);
   if (area < 6) return [];
@@ -246,3 +257,6 @@ export const deliverySpots: DeliverySpot[] = (() => {
 
 // Dev hook for screenshot scripts.
 if (import.meta.env.DEV) (window as unknown as { __restaurant?: unknown }).__restaurant = { ...RESTAURANT, toWorld: restaurantToWorld };
+
+// Dev hook for test scripts.
+if (import.meta.env.DEV) (window as unknown as { __osmDropped?: unknown }).__osmDropped = droppedNearLake;
