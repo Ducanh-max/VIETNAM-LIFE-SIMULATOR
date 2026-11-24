@@ -10,7 +10,6 @@ const limestone = new THREE.MeshStandardMaterial({ color: '#c5baa0', roughness: 
 const agedStone = new THREE.MeshStandardMaterial({ color: '#9a927c', roughness: 0.98 });
 const darkOpening = new THREE.MeshStandardMaterial({ color: '#41433b', roughness: 0.95 });
 const redPaint = new THREE.MeshStandardMaterial({ color: '#a9231c', roughness: 0.52, metalness: 0.05 });
-const bridgeDeckPaint = new THREE.MeshStandardMaterial({ color: '#aa3225', roughness: 0.66, side: THREE.DoubleSide });
 const roofTile = new THREE.MeshStandardMaterial({ color: '#6f3d32', roughness: 0.86 });
 const templeWall = new THREE.MeshStandardMaterial({ color: '#d7c39d', roughness: 0.9 });
 const timber = new THREE.MeshStandardMaterial({ color: '#643d31', roughness: 0.7 });
@@ -203,10 +202,18 @@ function bridgePoint(t: number) {
 
 function bridgeDeckGeometry(normal: THREE.Vector2) {
   const vertices: number[] = [];
+  const uvs: number[] = [];
   const indices: number[] = [];
+  let length = 0;
+  let previous = bridgePoint(0);
   for (let i = 0; i <= 60; i++) {
     const p = bridgePoint(i / 60);
-    for (const y of [0, -0.23]) for (const sign of [-1, 1]) vertices.push(p.x + normal.x * 1.35 * sign, p.y + y, p.z + normal.y * 1.35 * sign);
+    length += p.distanceTo(previous);
+    previous = p;
+    for (const y of [0, -0.23]) for (const sign of [-1, 1]) {
+      vertices.push(p.x + normal.x * 1.3 * sign, p.y + y, p.z + normal.y * 1.3 * sign);
+      uvs.push((sign + 1) * 1.3, length);
+    }
     if (i < 60) {
       const a = i * 4;
       for (const [l, r] of [[0, 1], [2, 3], [0, 2], [1, 3]]) {
@@ -216,47 +223,167 @@ function bridgeDeckGeometry(normal: THREE.Vector2) {
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
 }
 
+/** Worn timber planks laid across the deck; v runs along the bridge in metres. */
+function plankTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+  const plank = 256 / 8;
+  for (let i = 0; i < 8; i++) {
+    const tone = 92 + Math.round(Math.random() * 26);
+    ctx.fillStyle = `rgb(${tone + 52},${Math.round(tone * 0.62)},${Math.round(tone * 0.45)})`;
+    ctx.fillRect(0, i * plank, 128, plank);
+    for (let g = 0; g < 9; g++) {
+      ctx.strokeStyle = `rgba(60,25,15,${0.08 + Math.random() * 0.1})`;
+      ctx.beginPath();
+      const y = i * plank + 3 + Math.random() * (plank - 6);
+      ctx.moveTo(0, y);
+      ctx.bezierCurveTo(40, y + Math.random() * 3 - 1.5, 90, y + Math.random() * 3 - 1.5, 128, y);
+      ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(40,18,12,.75)';
+    ctx.fillRect(0, i * plank, 128, 2);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(1 / 2.6, 1 / 1.6);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
+}
+
+/** One InstancedMesh per part keeps the whole bridge to a handful of draw calls. */
+function Instances({ geometry, material, matrices, castShadow = true }: { geometry: THREE.BufferGeometry; material: THREE.Material; matrices: THREE.Matrix4[]; castShadow?: boolean }) {
+  const mesh = useMemo(() => {
+    const instanced = new THREE.InstancedMesh(geometry, material, matrices.length);
+    matrices.forEach((matrix, index) => instanced.setMatrixAt(index, matrix));
+    instanced.instanceMatrix.needsUpdate = true;
+    instanced.castShadow = castShadow;
+    instanced.receiveShadow = true;
+    instanced.computeBoundingSphere();
+    return instanced;
+  }, [geometry, material, matrices, castShadow]);
+  return <primitive object={mesh} />;
+}
+
+const unitBox = new THREE.BoxGeometry(1, 1, 1);
+const capGeometry = new THREE.SphereGeometry(0.5, 10, 8);
+const lotusPad = new THREE.CircleGeometry(0.5, 14);
+const brightRed = new THREE.MeshStandardMaterial({ color: '#c42a20', roughness: 0.48, metalness: 0.04 });
+const brass = new THREE.MeshStandardMaterial({ color: '#c9a24f', metalness: 0.55, roughness: 0.38 });
+const lotusLeaf = new THREE.MeshStandardMaterial({ color: '#4f8a3c', roughness: 0.75, side: THREE.DoubleSide });
+const lotusFlower = new THREE.MeshStandardMaterial({ color: '#f29bbd', roughness: 0.6, emissive: '#5a1a2c', emissiveIntensity: 0.15 });
+const lanternGlow = new THREE.MeshStandardMaterial({ color: '#ffe2a0', emissive: '#ffb648', emissiveIntensity: 1.4 });
+
+/** Box transform from a to b with a given cross-section (width along `side`, height up). */
+function barMatrix(a: THREE.Vector3, b: THREE.Vector3, thickness: number, depth: number) {
+  const direction = new THREE.Vector3().subVectors(b, a);
+  const length = direction.length();
+  const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), direction.normalize());
+  return new THREE.Matrix4().compose(new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5), quaternion, new THREE.Vector3(length, thickness, depth));
+}
+
+function GatePillar({ position, height, rotationY, lantern = false }: { position: THREE.Vector3; height: number; rotationY: number; lantern?: boolean }) {
+  return <group position={position} rotation={[0, rotationY, 0]}>
+    <mesh position={[0, 0.18, 0]} castShadow receiveShadow><boxGeometry args={[0.95, 0.36, 0.95]} /><primitive object={agedStone} attach="material" /></mesh>
+    <mesh position={[0, 0.36 + height / 2, 0]} castShadow receiveShadow><boxGeometry args={[0.72, height, 0.72]} /><primitive object={limestone} attach="material" /></mesh>
+    {[-1, 1].map((side) => <mesh key={side} position={[side * 0.365, 0.36 + height * 0.55, 0]}><boxGeometry args={[0.02, height * 0.55, 0.46]} /><primitive object={agedStone} attach="material" /></mesh>)}
+    <mesh position={[0, 0.42 + height, 0]} castShadow><boxGeometry args={[0.9, 0.16, 0.9]} /><primitive object={agedStone} attach="material" /></mesh>
+    {lantern
+      ? <group position={[0, 0.5 + height, 0]}>
+          <mesh position={[0, 0.25, 0]}><boxGeometry args={[0.42, 0.42, 0.42]} /><primitive object={lanternGlow} attach="material" /></mesh>
+          <mesh position={[0, 0.52, 0]} castShadow><coneGeometry args={[0.44, 0.32, 4]} /><primitive object={agedStone} attach="material" /></mesh>
+        </group>
+      : <mesh position={[0, 0.72 + height, 0]} castShadow><sphereGeometry args={[0.3, 10, 8]} /><primitive object={limestone} attach="material" /></mesh>}
+  </group>;
+}
+
+/**
+ * Cầu Thê Húc after the reference sheet: red timber bridge, X-lattice railing
+ * panels, posts with brass caps, paired square piers under each bent, a plank
+ * deck and stone gate pillars at both ends.
+ */
 export function TheHucBridge() {
   const [start, end] = bridgeEnds;
   const normal = useMemo(() => new THREE.Vector2(-(end[1] - start[1]), end[0] - start[0]).normalize(), [start, end]);
   const deck = useMemo(() => bridgeDeckGeometry(normal), [normal]);
-  const rails = useMemo(() => [-1, 1].flatMap((sign) => [0.55, 1.03].map((height) => {
-    const points = Array.from({ length: 31 }, (_, i) => {
-      const p = bridgePoint(i / 30);
-      return new THREE.Vector3(p.x + normal.x * 1.37 * sign, p.y + height, p.z + normal.y * 1.37 * sign);
-    });
-    return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 50, height > 1 ? 0.085 : 0.065, 6, false);
-  })), [normal]);
-  const sideBeams = useMemo(() => [-1, 1].map((sign) => {
-    const points = Array.from({ length: 31 }, (_, i) => {
-      const p = bridgePoint(i / 30);
-      return new THREE.Vector3(p.x + normal.x * 1.16 * sign, p.y - 0.36, p.z + normal.y * 1.16 * sign);
-    });
-    return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 50, 0.18, 7, false);
-  }), [normal]);
+  const deckMaterial = useMemo(() => new THREE.MeshStandardMaterial({ map: plankTexture(), color: '#ffffff', roughness: 0.82, side: THREE.DoubleSide }), []);
+  const heading = -Math.atan2(end[1] - start[1], end[0] - start[0]);
+  const parts = useMemo(() => {
+    const posts: THREE.Matrix4[] = [];
+    const caps: THREE.Matrix4[] = [];
+    const bars: THREE.Matrix4[] = [];
+    const piers: THREE.Matrix4[] = [];
+    const lotusPads: THREE.Matrix4[] = [];
+    const lotusFlowers: THREE.Matrix4[] = [];
+    const side = (p: THREE.Vector3, offset: number, y = 0) => new THREE.Vector3(p.x + normal.x * offset, p.y + y, p.z + normal.y * offset);
+    const panels = 15;
+    const railOffset = 1.36;
+    const postAngle = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), heading);
+    for (let i = 0; i <= panels; i++) {
+      const p = bridgePoint(i / panels);
+      const endPost = i === 0 || i === panels;
+      for (const sign of [-1, 1]) {
+        const base = side(p, railOffset * sign);
+        const h = endPost ? 1.35 : 1.18;
+        posts.push(new THREE.Matrix4().compose(base.clone().setY(base.y + h / 2 - 0.05), postAngle, new THREE.Vector3(0.17, h, 0.17)));
+        caps.push(new THREE.Matrix4().compose(base.clone().setY(base.y + h + 0.02), postAngle, new THREE.Vector3(endPost ? 0.3 : 0.24, endPost ? 0.3 : 0.24, endPost ? 0.3 : 0.24)));
+        // Piers stand in pairs below every bent, on a wider stance than the deck.
+        const foot = side(p, 1.05 * sign);
+        const top = p.y - 0.25;
+        piers.push(new THREE.Matrix4().compose(new THREE.Vector3(foot.x, (top - 0.4) / 2, foot.z), postAngle, new THREE.Vector3(0.36, top + 0.4, 0.36)));
+      }
+      // Cap beam across each bent, just under the deck.
+      piers.push(barMatrix(side(p, -1.3, -0.3), side(p, 1.3, -0.3), 0.22, 0.26));
+      if (i === panels) break;
+      const q = bridgePoint((i + 1) / panels);
+      for (const sign of [-1, 1]) {
+        const a = side(p, railOffset * sign);
+        const b = side(q, railOffset * sign);
+        const lowA = a.clone().setY(a.y + 0.2); const lowB = b.clone().setY(b.y + 0.2);
+        const topA = a.clone().setY(a.y + 1.02); const topB = b.clone().setY(b.y + 1.02);
+        bars.push(barMatrix(topA, topB, 0.11, 0.13)); // hand rail
+        bars.push(barMatrix(lowA, lowB, 0.08, 0.09)); // bottom rail
+        bars.push(barMatrix(lowA, topB, 0.06, 0.06)); // X lattice
+        bars.push(barMatrix(topA, lowB, 0.06, 0.06));
+        bars.push(barMatrix(a.clone().setY(a.y + 0.61), b.clone().setY(b.y + 0.61), 0.05, 0.05)); // mid rail
+      }
+    }
+    // Lotus pads drifting on both sides of the bridge, denser near the island.
+    let seed = 7;
+    const random = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let n = 0; n < 70; n++) {
+      const t = 0.15 + random() * 0.85;
+      const p = bridgePoint(t);
+      const offset = (random() < 0.5 ? -1 : 1) * (3 + random() * 9);
+      const position = new THREE.Vector3(p.x + normal.x * offset + (random() - 0.5) * 4, 0.06, p.z + normal.y * offset + (random() - 0.5) * 4);
+      const size = 0.55 + random() * 0.6;
+      lotusPads.push(new THREE.Matrix4().compose(position, new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, random() * Math.PI * 2)), new THREE.Vector3(size, size, size)));
+      if (random() < 0.3) lotusFlowers.push(new THREE.Matrix4().compose(position.clone().setY(0.28), new THREE.Quaternion(), new THREE.Vector3(0.24, 0.2, 0.24)));
+    }
+    return { posts, caps, bars, piers, lotusPads, lotusFlowers };
+  }, [normal, heading]);
+  const startPoint = bridgePoint(0);
+  const endPoint = bridgePoint(1);
+  const along = new THREE.Vector3(end[0] - start[0], 0, end[1] - start[1]).normalize();
+  const gate = (p: THREE.Vector3, sign: number, outward: number) => new THREE.Vector3(p.x + normal.x * 1.75 * sign + along.x * outward, 0.05, p.z + normal.y * 1.75 * sign + along.z * outward);
   return <group>
-    <mesh geometry={deck} material={bridgeDeckPaint} castShadow receiveShadow />
-    {rails.map((geometry, index) => <mesh key={index} geometry={geometry} material={redPaint} castShadow />)}
-    {sideBeams.map((geometry, index) => <mesh key={`beam-${index}`} geometry={geometry} material={mutedRed} castShadow />)}
-    {Array.from({ length: 16 }, (_, i) => {
-      const p = bridgePoint(i / 15);
-      return <group key={i}>
-        <mesh position={[p.x, p.y - 0.23, p.z]} rotation={[0, -Math.atan2(end[1] - start[1], end[0] - start[0]), 0]} castShadow><boxGeometry args={[0.085, 0.025, 2.56]} /><primitive object={timber} attach="material" /></mesh>
-        {[-1, 1].map((sign) => <group key={sign} position={[p.x + normal.x * 1.37 * sign, p.y, p.z + normal.y * 1.37 * sign]}>
-          <mesh position={[0, 0.52, 0]} castShadow><boxGeometry args={[0.15, 1.16, 0.15]} /><primitive object={redPaint} attach="material" /></mesh>
-          <mesh position={[0, 1.14, 0]}><sphereGeometry args={[0.13, 8, 6]} /><primitive object={gold} attach="material" /></mesh>
-        </group>)}
-      </group>;
-    })}
-    {[2, 5, 8, 11, 14].map((index) => {
-      const p = bridgePoint(index / 15);
-      return [-1, 1].map((sign) => <Beam key={`${index}-${sign}`} from={new THREE.Vector3(p.x + normal.x * 1.05 * sign, 0.08, p.z + normal.y * 1.05 * sign)} to={new THREE.Vector3(p.x + normal.x * 1.05 * sign, p.y - 0.24, p.z + normal.y * 1.05 * sign)} radius={0.15} material={redPaint} />);
-    })}
+    <mesh geometry={deck} material={deckMaterial} castShadow receiveShadow />
+    <Instances geometry={unitBox} material={brightRed} matrices={parts.posts} />
+    <Instances geometry={capGeometry} material={brass} matrices={parts.caps} />
+    <Instances geometry={unitBox} material={brightRed} matrices={parts.bars} />
+    <Instances geometry={unitBox} material={redPaint} matrices={parts.piers} />
+    <Instances geometry={lotusPad} material={lotusLeaf} matrices={parts.lotusPads} castShadow={false} />
+    <Instances geometry={capGeometry} material={lotusFlower} matrices={parts.lotusFlowers} castShadow={false} />
+    {[-1, 1].map((sign) => <GatePillar key={`s${sign}`} position={gate(startPoint, sign, -2.4)} height={1.7} rotationY={heading} lantern={sign > 0} />)}
+    {[-1, 1].map((sign) => <GatePillar key={`e${sign}`} position={gate(endPoint, sign, 0.9)} height={1.35} rotationY={heading} />)}
   </group>;
 }
 

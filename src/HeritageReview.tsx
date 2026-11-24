@@ -3,9 +3,11 @@ import { Clone, Html, OrbitControls, useGLTF } from '@react-three/drei';
 import { Component, Suspense, useEffect, useState, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { NgocSonTemple, TheHucBridge } from './world/Historic';
-import { templeCenter } from './world/geo';
+import { bridgeEnds, templeCenter } from './world/geo';
 
-type Asset = 'tower' | 'complex';
+const bridgeMid = [(bridgeEnds[0][0] + bridgeEnds[1][0]) / 2, (bridgeEnds[0][1] + bridgeEnds[1][1]) / 2] as const;
+
+type Asset = 'tower' | 'complex' | 'bridge';
 type Version = 'current' | 'candidate';
 
 const reviewAssets = {
@@ -19,7 +21,7 @@ class LoadBoundary extends Component<{ children: ReactNode }, { failed: boolean 
   render() { return this.state.failed ? <Html center><div className="heritage-review-message">Không tải được GLB. Hãy xem Console để biết lỗi.</div></Html> : this.props.children; }
 }
 
-function GlbModel({ asset, version, onLoaded }: { asset: Asset; version: Version; onLoaded: (url: string) => void }) {
+function GlbModel({ asset, version, onLoaded }: { asset: Exclude<Asset, 'bridge'>; version: Version; onLoaded: (url: string) => void }) {
   const url = version === 'current' ? '/models/thap-rua.glb?v=8m8-architecture' : reviewAssets[asset];
   const { scene } = useGLTF(url, '/draco/');
   useEffect(() => onLoaded(url), [onLoaded, url]);
@@ -36,17 +38,22 @@ function ReviewScene({ asset, version, onLoaded }: { asset: Asset; version: Vers
     <hemisphereLight args={['#eaf2f2', '#7b776d', 2.2]} />
     <directionalLight position={[25, 40, 25]} intensity={2.2} castShadow shadow-mapSize={[2048, 2048]}
       shadow-camera-left={-80} shadow-camera-right={80} shadow-camera-top={80} shadow-camera-bottom={-80} />
-    {asset === 'complex' && version === 'current'
+    {asset === 'bridge'
+      ? <group position={[-bridgeMid[0], 0, -bridgeMid[1]]}>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[bridgeMid[0], 0.02, bridgeMid[1]]} receiveShadow><planeGeometry args={[90, 90]} /><meshStandardMaterial color="#5f8f8c" roughness={0.35} /></mesh>
+          <TheHucBridge />
+        </group>
+      : asset === 'complex' && version === 'current'
       ? <group position={[-templeCenter[0], -0.28, -templeCenter[1]]}>
           <NgocSonTemple time="day" /><TheHucBridge />
         </group>
       : <LoadBoundary key={`${asset}-${version}`}>
           <Suspense fallback={<Html center><div className="heritage-review-message">Đang tải GLB…</div></Html>}>
-            <GlbModel asset={asset} version={version} onLoaded={onLoaded} />
+            <GlbModel asset={asset as Exclude<Asset, 'bridge'>} version={version} onLoaded={onLoaded} />
           </Suspense>
         </LoadBoundary>}
-    <gridHelper args={[asset === 'tower' ? 24 : 100, asset === 'tower' ? 24 : 50, '#b9c1c1', '#a6b0b0']} position={[0, -0.04, 0]} />
-    <OrbitControls makeDefault enableDamping target={asset === 'tower' ? [0, 4, 0] : [0, 5, 0]} minDistance={2} maxDistance={150} />
+    {asset !== 'bridge' && <gridHelper args={[asset === 'tower' ? 24 : 100, asset === 'tower' ? 24 : 50, '#b9c1c1', '#a6b0b0']} position={[0, -0.04, 0]} />}
+    <OrbitControls makeDefault enableDamping target={asset === 'tower' ? [0, 4, 0] : asset === 'bridge' ? [0, 1.2, 0] : [0, 5, 0]} minDistance={2} maxDistance={150} />
   </>;
 }
 
@@ -62,23 +69,26 @@ export default function HeritageReview() {
       <nav aria-label="Chọn mô hình xem thử">
         <button className={asset === 'tower' ? 'active' : ''} onClick={() => chooseAsset('tower')}>Tháp Rùa</button>
         <button className={asset === 'complex' ? 'active' : ''} onClick={() => chooseAsset('complex')}>Đền + cầu</button>
+        <button className={asset === 'bridge' ? 'active' : ''} onClick={() => { setAsset('bridge'); setVersion('current'); setLoadedUrl(null); }}>Cầu Thê Húc</button>
         <a href="/#play">Trở về game</a>
       </nav>
     </header>
-    <div className="heritage-review-versions" role="group" aria-label="Chọn phiên bản mô hình">
+    {asset !== 'bridge' && <div className="heritage-review-versions" role="group" aria-label="Chọn phiên bản mô hình">
       <button className={version === 'current' ? 'active' : ''} onClick={() => chooseVersion('current')}>Bản trước</button>
       <button className={version === 'candidate' ? 'active' : ''} onClick={() => chooseVersion('candidate')}>GLB mới từ Blender</button>
       <span>{version === 'candidate' ? loadedUrl ? `Đã tải: ${loadedUrl}` : 'Đang tải GLB mới…' : asset === 'tower' ? loadedUrl ? `Đã tải: ${loadedUrl}` : 'Đang tải GLB cũ…' : 'Mô hình procedural trước đây'}</span>
-    </div>
+    </div>}
     <div className="heritage-review-canvas">
-      <Canvas key={`${asset}-${version}`} camera={{ position: asset === 'tower' ? [13, 10, 14] : [48, 29, 68], fov: 50, near: 0.05, far: 300 }}
+      <Canvas key={`${asset}-${version}`} camera={{ position: asset === 'tower' ? [13, 10, 14] : asset === 'bridge' ? [30, 11, 36] : [48, 29, 68], fov: 50, near: 0.05, far: 300 }}
         dpr={[1, 1.5]} shadows gl={{ antialias: true, powerPreference: 'high-performance' }}
         onCreated={({ gl }) => { gl.outputColorSpace = THREE.SRGBColorSpace; gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 1.05; }}>
         <ReviewScene asset={asset} version={version} onLoaded={setLoadedUrl} />
       </Canvas>
     </div>
     <aside className="heritage-review-note">
-      {asset === 'tower'
+      {asset === 'bridge'
+        ? 'Cầu Thê Húc: mô hình procedural dựng lại theo ảnh tham khảo (lan can chữ X, trụ đỏ, mặt cầu ván gỗ, trụ cổng đá). Kéo chuột để xoay, cuộn để phóng to.'
+        : asset === 'tower'
         ? 'Tháp Rùa: mô hình và màu từ file Blender bạn cung cấp, cao 8,8 m. Kéo chuột để xoay, cuộn để phóng to. Bản trước là GLB cũ.'
         : 'Đền + cầu trong trang so sánh là cụm GLB nguyên bản từ Blender. Trong game, phần đền được tách và căn vào đảo; cầu vẫn là mô hình procedural vì nhịp cầu nguồn không khớp bản đồ.'}
     </aside>
