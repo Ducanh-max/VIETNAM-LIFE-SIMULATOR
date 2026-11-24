@@ -4,7 +4,8 @@ import * as THREE from 'three';
 import { CAN_OFFSET, drinkLevels, firstDrink, GLASS_OFFSET, lerpN, lerpV, mealAt, SET, setToBody, track } from './meal';
 import { taxi } from './ride';
 import { bike, game, player, useGame } from './state';
-import { PlayerModel, type Expression, type PlayerRig } from './PlayerModel';
+import { Phone3D } from './character/Phone3D';
+import { PlayerModel, type Expression, type HandPose, type PlayerRig } from './PlayerModel';
 import { Bottle, bottleLip, Chopsticks, IceGlass, Morsel, TakeawayBag } from './world/food';
 import { GRIP, PILLION, SEAT } from './world/Scooter';
 
@@ -20,7 +21,7 @@ const L1 = 0.3; // upper arm
 const L2 = 0.305; // elbow → hand joint (forearm + wrist)
 const HAND = 0.035; // hand centre beyond the hand joint
 const SHOULDER = (side: number) => new THREE.Vector3(side * 0.22, 0.38, 0); // spine space
-const MOUTH = new THREE.Vector3(0, 0.585, 0.15); // spine space
+const MOUTH = new THREE.Vector3(0, 0.55, 0.15); // spine space (head lowered by HEAD_DROP)
 const DOWN = new THREE.Vector3(0, -1, 0);
 const X = new THREE.Vector3(1, 0, 0);
 const tmpQ = new THREE.Quaternion();
@@ -63,6 +64,10 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
   const propSpace = useRef<THREE.Group>(null);
   const [expr, setExpr] = useState<Expression>('neutral');
   const shipping = useGame((s) => !!s.job);
+  const outfit = useGame((s) => s.outfit);
+  const [idleLook, setIdleLook] = useState(false);
+  const sitBlend = useRef(0);
+  const phone3d = useRef<THREE.Group>(null);
   const sticks = useRef<THREE.Group>(null);
   const morsel = useRef<THREE.Group>(null);
   const heldBottle = useRef<THREE.Group>(null);
@@ -94,6 +99,11 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
     /** Damp the torso toward the target lean and return the lean actually shown. */
     const lean = (target: number) => { t.rotation.x = THREE.MathUtils.damp(t.rotation.x, target, 12, dt); pr.rotation.x = t.rotation.x; return t.rotation.x; };
     const arm = (side: number, target: THREE.Vector3, pole?: THREE.Vector3) => solveArm(side, target, side < 0 ? R0.shoulderR : R0.shoulderL, side < 0 ? R0.elbowR : R0.elbowL, pole);
+    let handPoseL: HandPose = 'relaxed', handPoseR: HandPose = 'relaxed';
+    let showPhone = false; let idle = false; let mouthState: Expression | null = null;
+    // smooth sit-down / stand-up instead of snapping onto the stool
+    sitBlend.current = THREE.MathUtils.damp(sitBlend.current, player.seat ? 1 : 0, 6, dt);
+    const k = sitBlend.current;
 
     if (taxi.passenger && taxi.vehicle === 'car') {
       // ---- back seat of an Đen Car: the avatar root sits at the hip point (placed by the controller)
@@ -102,6 +112,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
       const al = lean(-0.05);
       arm(R, toTorso(V(-0.17, HIP + 0.06, 0.3), al), V(-1, -0.4, -0.2));
       arm(L, toTorso(V(0.17, HIP + 0.06, 0.3), al), V(1, -0.4, -0.2));
+      idle = true;
     } else if (bike.riding || taxi.passenger) {
       // ---- on a scooter: hips on the seat, knees bent, feet on the floor / pegs
       const pillion = taxi.passenger;
@@ -113,6 +124,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
         arm(R, toTorso(V(-0.2, HIP + 0.05, 0.32), al), V(-1, -0.4, -0.2)); // hands resting on the thighs
         arm(L, toTorso(V(0.2, HIP + 0.05, 0.32), al), V(1, -0.4, -0.2));
       } else {
+        handPoseL = handPoseR = 'fist';
         for (const side of [R, L]) {
           const g = GRIP(side, bike.steer);
           arm(side, toTorso(V(g.x - seat.x, g.y - seat.y + HIP, g.z - seat.z), al), V(side, -0.7, -0.25));
@@ -120,8 +132,8 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
       }
     } else if (player.seat) {
       // ---- seated at the table
-      b.position.set(0, -0.52, 0);
-      leg(-1, -1.7, 1.85, 0.08); leg(1, -1.7, 1.85, -0.08); // low stool: knees up, feet flat
+      b.position.set(0, -0.52 * k, 0);
+      leg(-1, -1.7 * k, 0.08 + 1.77 * k, 0.08 * k); leg(1, -1.7 * k, 0.08 + 1.77 * k, -0.08 * k); // low stool: knees up, feet flat
       const restR = V(-0.18, 1.1, 0.42); const restL = V(0.3, 1.08, 0.4);
       const eating = s.phase === 'eating' || s.phase === 'finished' || s.phase === 'served';
       let handR = restR.clone(); let handL = restL.clone();
@@ -131,7 +143,8 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
       let glassPose: { tilt: number } | null = null;
       let streamSurface: THREE.Vector3 | null = null;
       if (eating) {
-        showSticks = true;
+        showSticks = s.phase === 'eating';
+        if (showSticks) handPoseR = 'pinch';
         const p = s.phase === 'eating' ? s.eatProgress : s.phase === 'finished' ? 1 : 0;
         const m = mealAt(s.order, p);
         const lv = drinkLevels(s.order, p);
@@ -154,6 +167,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
           leanTarget = track(u, [[0, 0.05], [0.14, 0.22], [0.4, 0.32], [0.62, 0.2], [0.85, 0.12], [1, 0.05]], lerpN);
           headPitch = track(u, [[0, 0.25], [0.74, 0.3], [0.85, 0.05], [0.9, 0.08], [1, 0.25]], lerpN);
           showMorsel = u > 0.2 && u < 0.885;
+          if (u > 0.84) mouthState = 'eating';
           const kind = u < 0.46 ? 'noodle' : u < 0.68 ? 'wrap' : 'dipped';
           if (kind !== morselKind) setMorselKind(kind);
         } else if (m.action && firstDrink(s.order)) {
@@ -170,6 +184,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
             handL = track(u, [[0, restL], [0.18, C.clone().add(V(0, grip, 0))], [0.22, C.clone().add(V(0, grip, 0))], [0.36, above], [0.78, above], [0.9, C.clone().add(V(0, grip, 0))], [0.93, C.clone().add(V(0, grip, 0))], [1, restL]], lerpV);
             bottlePose = { tilt: track(u, [[0, 0], [0.38, 0], [0.48, -1.95], [0.7, -1.95], [0.8, 0], [1, 0]], lerpN), grip };
             showBottle = u > 0.2 && u < 0.92;
+            if (showBottle) handPoseL = 'grip';
             leanTarget = track(u, [[0, 0.05], [0.18, 0.3], [0.36, 0.25], [0.9, 0.3], [1, 0.05]], lerpN);
             showStream = u > 0.47 && u < 0.72;
             streamSurface = G.clone().add(V(0, 0.012 + 0.1 * lv.glass, 0));
@@ -181,6 +196,8 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
             headPitch = track(u, [[0, 0.22], [0.46, 0], [0.56, -0.3], [0.72, -0.34], [0.8, 0.1], [1, 0.22]], lerpN);
             leanTarget = track(u, [[0, 0.05], [0.2, 0.3], [0.46, 0.02], [0.86, 0.3], [1, 0.05]], lerpN);
             showGlass = u > 0.22 && u < 0.9;
+            if (showGlass) handPoseL = 'grip';
+            if (u > 0.44 && u < 0.76) mouthState = 'drinking';
           }
         }
         handR = tip.clone().addScaledVector(tipDir, -0.2);
@@ -213,12 +230,23 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
       // ---- walking (with the takeaway bag in hand while delivering)
       const run = Math.min(1, speed.current / 5);
       const swing = run * Math.sin(phase.current) * 0.6;
-      b.position.set(0, Math.abs(Math.sin(phase.current)) * 0.04 * run, 0);
-      leg(-1, swing, 0.08 + Math.max(0, -swing) * 1.1); leg(1, -swing, 0.08 + Math.max(0, swing) * 1.1);
+      b.position.set(0, Math.abs(Math.sin(phase.current)) * 0.04 * run - 0.52 * k, 0);
+      const lerp = THREE.MathUtils.lerp;
+      leg(-1, lerp(swing, -1.7, k), lerp(0.08 + Math.max(0, -swing) * 1.1, 1.85, k)); leg(1, lerp(-swing, -1.7, k), lerp(0.08 + Math.max(0, swing) * 1.1, 1.85, k));
       lean(0.04 * run);
+      idle = run < 0.1;
+      showPhone = s.phone;
       const carrying = s.job?.stage === 'deliver';
       for (const side of [R, L]) {
+        if (showPhone && side === L) {
+          // holding the phone in front of the chest, looking down at it
+          const hl = arm(L, V(0.06, 0.3, 0.3), V(1, -0.6, -0.1));
+          handPoseL = 'phone'; headPitch = 0.35;
+          if (phone3d.current) { phone3d.current.position.copy(hl).add(V(-0.02, -0.03, 0.02)); phone3d.current.rotation.set(-0.9, 0.35, 0); }
+          continue;
+        }
         if (carrying && side === R) {
+          handPoseR = 'grip';
           const w = arm(R, V(-0.3, 0.12, 0.12), V(-1, -0.3, -0.3));
           if (bag.current) { bag.current.position.copy(w).add(V(0, -0.3, 0)); showBag = true; }
           continue;
@@ -235,11 +263,16 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
       mood.current.toast = toast.id;
       const good = /(Ngon|cảm ơn|Cảm ơn|bo thêm|Đã tới|Tốt lắm|Mát lạnh)/.test(toast.text);
       const bad = /(huỷ|Không đủ|Đói|Khát|đói|khát|Quá giờ)/.test(toast.text);
-      if (good || bad) mood.current = { kind: good ? 'happy' : 'surprised', until: performance.now() + 3500, toast: toast.id };
+      const tipped = /bo thêm|Nhanh thế/.test(toast.text);
+      const kind: Expression = good ? (tipped ? 'laugh' : 'happy') : /huỷ/.test(toast.text) ? 'sad' : /Không đủ|Không có chỗ/.test(toast.text) ? 'confused' : 'surprised';
+      if (good || bad || kind === 'confused') mood.current = { kind, until: performance.now() + 3500, toast: toast.id };
     }
     expression.current = expressionOverride?.current ? expressionOverride.current : performance.now() < mood.current.until ? mood.current.kind
-      : s.phase === 'eating' || s.phase === 'finished' ? 'happy'
-      : s.hunger < 15 || s.thirst < 15 ? 'surprised' : 'neutral';
+      : mouthState ? mouthState
+      : s.dialog ? 'talking'
+      : s.phase === 'eating' ? 'smile' : s.phase === 'finished' ? 'happy'
+      : s.phone ? 'smile'
+      : s.hunger < 15 || s.thirst < 15 ? 'sad' : 'neutral';
     if (expression.current !== expr) setExpr(expression.current);
     R0.head.rotation.x = THREE.MathUtils.damp(R0.head.rotation.x, headPitch, 10, dt);
     if (sticks.current) sticks.current.visible = showSticks;
@@ -248,10 +281,13 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
     if (heldGlass.current) heldGlass.current.visible = showGlass;
     if (stream.current) stream.current.visible = showStream;
     if (bag.current) bag.current.visible = showBag;
+    if (phone3d.current) phone3d.current.visible = showPhone;
+    R0.setHand('L', handPoseL); R0.setHand('R', handPoseR);
+    if (idle !== idleLook) setIdleLook(idle);
   });
 
   return <group ref={body}>
-    <PlayerModel ref={rig} expression={expr} shipperBag={shipping} />
+    <PlayerModel ref={rig} expression={expr} shipperBag={shipping} outfit={outfit} idleLook={idleLook} />
     {/* held props live in a frame that follows the spine */}
     <group ref={propSpace} position={[0, SPINE, 0]}>
       <group ref={sticks} visible={false}><Chopsticks spread={0.008} /></group>
@@ -260,6 +296,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
       <group ref={heldGlass} visible={false}><group><IceGlass id={drinkId} level={glassLevel} /></group></group>
       <mesh ref={stream} visible={false} material={streamMat}><cylinderGeometry args={[0.007, 0.009, 1, 8]} /></mesh>
       <group ref={bag} visible={false}><TakeawayBag /></group>
+      <group ref={phone3d} visible={false}><Phone3D /></group>
     </group>
   </group>;
 }

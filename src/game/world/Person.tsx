@@ -1,6 +1,8 @@
 import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef, type ReactNode } from 'react';
 import * as THREE from 'three';
+import { HumanModel, type Expression, type PlayerRig } from '../character/HumanModel';
+import { npcOutfit, type NpcRole, type Outfit } from '../character/outfit';
 
 /** Floating name label above an NPC ("Đạt · Nướng chả"). */
 export function NameTag({ name, role, y = 2.35, color = '#e6bd83' }: { name: string; role?: string; y?: number; color?: string }) {
@@ -22,68 +24,50 @@ export function NameTag({ name, role, y = 2.35, color = '#e6bd83' }: { name: str
 export type PersonAnim = { mode: 'stand' | 'walk' | 'sit' | 'eat' | 'fan' | 'carry' | 'wave'; speed: number };
 
 /**
- * Low-poly Hà Nội local used for NPCs (waiter, grill cook, diners). Animation is driven through a
- * mutable `anim` object so NPC logic can change pose every frame without React re-renders.
+ * Hà Nội locals (waiter, grill cook, owner, diners, customers, drivers) on the shared character system:
+ * the same rig and body as the player, dressed from an NPC outfit. Animation is driven through a mutable
+ * `anim` object so NPC logic can change pose every frame without React re-renders.
  */
-export function Person({ anim, shirt = '#f3efe6', pants = '#2d3442', skin = '#c99a78', hair = '#1b1715', apron, hat, children, seed = 0 }: {
-  anim: PersonAnim; shirt?: string; pants?: string; skin?: string; hair?: string; apron?: string; hat?: string; children?: ReactNode; seed?: number;
+export function Person({ anim, shirt = '#f3efe6', pants = '#2d3442', skin, hair, apron, hat, children, seed = 0, role = 'middleAged', outfit }: {
+  anim: PersonAnim; shirt?: string; pants?: string; skin?: string; hair?: string; apron?: string; hat?: string; children?: ReactNode; seed?: number; role?: NpcRole; outfit?: Outfit;
 }) {
-  const legs = [useRef<THREE.Group>(null), useRef<THREE.Group>(null)];
-  const arms = [useRef<THREE.Group>(null), useRef<THREE.Group>(null)];
-  const body = useRef<THREE.Group>(null);
-  const head = useRef<THREE.Group>(null);
+  const o = useMemo(() => outfit ?? npcOutfit(role, seed, {
+    top: apron ? 'tee' : 'shirt', tee: shirt, hood: null, sling: false, backpack: false,
+    pants, pantsLight: '#' + new THREE.Color(pants).multiplyScalar(1.25).getHexString(), pantsDark: '#' + new THREE.Color(pants).multiplyScalar(0.75).getHexString(), pantsCuff: pants, cargo: false, shorts: false, skirt: false,
+    ...(skin ? { skin } : {}), ...(hair ? { hair, hairLight: hair, hairDark: hair } : {}),
+    apron: apron ?? null, hat: hat ? 'nonla' : 'none', hatColor: hat ?? '#d9c38a',
+  }), [outfit, role, seed, shirt, pants, skin, hair, apron, hat]);
+  const rig = useRef<PlayerRig>(null);
   const phase = useRef(seed * 3.7);
-  const mats = useMemo(() => ({
-    shirt: new THREE.MeshStandardMaterial({ color: shirt, roughness: 0.85 }),
-    pants: new THREE.MeshStandardMaterial({ color: pants, roughness: 0.85 }),
-    skin: new THREE.MeshStandardMaterial({ color: skin, roughness: 0.7 }),
-    hair: new THREE.MeshStandardMaterial({ color: hair, roughness: 0.9 }),
-    apron: apron ? new THREE.MeshStandardMaterial({ color: apron, roughness: 0.8 }) : null,
-    hat: hat ? new THREE.MeshStandardMaterial({ color: hat, roughness: 0.8 }) : null,
-    shoe: new THREE.MeshStandardMaterial({ color: '#2a2622', roughness: 0.6 }),
-  }), [shirt, pants, skin, hair, apron, hat]);
+  const expr: Expression = anim.mode === 'wave' ? 'happy' : anim.mode === 'eat' ? 'eating' : 'neutral';
   useFrame((_, dt) => {
+    const r = rig.current; if (!r || !r.hips) return;
     const a = anim;
     phase.current += dt * (a.mode === 'walk' || a.mode === 'carry' ? 4 + a.speed * 1.3 : a.mode === 'fan' ? 9 : 2.2);
     const s = Math.sin(phase.current);
-    const L0 = legs[0].current, L1 = legs[1].current, A0 = arms[0].current, A1 = arms[1].current;
-    if (!L0 || !L1 || !A0 || !A1 || !body.current) return;
     const sitting = a.mode === 'sit' || a.mode === 'eat' || a.mode === 'fan';
-    body.current.position.y = sitting ? -0.52 : (a.mode === 'walk' || a.mode === 'carry') ? Math.abs(s) * 0.04 : 0;
-    if (sitting) {
-      L0.rotation.set(-1.35, 0, 0.1); L1.rotation.set(-1.35, 0, -0.1);
-    } else {
-      const swing = (a.mode === 'walk' || a.mode === 'carry') ? Math.min(1, a.speed / 4) * s * 0.55 : 0;
-      L0.rotation.set(swing, 0, 0); L1.rotation.set(-swing, 0, 0);
-    }
-    if (a.mode === 'wave') { A0.rotation.set(-0.3, 0, -2.5 + Math.sin(phase.current * 3) * 0.35); A1.rotation.set(0, 0, -0.06); }
-    else if (a.mode === 'carry') { A0.rotation.set(-1.25, 0, 0.25); A1.rotation.set(-1.25, 0, -0.25); }
-    else if (a.mode === 'fan') { A0.rotation.set(-0.9, 0, 0.3 + s * 0.35); A1.rotation.set(-0.6, 0, -0.1); }
-    else if (a.mode === 'eat') { const bite = Math.max(0, s); A0.rotation.set(-0.9 - bite * 0.9, 0, 0.15); A1.rotation.set(-0.75, 0, -0.1); }
-    else if (a.mode === 'sit') { A0.rotation.set(-0.5, 0, 0.1); A1.rotation.set(-0.5, 0, -0.1); }
-    else if (a.mode === 'walk') { const swing = Math.min(1, a.speed / 4) * s * 0.5; A0.rotation.set(-swing, 0, 0.05); A1.rotation.set(swing, 0, -0.05); }
-    else { A0.rotation.set(Math.sin(phase.current * 0.4) * 0.05, 0, 0.06); A1.rotation.set(-Math.sin(phase.current * 0.4) * 0.05, 0, -0.06); }
-    if (head.current) head.current.rotation.set(a.mode === 'eat' ? 0.25 : 0, Math.sin(phase.current * 0.21) * 0.25, 0);
+    r.hips.position.y = sitting ? 0.4 : 0.92 + ((a.mode === 'walk' || a.mode === 'carry') ? Math.abs(s) * 0.03 : 0);
+    const legs = (thigh: number, knee: number, swing = 0) => {
+      r.hipL.rotation.set(thigh + swing, 0, 0.02); r.hipR.rotation.set(thigh - swing, 0, -0.02);
+      r.kneeL.rotation.set(knee + Math.max(0, -swing) * 1.1, 0, 0); r.kneeR.rotation.set(knee + Math.max(0, swing) * 1.1, 0, 0);
+    };
+    if (sitting) legs(-1.6, 1.7);
+    else { const sw = (a.mode === 'walk' || a.mode === 'carry') ? Math.min(1, a.speed / 4) * s * 0.55 : 0; legs(0, 0.05, sw); }
+    const arm = (side: 1 | -1, sx: number, sz: number, ex: number) => {
+      const sh = side === 1 ? r.shoulderL : r.shoulderR; const el = side === 1 ? r.elbowL : r.elbowR;
+      sh.rotation.set(sx, 0, sz); el.rotation.set(ex, 0, 0);
+    };
+    if (a.mode === 'carry') { arm(1, -0.55, 0.25, -1.0); arm(-1, -0.55, -0.25, -1.0); r.setHand('L', 'open'); r.setHand('R', 'open'); }
+    else if (a.mode === 'wave') { arm(-1, -0.2, -2.4 + s * 0.3, -0.6); arm(1, 0, 0.08, -0.1); r.setHand('R', 'open'); }
+    else if (a.mode === 'fan') { arm(-1, -0.8, -0.35 - s * 0.35, -0.9); arm(1, -0.6, 0.2, -0.9); r.setHand('R', 'grip'); }
+    else if (a.mode === 'eat') { const bite = Math.max(0, s); arm(-1, -0.7 - bite * 0.5, -0.2, -1.1 - bite * 0.7); arm(1, -0.55, 0.2, -1.0); r.setHand('R', 'pinch'); }
+    else if (a.mode === 'sit') { arm(1, -0.45, 0.12, -0.8); arm(-1, -0.45, -0.12, -0.8); }
+    else if (a.mode === 'walk') { const sw = Math.min(1, a.speed / 4) * s * 0.5; arm(1, -sw, 0.08, -0.2); arm(-1, sw, -0.08, -0.2); }
+    else { arm(1, Math.sin(phase.current * 0.4) * 0.04, 0.08, -0.15); arm(-1, -Math.sin(phase.current * 0.4) * 0.04, -0.08, -0.15); }
+    r.head.rotation.x = a.mode === 'eat' ? 0.25 : 0;
   });
-  return <group ref={body}>
-    <mesh position={[0, 1.25, 0]} castShadow material={mats.shirt}><capsuleGeometry args={[0.23, 0.5, 6, 12]} /></mesh>
-    {mats.apron && <mesh position={[0, 1.08, 0.2]} castShadow material={mats.apron}><boxGeometry args={[0.42, 0.62, 0.04]} /></mesh>}
-    <mesh position={[0, 0.98, 0]} castShadow material={mats.pants}><cylinderGeometry args={[0.24, 0.23, 0.16, 12]} /></mesh>
-    {/* head pivots at the base of the neck, so nodding never detaches it */}
-    <group ref={head} position={[0, 1.64, 0]}>
-      <mesh position={[0, 0.13, 0]} material={mats.skin}><cylinderGeometry args={[0.065, 0.075, 0.2, 10]} /></mesh>
-      <mesh position={[0, 0.31, 0.01]} castShadow material={mats.skin}><sphereGeometry args={[0.17, 16, 12]} /></mesh>
-      <mesh position={[0, 0.39, -0.01]} castShadow material={mats.hair}><sphereGeometry args={[0.18, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2.1]} /></mesh>
-      {mats.hat && <mesh position={[0, 0.48, 0]} castShadow material={mats.hat}><coneGeometry args={[0.36, 0.2, 18]} /></mesh>}
-    </group>
-    {[-1, 1].map((side, i) => <group key={`l${side}`} ref={legs[i]} position={[side * 0.12, 0.92, 0]}>
-      <mesh position={[0, -0.42, 0]} castShadow material={mats.pants}><capsuleGeometry args={[0.09, 0.62, 4, 8]} /></mesh>
-      <mesh position={[0, -0.86, 0.06]} castShadow material={mats.shoe}><boxGeometry args={[0.15, 0.09, 0.3]} /></mesh>
-    </group>)}
-    {[-1, 1].map((side, i) => <group key={`a${side}`} ref={arms[i]} position={[side * 0.3, 1.52, 0]}>
-      <mesh position={[0, -0.3, 0]} castShadow material={mats.shirt}><capsuleGeometry args={[0.07, 0.45, 4, 8]} /></mesh>
-      <mesh position={[0, -0.6, 0]} material={mats.skin}><sphereGeometry args={[0.07, 8, 6]} /></mesh>
-    </group>)}
+  return <group>
+    <HumanModel ref={rig} outfit={o} expression={expr} detail="low" idleLook={anim.mode === 'stand'} />
     {children}
   </group>;
 }

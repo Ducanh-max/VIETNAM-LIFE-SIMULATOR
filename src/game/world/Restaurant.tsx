@@ -410,7 +410,7 @@ export function Restaurant({ paused }: { paused: boolean }) {
   const served = (phase === 'served' || phase === 'eating' || phase === 'finished') && table >= 0;
   const t = table >= 0 ? TABLES[table] : null;
   const playerSide = t && player.seat ? (worldToRestaurant([player.seat.position.x, player.seat.position.z])[1] > t.z ? 1 : -1) : 1;
-  const inHand = phase === 'eating' || phase === 'finished';
+  const inHand = phase === 'eating'; // chopsticks are picked up to eat and put back down when finished
 
   return <group position={[RESTAURANT.center[0], GROUND_HEIGHT, RESTAURANT.center[1]]} rotation={[0, RESTAURANT.angle, 0]}>
     <Building mats={mats} />

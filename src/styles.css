@@ -210,3 +210,13 @@
 .den-vehicles button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px;border-radius:14px;border:1.5px solid #2a2d30;background:#111315;color:#f2f5f3;text-align:left}
 .den-vehicles button.on{border-color:#16c784;background:#0f2a1f}
 .den-veh-icon{font-size:22px}.den-vehicles b{font-size:13px}.den-vehicles small{font-size:10px;color:#9aa39f}.den-vehicles strong{font-size:15px;color:#16c784;margin-top:4px}
+.character-card{width:240px}
+.character-stage{position:relative}
+.character-zoom{position:absolute;right:4px;top:4px;padding:4px 8px;border:1px solid #ffffff33;background:#0e2220cc;color:#e6bd83;font-size:10px;font-weight:700}
+.character-select{width:100%;margin:4px 0 6px;padding:6px;background:#0e2220;color:#f4f0e6;border:1px solid #ffffff2a;font:inherit;font-size:11px}
+.character-swatches{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-top:5px}
+.character-swatches span{width:56px;font-size:10px;color:#c7d1cb}
+.character-swatches button{width:18px;height:18px;border-radius:50%;border:2px solid #ffffff44;padding:0}
+.character-swatches button.on{border-color:#e6bd83;box-shadow:0 0 0 2px #e6bd8355}
+.character-swatches button.chip{width:auto;height:auto;border-radius:10px;padding:2px 8px;background:#0e2220;color:#c7d1cb;font-size:10px;font-weight:700;border-width:1px}
+.character-swatches button.chip.on{background:#e6bd83;color:#1e2824}

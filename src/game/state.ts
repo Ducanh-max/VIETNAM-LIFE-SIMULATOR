@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import * as THREE from 'three';
 import type { Ride } from './ride';
+import { loadPlayerOutfit, savePlayerOutfit, type Outfit } from './character/outfit';
 
 /** Menu of Bún chả Đức Anh. Prices in VND. */
 export type MenuId = 'buncha' | 'pepsi' | 'coca' | 'sevenup' | 'lavie';
@@ -33,6 +34,8 @@ type State = {
   toast: { text: string; id: number } | null;
   /** Mini smartphone overlay. */
   phone: boolean;
+  /** The player's outfit (modular, saved). */
+  outfit: Outfit;
   /** Current Đen SM ride, if any. */
   ride: Ride | null;
   /** Wallet history (newest first) and phone messages (newest first). */
@@ -51,7 +54,7 @@ function load(): Pick<State, 'hunger' | 'thirst' | 'money'> {
   return { hunger: 72, thirst: 64, money: 300_000 };
 }
 
-let state: State = { ...load(), phase: 'none', order: {}, table: -1, eatProgress: 0, prompt: null, toast: null, dialog: null, job: null, phone: false, ride: null, txns: [], messages: [] };
+let state: State = { ...load(), phase: 'none', order: {}, table: -1, eatProgress: 0, prompt: null, toast: null, dialog: null, job: null, phone: false, ride: null, txns: [], messages: [], outfit: loadPlayerOutfit() };
 
 // One-time gift of 500.000đ for existing and new saves.
 const BONUS_KEY = 'doi-viet-bonus-500k';
@@ -66,6 +69,12 @@ if (!localStorage.getItem(BONUS_KEY)) {
 /** Record money in/out (amount negative for spending) and keep the wallet history. */
 export function addMoney(amount: number, text: string) {
   game.set({ money: state.money + amount, txns: [{ text, amount, at: Date.now() }, ...state.txns].slice(0, 60) });
+}
+/** Change pieces of the player's outfit and save them. */
+export function setOutfit(patch: Partial<Outfit>) {
+  const outfit = { ...state.outfit, ...patch };
+  savePlayerOutfit(outfit);
+  game.set({ outfit });
 }
 export function pushMessage(from: string, text: string) {
   game.set({ messages: [{ from, text, at: Date.now() }, ...state.messages].slice(0, 40) });

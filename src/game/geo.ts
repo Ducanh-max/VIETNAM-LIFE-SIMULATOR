@@ -275,6 +275,9 @@ function hitsObstacle([px, pz]: Point) {
 }
 
 /** Walkable extent: the OSM street map covers roughly ±820 m around the lake. */
+/** True when a camera position would be inside a building, wall or other blocker. */
+export function cameraBlocked(p: Point) { return hitsObstacle(p); }
+
 export const WORLD_LIMIT = { x: 780, z: 780 };
 
 const templeWalk = offsetRing(templeIsland, -0.6);

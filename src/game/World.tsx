@@ -7,6 +7,7 @@ import { Player } from './Player';
 import { TheHucBridge } from './world/Bridge';
 import { OsmBuildings } from './world/OsmBuildings';
 import { DenSM } from './world/DenSM';
+import { Pedestrians } from './world/Pedestrians';
 import { Interaction, Job } from './world/Job';
 import { Restaurant } from './world/Restaurant';
 import { Streets } from './world/Streets';
@@ -72,6 +73,7 @@ export function World({ time, quality, paused, freeCamera, onFps, onPosition }: 
     <Restaurant paused={paused} />
     <Job />
     <DenSM paused={paused} />
+    <Pedestrians />
     <TheHucBridge />
     <TurtleIsland />
     <NgocSonIsland />

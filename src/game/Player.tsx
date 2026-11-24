@@ -1,7 +1,7 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { bridgeEnds, canWalk, groundHeight, type Point } from './geo';
+import { bridgeEnds, cameraBlocked, canWalk, groundHeight, type Point } from './geo';
 import { Avatar } from './Avatar';
 import { taxi } from './ride';
 import { CAR_PASSENGER } from './world/DenCar';
@@ -61,7 +61,7 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
     };
     const pressed = (e: MouseEvent) => { if (e.button === 2) dragging.current = true; };
     const released = () => { dragging.current = false; };
-    const wheel = (e: WheelEvent) => { distance.current = THREE.MathUtils.clamp(distance.current + e.deltaY * 0.01, 3, 22); };
+    const wheel = (e: WheelEvent) => { distance.current = THREE.MathUtils.clamp(distance.current + e.deltaY * 0.01, 1.4, 22); };
     const blur = () => keys.current.clear();
     const menu = (e: Event) => e.preventDefault();
     window.addEventListener('keydown', down);
@@ -272,10 +272,17 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
     view.yaw = yaw.current;
     if (avatar.current && avatar.current.rotation.z !== 0) avatar.current.rotation.set(0, avatar.current.rotation.y, 0, 'XYZ');
     if (!paused) tickNeeds(dt, running && speed.current > 1, speed.current > 0.5);
-    const dist = Math.min(distance.current, player.cameraMax);
+    let dist = Math.min(distance.current, player.cameraMax);
+    // camera collision: pull the camera in front of walls and buildings between it and the player
+    for (let k = 1; k <= 10; k++) {
+      const dd = (dist * k) / 10;
+      const q: Point = [p.x - forward.x * Math.cos(pitch.current) * dd, p.z - forward.z * Math.cos(pitch.current) * dd];
+      if (cameraBlocked(q)) { dist = Math.max(1.2, dd - 0.35); break; }
+    }
     const desired = p.clone()
       .addScaledVector(forward, -Math.cos(pitch.current) * dist)
       .add(new THREE.Vector3(0, 1.6 + Math.sin(pitch.current) * dist, 0));
+    desired.y = Math.max(desired.y, p.y + 0.4);
     camera.position.lerp(desired, 1 - Math.exp(-8 * dt));
     camera.lookAt(p.x, p.y + 1.5, p.z);
   });
