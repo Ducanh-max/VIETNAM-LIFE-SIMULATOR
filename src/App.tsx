@@ -1,53 +1,16 @@
 import { Canvas } from '@react-three/fiber';
-import { Sky, Stars } from '@react-three/drei';
 import { memo, useEffect, useState } from 'react';
 import * as THREE from 'three';
-import { Explorer, type ExplorerMode } from './world/Explorer';
-import { Landmarks } from './world/Historic';
-import { Landscape, type TimeOfDay } from './world/Landscape';
-import { Urban } from './world/Urban';
-import { mapAttribution, type Point } from './world/geo';
+import { mapAttribution, type Point } from './game/geo';
+import { qualityConfig, World, type Quality, type TimeOfDay } from './game/World';
 import { NameEntry, VietnamMap } from './ui/Entry';
 import { loadPlayerName, savePlayerName } from './ui/player';
 import { vietnamTimeOfDay } from './ui/vietnamTime';
 
-type Quality = 'low' | 'medium' | 'high' | 'ultra';
+type ExplorerMode = 'home' | 'game';
 type Panel = 'settings' | 'about' | 'help' | null;
 const buildSha = import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA || import.meta.env.VITE_BUILD_COMMIT;
-const buildLabel = buildSha ? buildSha.slice(0, 7) : 'chưa có SHA';
-const qualityConfig: Record<Quality, { dpr: number; shadow: number; antialias: boolean }> = {
-  low: { dpr: 1, shadow: 0, antialias: false },
-  medium: { dpr: 1.2, shadow: 1024, antialias: true },
-  high: { dpr: 1.6, shadow: 2048, antialias: true },
-  ultra: { dpr: 2, shadow: 4096, antialias: true },
-};
-
-function World({ mode, paused, time, quality, freeCamera, onFps, onPosition }: {
-  mode: ExplorerMode; paused: boolean; time: TimeOfDay; quality: Quality; freeCamera: boolean;
-  onFps: (fps: number) => void; onPosition: (point: Point) => void;
-}) {
-  const sun = time === 'day' ? [120, 150, -45] : time === 'sunset' ? [-145, 48, 90] : [45, 75, -80];
-  const light = time === 'day' ? '#fff3d5' : time === 'sunset' ? '#ffc08e' : '#a8bbd2';
-  const ambient = time === 'day' ? 0.95 : time === 'sunset' ? 0.76 : 0.58;
-  const intensity = time === 'day' ? 2.75 : time === 'sunset' ? 2.25 : 0.7;
-  const background = time === 'day' ? '#a7c8cf' : time === 'sunset' ? '#cf8d85' : '#1c2b35';
-  const shadows = qualityConfig[quality].shadow;
-  return <>
-    <color attach="background" args={[background]} />
-    <fog attach="fog" args={[background, 290, quality === 'low' ? 590 : 800]} />
-    {time !== 'night' && <Sky distance={450000} sunPosition={sun as [number, number, number]} inclination={time === 'day' ? 0.5 : 0.62} turbidity={time === 'day' ? 3.5 : 5.5} rayleigh={time === 'day' ? 1.6 : 2.2} />}
-    {time === 'night' && <Stars radius={350} depth={80} count={750} factor={3} fade speed={0.35} />}
-    <hemisphereLight args={[time === 'night' ? '#6b829b' : '#d6e9eb', '#677264', ambient]} />
-    <ambientLight intensity={time === 'night' ? 0.2 : 0.18} />
-    <directionalLight position={sun as [number, number, number]} color={light} intensity={intensity} castShadow={shadows > 0}
-      shadow-mapSize={[shadows, shadows]} shadow-camera-left={-190} shadow-camera-right={190} shadow-camera-top={190} shadow-camera-bottom={-190}
-      shadow-camera-near={1} shadow-camera-far={520} shadow-bias={-0.0003} shadow-normalBias={0.025} />
-    <Landscape time={time} />
-    <Landmarks time={time} />
-    <Urban time={time} />
-    <Explorer mode={mode} paused={paused} freeCamera={freeCamera} onFps={onFps} onPosition={onPosition} />
-  </>;
-}
+const buildLabel = buildSha ? buildSha.slice(0, 7) : 'localhost';
 
 const MemoWorld = memo(World);
 
@@ -68,7 +31,7 @@ function App() {
   const [time, setTime] = useState<TimeOfDay>(() => vietnamTimeOfDay());
   const [playerName, setPlayerName] = useState(loadPlayerName);
   const [renaming, setRenaming] = useState(false);
-  const [quality, setQuality] = useState<Quality>('high');
+  const [quality, setQuality] = useState<Quality>('medium');
   const [freeCamera, setFreeCamera] = useState(false);
   const [paused, setPaused] = useState(false);
   const [fps, setFps] = useState(0);
@@ -123,13 +86,13 @@ function App() {
 
   return <main className="app-shell text-stone-100" data-mode={mode}>
     {mode === 'game' && <div className="scene-wrap" onClick={lockPointer} role="presentation">
-      <Canvas key={quality} camera={{ position: [145, 84, -145], fov: 54, near: 0.1, far: 1500 }} dpr={Math.min(window.devicePixelRatio || 1, config.dpr)} shadows={config.shadow > 0}
+      <Canvas key={quality} camera={{ position: [70, 8, -205], fov: 55, near: 0.1, far: 2000 }} dpr={Math.min(window.devicePixelRatio || 1, config.dpr)} shadows={config.shadow > 0}
         gl={{ antialias: config.antialias, powerPreference: 'high-performance' }} onCreated={({ gl }) => {
           gl.outputColorSpace = THREE.SRGBColorSpace;
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = 1.08;
         }}>
-        <MemoWorld mode={mode} paused={controlsPaused} time={time} quality={quality} freeCamera={freeCamera} onFps={setFps} onPosition={setPosition} />
+        <MemoWorld paused={controlsPaused} time={time} quality={quality} freeCamera={freeCamera} onFps={setFps} onPosition={setPosition} />
       </Canvas>
     </div>}
 
@@ -139,7 +102,7 @@ function App() {
     ) : <>
       <header className="game-header">
         <div className="game-brand" onClick={returnHome} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') returnHome(); }}>ĐỜI VIỆT<span> / HÀ NỘI 3D</span></div>
-        <div className="game-actions"><a className="game-review-link" href="/#heritage-review">So sánh mô hình ↗</a><button title="Trợ giúp" aria-label="Trợ giúp" onClick={() => openPanel('help')}>?</button><button title="Cài đặt" aria-label="Cài đặt" onClick={() => openPanel('settings')}><Icon name="settings" /></button><button title={paused ? 'Tiếp tục' : 'Tạm dừng'} aria-label={paused ? 'Tiếp tục' : 'Tạm dừng'} onClick={() => { if (document.pointerLockElement) document.exitPointerLock(); setPaused(!paused); }}><Icon name={paused ? 'play' : 'pause'} /></button></div>
+        <div className="game-actions"><button title="Trợ giúp" aria-label="Trợ giúp" onClick={() => openPanel('help')}>?</button><button title="Cài đặt" aria-label="Cài đặt" onClick={() => openPanel('settings')}><Icon name="settings" /></button><button title={paused ? 'Tiếp tục' : 'Tạm dừng'} aria-label={paused ? 'Tiếp tục' : 'Tạm dừng'} onClick={() => { if (document.pointerLockElement) document.exitPointerLock(); setPaused(!paused); }}><Icon name={paused ? 'play' : 'pause'} /></button></div>
       </header>
       <div className="area-tag"><Icon name="compass" /><span>{freeCamera ? 'CHẾ ĐỘ DRONE' : 'ĐANG KHÁM PHÁ'}<strong>Hồ Hoàn Kiếm, Hà Nội</strong>{playerName && <em className="area-player">{playerName}</em>}<small>Commit {buildLabel}</small></span></div>
       {freeCamera && <div className="drone-reticle" aria-hidden="true">+</div>}
@@ -155,7 +118,7 @@ function App() {
         <div className="setting-group"><label>Chất lượng đồ họa</label><div className="segmented quality">{(['low', 'medium', 'high', 'ultra'] as Quality[]).map((value) => <button key={value} className={quality === value ? 'selected' : ''} onClick={() => setQuality(value)}>{value.toUpperCase()}</button>)}</div></div>
         <div className="setting-group toggle-row"><div><label>Chế độ drone</label><small>Nhấn V để bật/tắt. Space/Ctrl để lên/xuống, Shift để bay nhanh.</small></div><button className={`toggle ${freeCamera ? 'on' : ''}`} role="switch" aria-checked={freeCamera} onClick={() => setFreeCamera(!freeCamera)}><span /></button></div>
         <button className="primary-button modal-primary" onClick={() => setPanel(null)}>Áp dụng</button>
-      </> : panel === 'about' ? <><span className="modal-kicker">VỀ ĐỜI VIỆT</span><h2>Một thế giới bắt đầu từ Hà Nội.</h2><p>ĐỜI VIỆT là bản thử nghiệm game web 3D mô phỏng Việt Nam. Phiên bản này tập trung vào cảnh quan Hồ Hoàn Kiếm, Cầu Thê Húc, Đền Ngọc Sơn và Tháp Rùa.</p><p>Địa hình hồ và vị trí các đảo dựa trên dữ liệu OpenStreetMap. Các công trình hiện là mô hình 3D dựng theo cấu trúc kiến trúc tham khảo; chi tiết chuyên sâu sẽ được tiếp tục hoàn thiện.</p><p>Phiên bản triển khai: <strong>commit {buildLabel}</strong>.</p><div className="about-stats"><div><strong>01</strong><span>Khu vực</span></div><div><strong>03</strong><span>Chế độ ánh sáng</span></div><div><strong>04</strong><span>Mức đồ họa</span></div></div><button className="primary-button modal-primary" onClick={mode === 'home' ? start : () => setPanel(null)}>{mode === 'home' ? 'Bắt đầu khám phá' : 'Quay lại game'} <span>↗</span></button></> : <><span className="modal-kicker">HƯỚNG DẪN KHÁM PHÁ</span><h2>Dạo bước bên Hồ Gươm.</h2><div className="help-grid"><div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Di chuyển</span></div><div><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd><span>Xoay góc nhìn</span></div><div><kbd>SHIFT</kbd><span>Chạy / bay nhanh</span></div><div><kbd>V</kbd><span>Bật / tắt drone</span></div><div><kbd>SPACE</kbd><kbd>CTRL</kbd><span>Drone lên / xuống</span></div><div><kbd>ESC</kbd><span>Thoát con trỏ</span></div></div><p>Chuột cũng có thể xoay camera khi nhấp vào cảnh 3D để khóa con trỏ. Bạn có thể đi qua Cầu Thê Húc tới đảo Ngọc Sơn; bờ hồ và công trình có va chạm cơ bản.</p><button className="primary-button modal-primary" onClick={() => setPanel(null)}>Bắt đầu đi dạo <span>↗</span></button></>}
+      </> : panel === 'about' ? <><span className="modal-kicker">VỀ ĐỜI VIỆT</span><h2>Một thế giới bắt đầu từ Hà Nội.</h2><p>ĐỜI VIỆT là bản thử nghiệm game web 3D mô phỏng Việt Nam. Phiên bản này tập trung vào cảnh quan Hồ Hoàn Kiếm, Cầu Thê Húc, Đền Ngọc Sơn và Tháp Rùa.</p><p>Bờ hồ và vị trí các đảo lấy theo dữ liệu OpenStreetMap. Tháp Rùa, Cầu Thê Húc, Đền Ngọc Sơn, cây cối và phố xá đều được dựng hoàn toàn bằng Three.js, không dùng file mô hình ngoài.</p><p>Phiên bản triển khai: <strong>commit {buildLabel}</strong>.</p><div className="about-stats"><div><strong>01</strong><span>Khu vực</span></div><div><strong>03</strong><span>Chế độ ánh sáng</span></div><div><strong>04</strong><span>Mức đồ họa</span></div></div><button className="primary-button modal-primary" onClick={mode === 'home' ? start : () => setPanel(null)}>{mode === 'home' ? 'Bắt đầu khám phá' : 'Quay lại game'} <span>↗</span></button></> : <><span className="modal-kicker">HƯỚNG DẪN KHÁM PHÁ</span><h2>Dạo bước bên Hồ Gươm.</h2><div className="help-grid"><div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Di chuyển</span></div><div><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd><span>Xoay góc nhìn</span></div><div><kbd>SHIFT</kbd><span>Chạy / bay nhanh</span></div><div><kbd>V</kbd><span>Bật / tắt drone</span></div><div><kbd>SPACE</kbd><kbd>CTRL</kbd><span>Drone lên / xuống</span></div><div><kbd>ESC</kbd><span>Thoát con trỏ</span></div></div><p>Nhấp vào cảnh để khóa con trỏ và xoay camera bằng chuột, hoặc giữ chuột phải rồi kéo; cuộn chuột để phóng to, thu nhỏ. Bạn có thể đi qua Cầu Thê Húc tới đảo Ngọc Sơn; bờ hồ và công trình có va chạm cơ bản.</p><button className="primary-button modal-primary" onClick={() => setPanel(null)}>Bắt đầu đi dạo <span>↗</span></button></>}
     </section></div>}
     <div className="attribution">Dữ liệu bản đồ © {mapAttribution}</div>
   </main>;
