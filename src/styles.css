@@ -196,3 +196,12 @@
 .den-route,.den-fare{display:flex;flex-direction:column;gap:2px;padding:12px;border-radius:14px;background:#17191b}
 .den-route span,.den-fare span{font-size:11px;color:#9aa39f}.den-route b,.den-fare b{font-size:15px}.den-route small,.den-fare small{font-size:11px;color:#9aa39f}
 .den-fare b{color:#16c784;font-size:20px}
+/* Character turntable on the destination screen */
+.character-card{position:absolute;z-index:3;right:3%;bottom:26px;width:220px;padding:12px 14px 12px;background:#13302bd9;border:1px solid #e3c48f55;backdrop-filter:blur(8px);display:flex;flex-direction:column;gap:2px}
+.character-kicker{font-size:9px;font-weight:800;letter-spacing:.2em;color:#e3c48f}
+.character-card strong{font-size:15px;color:#fff}
+.character-stage{height:250px;margin:4px -6px}
+.character-moods{display:flex;gap:4px}
+.character-moods button{flex:1;padding:6px 2px;border:1px solid #ffffff2a;background:#0e2220;color:#c7d1cb;font-size:10px;font-weight:700}
+.character-moods button.on{background:#e6bd83;color:#1e2824;border-color:#e6bd83}
+@media(max-width:900px){.character-card{position:relative;right:auto;bottom:auto;margin:16px 20px;width:auto}}

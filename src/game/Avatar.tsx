@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { CAN_OFFSET, drinkLevels, firstDrink, GLASS_OFFSET, lerpN, lerpV, mealAt, SET, setToBody, track } from './meal';
 import { taxi } from './ride';
 import { bike, game, player, useGame } from './state';
+import { PlayerForearm, PlayerHead, PlayerShin, PlayerThigh, PlayerTorso, PlayerUpperArm, type Expression } from './PlayerLook';
 import { Bottle, bottleLip, Chopsticks, IceGlass, Morsel, TakeawayBag } from './world/food';
 import { GRIP, PILLION, SEAT } from './world/Scooter';
 
@@ -53,7 +54,7 @@ function solveArm(side: number, hand: THREE.Vector3, upper: THREE.Group, fore: T
   return S.clone().addScaledVector(dir, len);
 }
 
-export function Avatar({ speed }: { speed: { current: number } }) {
+export function Avatar({ speed, expressionOverride }: { speed: { current: number }; expressionOverride?: { current: Expression | null } }) {
   const body = useRef<THREE.Group>(null);
   const torso = useRef<THREE.Group>(null);
   const head = useRef<THREE.Group>(null);
@@ -72,7 +73,8 @@ export function Avatar({ speed }: { speed: { current: number } }) {
   const [glassLevel, setGlassLevel] = useState(0);
   const drinkId = useGame((s) => firstDrink(s.order) ?? 'lavie');
   const streamMat = useMemo(() => new THREE.MeshStandardMaterial({ color: drinkId === 'lavie' || drinkId === 'sevenup' ? '#e8f4ff' : '#3a1a0c', transparent: true, opacity: 0.8, roughness: 0.1 }), [drinkId]);
-  const skin = '#c99a78';
+  const expression = useRef<Expression>('neutral');
+  const mood = useRef<{ kind: Expression; until: number; toast: number }>({ kind: 'neutral', until: 0, toast: 0 });
 
   useFrame((_, dt) => {
     const b = body.current, t = torso.current;
@@ -223,6 +225,17 @@ export function Avatar({ speed }: { speed: { current: number } }) {
         F[i]!.position.copy(E); F[i]!.quaternion.copy(tmpQ.setFromUnitVectors(DOWN, dirF));
       }
     }
+    // ---- facial expression: happy while eating / after good news, surprised when starving or on bad news
+    const toast = s.toast;
+    if (toast && toast.id !== mood.current.toast) {
+      mood.current.toast = toast.id;
+      const good = /(Ngon|cảm ơn|Cảm ơn|bo thêm|Đã tới|Tốt lắm|Mát lạnh)/.test(toast.text);
+      const bad = /(huỷ|Không đủ|Đói|Khát|đói|khát|Quá giờ)/.test(toast.text);
+      if (good || bad) mood.current = { kind: good ? 'happy' : 'surprised', until: performance.now() + 3500, toast: toast.id };
+    }
+    expression.current = expressionOverride?.current ? expressionOverride.current : performance.now() < mood.current.until ? mood.current.kind
+      : s.phase === 'eating' || s.phase === 'finished' ? 'happy'
+      : s.hunger < 15 || s.thirst < 15 ? 'surprised' : 'neutral';
     if (head.current) head.current.rotation.x = THREE.MathUtils.damp(head.current.rotation.x, headPitch, 10, dt);
     if (sticks.current) sticks.current.visible = showSticks;
     if (morsel.current) morsel.current.visible = showMorsel;
@@ -233,29 +246,17 @@ export function Avatar({ speed }: { speed: { current: number } }) {
   });
 
   return <group ref={body}>
-    {[-1, 1].map((side, i) => <group key={`l${side}`} ref={thighs[i]} position={[side * 0.12, HIP, 0]}>
-      <mesh position={[0, -THIGH / 2, 0]} castShadow><capsuleGeometry args={[0.095, THIGH - 0.1, 4, 8]} /><meshStandardMaterial color="#33415a" roughness={0.85} /></mesh>
-      <group ref={shins[i]} position={[0, -THIGH, 0]}>
-        <mesh position={[0, -SHIN / 2, 0]} castShadow><capsuleGeometry args={[0.085, SHIN - 0.1, 4, 8]} /><meshStandardMaterial color="#33415a" roughness={0.85} /></mesh>
-        <mesh position={[0, -SHIN + 0.02, 0.06]} castShadow><boxGeometry args={[0.15, 0.09, 0.3]} /><meshStandardMaterial color="#f2f2f2" roughness={0.6} /></mesh>
-      </group>
+    {[-1, 1].map((side, i) => <group key={`l${side}`} ref={thighs[i]} position={[side * 0.13, HIP, 0]}>
+      <PlayerThigh length={THIGH} />
+      <group ref={shins[i]} position={[0, -THIGH, 0]}><PlayerShin length={SHIN} /></group>
     </group>)}
     <group ref={torso} position={[0, HIP, 0]}>
-      <mesh position={[0, 0.33, 0]} castShadow><capsuleGeometry args={[0.24, 0.5, 6, 12]} /><meshStandardMaterial color="#f3efe6" roughness={0.85} /></mesh>
-      <mesh position={[0, 0.06, 0]} castShadow><cylinderGeometry args={[0.25, 0.24, 0.16, 12]} /><meshStandardMaterial color="#2c2b2a" roughness={0.6} /></mesh>
-      <mesh position={[0, 0.38, -0.22]} castShadow><boxGeometry args={[0.36, 0.42, 0.14]} /><meshStandardMaterial color="#2f5d50" roughness={0.8} /></mesh>
+      <PlayerTorso />
       {/* neck and head, pivoting at the base of the neck */}
-      <group ref={head} position={[0, 0.78, 0]}>
-        <mesh position={[0, 0.07, 0]}><cylinderGeometry args={[0.065, 0.075, 0.18, 10]} /><meshStandardMaterial color={skin} /></mesh>
-        <mesh position={[0, 0.27, 0.01]} castShadow><sphereGeometry args={[0.17, 16, 12]} /><meshStandardMaterial color={skin} roughness={0.7} /></mesh>
-        <mesh position={[0, 0.35, -0.01]} castShadow><sphereGeometry args={[0.18, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2.1]} /><meshStandardMaterial color="#1b1715" roughness={0.9} /></mesh>
-      </group>
+      <group ref={head} position={[0, 0.78, 0]}><PlayerHead expression={expression} /></group>
       {[-1, 1].map((side, i) => <group key={`a${side}`}>
-        <group ref={upper[i]}><mesh position={[0, -L1 / 2, 0]} castShadow><capsuleGeometry args={[0.07, L1 - 0.08, 4, 8]} /><meshStandardMaterial color="#f3efe6" roughness={0.85} /></mesh></group>
-        <group ref={fore[i]}>
-          <mesh position={[0, -L2 / 2, 0]} castShadow><capsuleGeometry args={[0.058, L2 - 0.08, 4, 8]} /><meshStandardMaterial color="#f3efe6" roughness={0.85} /></mesh>
-          <mesh position={[0, -L2 - HAND * 0.6, 0]}><sphereGeometry args={[0.06, 10, 8]} /><meshStandardMaterial color={skin} /></mesh>
-        </group>
+        <group ref={upper[i]}><PlayerUpperArm length={L1} /></group>
+        <group ref={fore[i]}><PlayerForearm length={L2} hand={HAND} /></group>
       </group>)}
       <group ref={sticks} visible={false}><Chopsticks spread={0.008} /></group>
       <group ref={morsel} visible={false}><Morsel kind={morselKind} /></group>

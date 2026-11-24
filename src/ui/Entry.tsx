@@ -1,3 +1,4 @@
+import { CharacterPreview } from './CharacterPreview';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { project, VN_MAP, vietnamIslands, vietnamPath } from '../data/vietnamMap';
 import { cities, type City } from './cities';
@@ -84,6 +85,7 @@ export function VietnamMap({ playerName, onEnter, onRename, onAbout }: { playerN
       <div className="map-legend"><span><i className="legend-open" /> Đã mở</span><span><i className="legend-locked" /> Sắp ra mắt</span></div>
     </aside>
 
+    <CharacterPreview name={playerName} />
     <div className="map-stage">
       <div className="vn-map" style={{ aspectRatio: `${VN_MAP.width} / ${VN_MAP.height}` }}>
         <svg viewBox={`0 0 ${VN_MAP.width.toFixed(1)} ${VN_MAP.height.toFixed(1)}`} role="img" aria-label="Bản đồ Việt Nam">
