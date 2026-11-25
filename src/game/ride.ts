@@ -54,7 +54,17 @@ export function places(): Place[] {
   byFootprint('Cột cờ Hà Nội', 'Đường Điện Biên Phủ');
   byFootprint('Khuê Văn Các', 'Phố Quốc Tử Giám', 'Văn Miếu – Quốc Tử Giám');
   const thuLe = parks.find((p) => p.name === 'Công viên Thủ Lệ');
-  if (thuLe) { const c = thuLe.ring.reduce((s, p) => [s[0] + p[0] / thuLe.ring.length, s[1] + p[1] / thuLe.ring.length], [0, 0]); const [x, z] = curbNear(c[0], c[1] + 120); list.push({ name: 'Công viên Thủ Lệ', note: 'Vườn thú Hà Nội · Kim Mã, Đào Tấn', x, z }); }
+  if (thuLe) {
+    // the pavement of the named street nearest the park's middle
+    const c = thuLe.ring.reduce((s, p) => [s[0] + p[0] / thuLe.ring.length, s[1] + p[1] / thuLe.ring.length], [0, 0]);
+    let best: Point | null = null, bd = Infinity;
+    for (const r of roads) if (r.name && r.kind !== 'service') for (let i = 0; i < r.points.length - 1; i++) {
+      const a = r.points[i], b = r.points[i + 1]; const dx = b[0] - a[0], dz = b[1] - a[1]; const l2 = dx * dx + dz * dz || 1;
+      const t = Math.max(0, Math.min(1, ((c[0] - a[0]) * dx + (c[1] - a[1]) * dz) / l2)); const q: Point = [a[0] + dx * t, a[1] + dz * t];
+      const d = Math.hypot(q[0] - c[0], q[1] - c[1]); if (d < bd) { bd = d; const k = (r.width / 2 + 1.5) / (d || 1); best = [q[0] + (c[0] - q[0]) * k, q[1] + (c[1] - q[1]) * k]; }
+    }
+    if (best) list.push({ name: 'Công viên Thủ Lệ', note: 'Vườn thú Hà Nội · Kim Mã, Đào Tấn', x: best[0], z: best[1] });
+  }
   byName('Nhà hát Lớn', 'Quảng trường Cách mạng Tháng Tám');
   byName('Nhà thờ Lớn', 'Phố Nhà Chung');
   byName('Tràng Tiền Plaza', 'Phố Tràng Tiền');

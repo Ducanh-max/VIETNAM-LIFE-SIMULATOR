@@ -13,7 +13,8 @@ type RawPark = { p: number[][]; n?: string; h?: number[][][] };
 
 /** `points` run in the direction of travel for one-way streets. `maxspeed` (km/h) when OSM has it. */
 export type Road = { name: string; kind: string; width: number; oneway: boolean; lanes: number; points: Point[]; maxspeed?: number };
-export type Building = { ring: Point[]; floors: number; height: number; name?: string; kind?: string; area: number; center: Point; seed: number };
+/** `infill`: a filler tube house where OSM has no footprints along a street (see fillGaps below). */
+export type Building = { ring: Point[]; floors: number; height: number; name?: string; kind?: string; area: number; center: Point; seed: number; infill?: boolean };
 export type Park = { ring: Point[]; name?: string; holes?: Point[][] };
 
 const vehicleKinds = new Set(['primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link', 'residential', 'unclassified', 'living_street', 'service', 'pedestrian', 'trunk']);
@@ -270,6 +271,103 @@ export const buildings: Building[] = (osm.buildings as RawBuilding[]).flatMap((b
   return [{ ring, floors, height, name: b.n, kind: b.k, area, center, seed }];
 });
 
+/*
+ * Filler houses. Many Hà Nội blocks have no building footprints on OpenStreetMap yet, so those streets showed bare
+ * paving where in reality every frontage is a row of nhà ống (narrow tube houses, 3–6 m wide, 3–5 storeys). Along
+ * each street and ngõ, wherever OSM has no building, no park, lake, lawn or compound (temple, school, barracks,
+ * museum, square… see scripts/geo/fetch-compounds.mjs) and no other road, a tube house is placed facing the street.
+ * They stand for "houses are here", not for real footprints, and are flagged `infill`.
+ */
+export const infillStats = { placed: 0, ms: 0 };
+const NO_INFILL = import.meta.env.DEV && typeof location !== 'undefined' && location.search.includes('noinfill'); // for before/after checks
+(() => {
+  if (NO_INFILL) return;
+  const t0 = performance.now();
+  // everything taken (buildings, parks, water, lawns, compounds…) rasterised once into a 2 m mask over the map
+  const MC = 2, MX = -5300, MZ = -1340, MW = Math.ceil(6640 / MC), MH = Math.ceil(2680 / MC);
+  const mask = new Uint8Array(MW * MH);
+  const addPoly = (ring: Point[]) => {
+    let z0 = Infinity, z1 = -Infinity;
+    for (const [, z] of ring) { z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    const j0 = Math.max(0, Math.floor((z0 - MZ) / MC)), j1 = Math.min(MH - 1, Math.floor((z1 - MZ) / MC));
+    const xs: number[] = [];
+    for (let j = j0; j <= j1; j++) {
+      const zc = MZ + (j + 0.5) * MC; xs.length = 0;
+      for (let k = 0, m = ring.length - 1; k < ring.length; m = k++) {
+        const [xa, za] = ring[k], [xb, zb] = ring[m];
+        if ((za > zc) !== (zb > zc)) xs.push(xa + ((zc - za) * (xb - xa)) / (zb - za));
+      }
+      xs.sort((p, q) => p - q);
+      for (let k = 0; k + 1 < xs.length; k += 2) {
+        // cells the span touches at all (conservative: a lot never overlaps what is there)
+        const i0 = Math.max(0, Math.floor((xs[k] - MX) / MC)), i1 = Math.min(MW - 1, Math.floor((xs[k + 1] - MX) / MC));
+        mask.fill(1, j * MW + i0, j * MW + i1 + 1);
+      }
+    }
+  };
+  const taken = (p: Point) => { const i = Math.floor((p[0] - MX) / MC), j = Math.floor((p[1] - MZ) / MC); return i < 0 || j < 0 || i >= MW || j >= MH || mask[j * MW + i] === 1; };
+  type Raw = { p: number[][]; h?: number[][][] };
+  const extra = osm as unknown as { water?: Raw[]; grass?: Raw[]; compounds?: Raw[] };
+  for (const list of [osm.parks as Raw[], (extra.water ?? []).filter((w) => polygonArea(w.p as Point[]) < 200_000), extra.grass ?? [], extra.compounds ?? []]) for (const a of list) addPoly(a.p as Point[]);
+  for (const b of buildings) addPoly(b.ring);
+  for (const b of osm.buildings as RawBuilding[]) if (/^Lotte Center/i.test(b.n ?? '') || LANDMARK_NAMES.has(b.n ?? '')) addPoly(b.p as Point[]);
+  if (langC) addPoly([[langC[0] - 120, langC[1] - 120], [langC[0] + 120, langC[1] - 120], [langC[0] + 120, langC[1] + 120], [langC[0] - 120, langC[1] + 120]]); // Lăng and its stands
+  addPoly(restaurantRect);
+  const box = (x: number, z: number, r: number): Point[] => [[x - r, z - r], [x + r, z - r], [x + r, z + r], [x - r, z + r]];
+  addPoly(box(-89.4, 460.3, 20)); // Thuê Xe Hồ Gươm (rental.ts RENTAL): its kerb, bikes and return bay
+  // the filler houses themselves, exactly (so neighbours can share a party wall)
+  const lots = new Map<string, Point[][]>(); const LC = 16;
+  const addLot = (ring: Point[]) => {
+    const xs = ring.map((p) => p[0]), zs = ring.map((p) => p[1]);
+    for (let i = Math.floor(Math.min(...xs) / LC); i <= Math.floor(Math.max(...xs) / LC); i++) for (let j = Math.floor(Math.min(...zs) / LC); j <= Math.floor(Math.max(...zs) / LC); j++) {
+      const k = `${i},${j}`; const l = lots.get(k); if (l) l.push(ring); else lots.set(k, [ring]);
+    }
+  };
+  const onLot = (p: Point) => { const l = lots.get(`${Math.floor(p[0] / LC)},${Math.floor(p[1] / LC)}`); return !!l && l.some((r) => insidePolygon(p, r)); };
+  const blocked = (p: Point) => {
+    if (taken(p) || onLot(p) || !inWorld(p) || roadClearance(p) < 0.4) return true;
+    return Math.abs(p[0]) < 380 && Math.abs(p[1]) < 380 && (insidePolygon(p, shore) || distanceToShore(p) < LAKESIDE_CLEAR + 6); // round Hồ Gươm only
+  };
+  const kinds = new Set(['residential', 'tertiary', 'secondary', 'primary', 'unclassified', 'living_street', 'service']);
+  for (const road of roads) {
+    if (!kinds.has(road.kind)) continue;
+    const alley = isAlley(road.name, road.kind);
+    if (road.kind === 'service' && !alley) continue; // driveways inside compounds
+    let seed = hash(road.points[0][0], road.points[0][1]);
+    const next = () => (seed = hash(seed * 917.3, seed * 131.7));
+    for (let i = 0; i < road.points.length - 1; i++) {
+      const a = road.points[i], b = road.points[i + 1];
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]); if (len < 8) continue;
+      const d: Point = [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
+      for (const side of [1, -1]) {
+        const n: Point = [-d[1] * side, d[0] * side];
+        const off = road.width / 2 + (alley ? 0.15 : PAVEMENT + 0.2);
+        let t = 3 + next() * 2;
+        while (t < len - 3) {
+          const w = alley ? 3.4 + next() * 1.6 : 3.8 + next() * 2.2; const depth = alley ? 7 + next() * 4 : 10 + next() * 6;
+          if (t + w > len - 3) break;
+          const f0: Point = [a[0] + d[0] * t + n[0] * off, a[1] + d[1] * t + n[1] * off];
+          // the house on the street, then one more behind it (blocks are built up deep, reached by unmapped ngõ)
+          for (let row = 0, back = 0; row < 2; row++) {
+            const dep = row ? 8 + next() * 5 : depth;
+            const corner = (u: number, v: number): Point => [f0[0] + d[0] * u + n[0] * (v + back), f0[1] + d[1] * u + n[1] * (v + back)];
+            const ring = [corner(0, 0), corner(w, 0), corner(w, dep), corner(0, dep)];
+            const e = 0.15; // probes just inside the lot, so a neighbour's wall on the line doesn't count
+            const probes = [corner(e, e), corner(w - e, e), corner(w - e, dep - e), corner(e, dep - e), corner(w / 2, dep / 2), corner(w / 2, e), corner(w / 2, dep - e), corner(e, dep / 2), corner(w - e, dep / 2)];
+            if (probes.some(blocked)) break;
+            const s = next(); const floors = (row ? 2 : 3) + Math.floor(s * 3);
+            buildings.push({ ring, floors, height: floors * FLOOR + 0.4, area: w * dep, center: corner(w / 2, dep / 2), seed: s, infill: true });
+            addLot(ring); infillStats.placed++;
+            back += dep + 0.6;
+          }
+          t += w;
+        }
+      }
+    }
+  }
+  infillStats.ms = Math.round(performance.now() - t0);
+})();
+
 const buildingGrid = new Map<string, number[]>();
 buildings.forEach((b, index) => {
   let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
@@ -366,6 +464,7 @@ if (import.meta.env.DEV) (window as unknown as { __restaurant?: unknown }).__res
 // Dev hook for test scripts.
 if (import.meta.env.DEV) (window as unknown as { __osmDropped?: unknown }).__osmDropped = droppedNearLake;
 if (import.meta.env.DEV) (window as unknown as { __roadTrim?: unknown }).__roadTrim = roadTrim;
+if (import.meta.env.DEV) (window as unknown as { __infill?: unknown }).__infill = infillStats;
 
 /** Traffic signals and pedestrian crossings mapped as OSM nodes. */
 export const osmNodes = ((osm as { nodes?: RawNode[] }).nodes ?? []).map((n) => ({ kind: n.t, p: n.p as Point }));
