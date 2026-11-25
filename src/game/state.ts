@@ -165,11 +165,11 @@ export const actions = {
   },
 };
 
-/** Hunger/thirst drain per second (full → empty in ~14 and ~10 minutes of walking; running drains faster). */
+/** Hunger/thirst drain per second (full → empty in ~35 and ~25 minutes of walking; running drains faster). */
 export function tickNeeds(dt: number, running: boolean, moving: boolean) {
   const factor = running ? 1.8 : moving ? 1.15 : 1;
-  const hunger = Math.max(0, state.hunger - dt * (100 / 840) * factor);
-  const thirst = Math.max(0, state.thirst - dt * (100 / 600) * factor);
+  const hunger = Math.max(0, state.hunger - dt * (100 / 2100) * factor);
+  const thirst = Math.max(0, state.thirst - dt * (100 / 1500) * factor);
   if (Math.floor(hunger) !== Math.floor(state.hunger) || Math.floor(thirst) !== Math.floor(state.thirst)) {
     if (state.hunger >= 20 && hunger < 20) game.toast('Bụng đói cồn cào rồi… đi kiếm gì ăn thôi! Quán Bún chả Đức Anh ngay phố Đinh Tiên Hoàng.');
     if (state.thirst >= 20 && thirst < 20) game.toast('Khát khô cổ! Gọi một chai nước nhé.');
