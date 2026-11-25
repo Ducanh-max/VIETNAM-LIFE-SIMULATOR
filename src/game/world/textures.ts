@@ -100,6 +100,17 @@ export const asphaltTexture = () => cached('asphalt', () => {
   return finish(c);
 });
 
+/** Poured concrete of a Hà Nội ngõ: pale grey, speckled and stained, with a joint every 3 m. Covers 3 × 3 m. */
+export const concreteTexture = () => cached('concrete', () => {
+  const [c, ctx] = canvas(256, 256);
+  const r = rng(53);
+  ctx.fillStyle = '#a8a59d'; ctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 9000; i++) { const g = 135 + r() * 60; ctx.fillStyle = `rgb(${g},${g - 2},${g - 6})`; ctx.fillRect(r() * 256, r() * 256, 1.5, 1.5); }
+  for (let i = 0; i < 14; i++) { ctx.fillStyle = `rgba(70,66,58,${0.05 + r() * 0.08})`; ctx.beginPath(); ctx.ellipse(r() * 256, r() * 256, 10 + r() * 40, 6 + r() * 22, r() * 3, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = 'rgba(60,58,52,0.55)'; ctx.fillRect(0, 0, 256, 2);
+  return finish(c);
+});
+
 /** Tileable water normal map built from summed sine waves. */
 export const waterNormals = () => cached('waterNormals', () => {
   const size = 256;

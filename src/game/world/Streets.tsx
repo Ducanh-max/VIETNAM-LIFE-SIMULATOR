@@ -2,10 +2,10 @@ import { useEffect, useMemo } from 'react';
 import { insideTowerPlan } from '../lotte';
 import * as THREE from 'three';
 import { distanceToShore, GROUND_HEIGHT, insidePolygon, registerBlocker, type Point } from '../geo';
-import { inLake, insideBuilding, lakes, lawns, parks, roadClearance, roads, type Park, type Road } from '../osm';
+import { inLake, insideBuilding, isAlley, lakes, lawns, parks, roadClearance, roads, type Park, type Road } from '../osm';
 import { Instances, trs, unitBox, unitCylinder } from './Instances';
 import { materials } from './materials';
-import { asphaltTexture, grassTexture, rng } from './textures';
+import { asphaltTexture, concreteTexture, grassTexture, rng } from './textures';
 import { Trees, type Tree } from './Vegetation';
 
 const ROAD_Y = GROUND_HEIGHT + 0.03;
@@ -86,6 +86,7 @@ const roadLength = (r: Road) => r.points.reduce((s, p, i) => i ? s + Math.hypot(
 function Roads() {
   const data = useMemo(() => {
     const asphalt: number[] = [];
+    const concrete: number[] = [];
     const kerb: number[] = [];
     const dashes: THREE.Matrix4[] = [];
     const zebra: THREE.Matrix4[] = [];
@@ -93,6 +94,8 @@ function Roads() {
       const half = road.width / 2;
       // driveways mapped through the Lotte tower's ground floor would show through the lobby floor
       if (road.kind === 'service' && road.points.some((q) => insideTowerPlan(q))) continue;
+      // ngõ / ngách: poured-concrete lanes without kerbs, drawn under the streets so a street always wins at the alley mouth
+      if (isAlley(road.name, road.kind)) { pushRibbon(concrete, road.points, half, ROAD_Y); continue; }
       pushRibbon(kerb, road.points, half + 0.35, ROAD_Y - 0.02); // kerb strip: lower and never pulled forward, so a crossing street's asphalt always covers it at junctions
       pushRibbon(asphalt, road.points, half, ROAD_Y);
       if (!road.oneway && road.width >= 8 && road.kind !== 'service') {
@@ -120,11 +123,12 @@ function Roads() {
         }
       }
     }
-    return { asphalt: flatGeometry(asphalt, 1 / 6), kerb: flatGeometry(kerb), dashes, zebra };
+    return { asphalt: flatGeometry(asphalt, 1 / 6), concrete: flatGeometry(concrete, 1 / 3), kerb: flatGeometry(kerb), dashes, zebra };
   }, []);
   const mats = useMemo(() => ({
     asphalt: new THREE.MeshStandardMaterial({ map: repeated(asphaltTexture(), 1, 1), roughness: 0.92, side: THREE.DoubleSide, depthFunc: THREE.AlwaysDepth }),
     kerb: new THREE.MeshStandardMaterial({ color: '#c3bdb1', roughness: 0.85, side: THREE.DoubleSide }),
+    concrete: new THREE.MeshStandardMaterial({ map: repeated(concreteTexture(), 1, 1), roughness: 0.95, side: THREE.DoubleSide, depthFunc: THREE.AlwaysDepth }),
     // paint sits above the asphalt's polygon offset so stripes are never partly swallowed by an overlapping street
     paint: new THREE.MeshStandardMaterial({ color: '#f1eee4', roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8 }),
   }), []);
@@ -132,10 +136,18 @@ function Roads() {
     {/* kerbs first, then all asphalt over them regardless of depth: at junctions a street's kerb strip never
         shows through the crossing street, and overlapping road pieces can't z-fight */}
     <mesh geometry={data.kerb} material={mats.kerb} receiveShadow renderOrder={-2} />
+    <mesh geometry={data.concrete} material={mats.concrete} receiveShadow renderOrder={-1.5} />
     <mesh geometry={data.asphalt} material={mats.asphalt} receiveShadow renderOrder={-1} />
     <Instances geometry={unitBox} material={mats.paint} matrices={data.dashes} castShadow={false} />
     <Instances geometry={unitBox} material={mats.paint} matrices={data.zebra} castShadow={false} />
   </group>;
+}
+
+/** The district printed under the street name: Hoàn Kiếm round the lake, Ba Đình north of Nguyễn Thái Học and
+ *  Kim Mã out to Lotte and Thủ Lệ, Đống Đa south of it (Văn Miếu). Approximate boundaries. */
+function districtOf([x, z]: Point) {
+  if (x > -1250) return 'QUẬN HOÀN KIẾM · HÀ NỘI';
+  return z < -40 ? 'QUẬN BA ĐÌNH · HÀ NỘI' : 'QUẬN ĐỐNG ĐA · HÀ NỘI';
 }
 
 /** Blue Hà Nội street-name plates ("PHỐ HÀNG KHAY / Q. HOÀN KIẾM") on posts, all from one texture atlas. */
@@ -156,7 +168,7 @@ function StreetSigns() {
       ctx.font = 'bold 40px "Be Vietnam Pro", Arial, sans-serif';
       ctx.fillText(name.toUpperCase(), x + slotW / 2, y + 40, slotW - 40);
       ctx.font = '600 17px "Be Vietnam Pro", Arial, sans-serif';
-      ctx.fillText('QUẬN HOÀN KIẾM · HÀ NỘI', x + slotW / 2, y + 74, slotW - 60);
+      ctx.fillText(districtOf(named.find((r) => r.name === name)!.points[0]), x + slotW / 2, y + 74, slotW - 60);
     });
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;

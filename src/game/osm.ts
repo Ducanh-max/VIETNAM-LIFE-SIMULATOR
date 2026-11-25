@@ -22,8 +22,11 @@ const baseWidth: Record<string, number> = {
   residential: 6.5, unclassified: 6, living_street: 4.5, pedestrian: 6, service: 3.6,
 };
 
+/** Hà Nội's ngõ and ngách (alleys): narrow concrete lanes between the houses. */
+export const isAlley = (name: string, kind: string) => /^(Ngõ|Ngách|Hẻm|Kiệt)(\s|$)/i.test(name) && (kind === 'service' || kind === 'residential' || kind === 'living_street');
 function roadWidth(r: RawRoad) {
   if (r.w && r.w > 2 && r.w < 30) return r.w;
+  if (isAlley(r.n, r.h) && !r.l) return /^Ngách/i.test(r.n) ? 2.6 : r.h === 'service' ? 3.2 : 4.2; // a ngõ is 2–4 m house to house, a ngách less
   const base = baseWidth[r.h] ?? 5;
   if (r.l && r.h !== 'service') return Math.max(base * 0.8, Math.min(18, r.l * 3.2 + 1.5));
   return base;
