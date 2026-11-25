@@ -39,6 +39,25 @@ function shaft(y0: number, y1: number, scale = 1, rings = 14) {
   g.computeVertexNormals();
   return g;
 }
+/** Floor-1 glass of the tower seen from outside, with the lobby door opening on the east face. */
+function lobbyBand() {
+  const ring = roundedRing(TOWER.halfU, TOWER.halfV, ROUND);
+  const pos: number[] = [], uv: number[] = [];
+  const y0 = GROUND_HEIGHT - 0.02, y1 = GROUND_HEIGHT + FLOOR_H + 0.02;
+  let acc = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], b = ring[(i + 1) % ring.length]; const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const u0 = acc / 8, u1 = (acc + l) / 8; acc += l;
+    if (a[0] > TOWER.halfU - 0.5 && b[0] > TOWER.halfU - 0.5 && Math.abs((a[1] + b[1]) / 2) < 2.6) continue; // the door
+    // counter-clockwise ring seen from above: this winding faces outward
+    pos.push(a[0], y0, a[1], a[0], y1, a[1], b[0], y0, b[1], b[0], y0, b[1], a[0], y1, a[1], b[0], y1, b[1]);
+    uv.push(u0, 0, u0, 1, u1, 0, u1, 0, u0, 1, u1, 1);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.computeVertexNormals();
+  return g;
+}
 function cap(y: number, scale: number) {
   const s = taper(y) * scale; const ring = roundedRing(TOWER.halfU * s, TOWER.halfV * s, ROUND * s);
   const shape = new THREE.Shape(ring.map(([x, z]) => new THREE.Vector2(x, -z)));
@@ -165,13 +184,16 @@ export function Lotte() {
     if (!LOTTE) return null;
     const top65 = floorY(FLOORS) + FLOOR_H;
     const pd = LOTTE.podium;
-    const podium = new THREE.BoxGeometry(pd.u1 - pd.u0, pd.h, pd.v1 - pd.v0);
-    podium.translate((pd.u0 + pd.u1) / 2, GROUND_HEIGHT + pd.h / 2, (pd.v0 + pd.v1) / 2);
+    // podium: the OSM footprint west of the tower, extruded to six storeys, standing on the ground
+    const shape = new THREE.Shape(LOTTE.podiumRing.map(([u, v]) => new THREE.Vector2(u, -v)));
+    const podium = new THREE.ExtrudeGeometry(shape, { depth: pd.h, bevelEnabled: false });
+    podium.rotateX(-Math.PI / 2); podium.translate(0, GROUND_HEIGHT, 0);
     const uv = podium.getAttribute('uv'); const pos = podium.getAttribute('position'); const nor = podium.getAttribute('normal');
-    for (let i = 0; i < uv.count; i++) { const along = Math.abs(nor.getX(i)) > 0.5 ? pos.getZ(i) : pos.getX(i); uv.setXY(i, along / 6, pos.getY(i) / FLOOR_H); }
+    podium.computeVertexNormals();
+    for (let i = 0; i < uv.count; i++) { const along = Math.abs(nor.getX(i)) > 0.5 ? pos.getZ(i) : pos.getX(i) + pos.getZ(i); uv.setXY(i, along / 6, (pos.getY(i) - GROUND_HEIGHT) / FLOOR_H); }
     return {
       shaft: shaft(GROUND_HEIGHT + FLOOR_H, GROUND_HEIGHT + top65),
-      band: shaft(GROUND_HEIGHT, GROUND_HEIGHT + FLOOR_H, 1, 1),
+      band: lobbyBand(),
       crown: shaft(GROUND_HEIGHT + top65, GROUND_HEIGHT + 267 + 1.5, 0.82, 2),
       roof: cap(GROUND_HEIGHT + 267 + 1.5, 0.82),
       shoulder: cap(GROUND_HEIGHT + top65, 1),
@@ -243,15 +265,16 @@ export function Lotte() {
     {/* open-air top ("Top of Hanoi"): a frame parapet up to 272 m */}
     {geo.parapet.filter((_, i) => i % 3 === 0).map(([x, z], i) => <mesh key={i} material={m.frame} position={[x, GROUND_HEIGHT + (268.5 + TOWER_TOP) / 2, z]}><boxGeometry args={[0.35, TOWER_TOP - 268.5, 0.35]} /></mesh>)}
     <mesh material={m.sign} position={[TOWER.halfU * taper(270) + 0.1, GROUND_HEIGHT + 258, 0]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[16, 3]} /></mesh>
-    <mesh material={m.sign} position={[0, GROUND_HEIGHT + LOTTE.podium.h - 3, LOTTE.podium.v1 + 0.1]}><planeGeometry args={[18, 3.4]} /></mesh>
-    {/* lobby storefront on floor 1 and the entrance canopy */}
-    <mesh material={m.frame} position={[TOWER.halfU + 1.5, GROUND_HEIGHT + 3.6, 0]}><boxGeometry args={[3, 0.25, 7]} /></mesh>
+    {/* entrance: canopy on two posts over the lobby door, the name above it */}
+    <mesh material={m.frame} position={[TOWER.halfU + 1.5, GROUND_HEIGHT + 3.4, 0]}><boxGeometry args={[3, 0.2, 6]} /></mesh>
+    {[-2.8, 2.8].map((v) => <mesh key={v} material={m.frame} position={[TOWER.halfU + 2.9, GROUND_HEIGHT + 1.7, v]}><cylinderGeometry args={[0.08, 0.08, 3.4, 8]} /></mesh>)}
+    <mesh material={m.sign} position={[TOWER.halfU + 0.12, GROUND_HEIGHT + 4.6, 0]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[6, 1.1]} /></mesh>
     {near && <>
       <Interior key={floor} f={floor} doorsRef={landingDoors} display={display} />
       <group position={[0, 0, 0]}><Cabin cabin={cabin} doors={cabinDoors} /></group>
     </>}
     {/* the ground-floor glass is part of Interior; seen from outside when far, a plain glass band */}
-    {(!near || floor > 1) && <mesh geometry={geo.band} material={m.glass} />}
+    <mesh geometry={geo.band} material={m.glass} />
   </group>;
 }
 

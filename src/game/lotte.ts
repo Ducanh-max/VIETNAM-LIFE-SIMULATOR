@@ -1,4 +1,4 @@
-import { GROUND_HEIGHT, type Point } from './geo';
+import { GROUND_HEIGHT, insidePolygon, type Point } from './geo';
 import { lotteFootprint } from './osm';
 
 /*
@@ -42,7 +42,18 @@ const frame = (() => {
   const center: Point = [c[0] + dir[0] * tu - dir[1] * midV, c[1] + dir[1] * tu + dir[0] * midV];
   // the six-storey podium (department store) stretches west of the tower over the rest of the footprint
   const podium = { u0: minU - tu, u1: -TOWER.halfU, v0: Math.min(...vs) - midV, v1: Math.max(...vs) - midV, h: 6 * FLOOR_H };
-  return { dir, center, podium, rotY: Math.atan2(-dir[1], dir[0]) };
+  // the podium is the OSM footprint cut off at the tower's west face (Sutherland–Hodgman against u = −halfU),
+  // so it meets the tower exactly and never pokes out round it
+  const local = fp.map((_, i): Point => [us[i] - tu, vs[i] - midV]);
+  const cut = -TOWER.halfU;
+  const ring: Point[] = [];
+  for (let i = 0; i < local.length; i++) {
+    const a = local[i], b = local[(i + 1) % local.length];
+    const ain = a[0] <= cut, bin = b[0] <= cut;
+    if (ain) ring.push(a);
+    if (ain !== bin) { const t = (cut - a[0]) / (b[0] - a[0]); ring.push([cut, a[1] + (b[1] - a[1]) * t]); }
+  }
+  return { dir, center, podium, podiumRing: ring, rotY: Math.atan2(-dir[1], dir[0]) };
 })();
 export const LOTTE = frame;
 /** World point → tower local (u along the podium axis, east; v across). */
@@ -122,8 +133,7 @@ export function lotteBlocks(p: Point): boolean {
   } else {
     const towerOuter = Math.abs(u) < TOWER.halfU + 0.3 && Math.abs(v) < TOWER.halfV + 0.3;
     const door = u > TOWER.halfU - 1.5 && u < TOWER.halfU + 1 && Math.abs(v) < 2.6;
-    const pd = frame.podium;
-    const inPodium = u > pd.u0 && u < pd.u1 + 0.5 && v > pd.v0 && v < pd.v1;
+    const inPodium = insidePolygon([u, v], frame.podiumRing) || (u > -TOWER.halfU - 0.5 && u < -TOWER.halfU + 0.1 && Math.abs(v) < TOWER.halfV);
     if ((inPodium || towerOuter) && !here && !door) return true;
   }
   if (inCore(u, v)) {
