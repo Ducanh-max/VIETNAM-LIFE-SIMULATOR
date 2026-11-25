@@ -118,6 +118,8 @@ export const routeLength = (r: Point[]) => r.reduce((s, p, i) => (i ? s + Math.h
 export const nav = {
   route: null as Point[] | null,
   target: null as { x: number; z: number; label: string } | null,
+  /** A destination picked in the map search (used when no job or ride sets one). */
+  custom: null as { x: number; z: number; label: string } | null,
   length: 0,
   lastFrom: [Infinity, Infinity] as Point,
   lastTarget: '',
@@ -139,14 +141,16 @@ export function updateNav() {
   const job = game.get().job;
   const ride = game.get().ride;
   const drv = game.get().driver;
+  if (nav.custom && Math.hypot(player.position.x - nav.custom.x, player.position.z - nav.custom.z) < 14) { const name = nav.custom.label; nav.custom = null; game.toast(`Đã tới ${name}.`); }
   const target = drv ? (drv.fare ? (drv.stage === 'onboard' ? { x: drv.fare.dest.x, z: drv.fare.dest.z, label: `Trả khách · ${drv.fare.dest.street}` } : { x: drv.fare.pickup.x, z: drv.fare.pickup.z, label: `Đón ${drv.fare.passenger}` }) : null) : ride ? (ride.stage === 'riding' ? { x: ride.dest.x, z: ride.dest.z, label: ride.dest.name } : { x: taxi.position.x, z: taxi.position.z, label: `Xe Đen SM · ${ride.driver}` }) : !job ? null : job.stage === 'deliver' && job.delivery ? { ...job.delivery.dest, label: job.delivery.customer } : { ...pickupPoint(), label: 'Quán Bún chả Đức Anh' };
-  nav.target = target;
-  if (!target) { nav.route = null; nav.length = 0; nav.lastTarget = ''; return; }
+  const finalTarget = target ?? nav.custom;
+  nav.target = finalTarget;
+  if (!finalTarget) { nav.route = null; nav.length = 0; nav.lastTarget = ''; return; }
   const from: Point = [player.position.x, player.position.z];
-  const key = `${Math.round(target.x / 12)},${Math.round(target.z / 12)}`; // a moving target (the Đen SM driver) only reroutes every ~12 m
+  const key = `${Math.round(finalTarget.x / 12)},${Math.round(finalTarget.z / 12)}`; // a moving finalTarget (the Đen SM driver) only reroutes every ~12 m
   const strayed = nav.route ? distToRoute(from, nav.route) > 10 : true;
   if (key !== nav.lastTarget || strayed) {
-    nav.route = findRoute(from, [target.x, target.z]);
+    nav.route = findRoute(from, [finalTarget.x, finalTarget.z]);
     nav.lastTarget = key;
     nav.lastFrom = from;
   }

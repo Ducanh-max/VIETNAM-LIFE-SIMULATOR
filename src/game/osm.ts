@@ -315,3 +315,4 @@ if (import.meta.env.DEV) (window as unknown as { __roadTrim?: unknown }).__roadT
 
 /** Traffic signals and pedestrian crossings mapped as OSM nodes. */
 export const osmNodes = ((osm as { nodes?: RawNode[] }).nodes ?? []).map((n) => ({ kind: n.t, p: n.p as Point }));
+if (import.meta.env.DEV) (window as unknown as { __osmData?: unknown }).__osmData = { deliverySpots, restaurantToWorld, RESTAURANT };

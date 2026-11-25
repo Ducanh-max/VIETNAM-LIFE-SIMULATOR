@@ -274,3 +274,25 @@
 .mp-count { font-size: 11px; color: #aab; }
 .mp-chat { display: grid; gap: 3px; font-size: 12px; }
 .mp-leave { padding: 7px; border-radius: 9px; border: 1px solid #e5372a; background: transparent; color: #ff9a8f; cursor: pointer; }
+
+/* rental counter */
+.rent-panel { position: fixed; right: 24px; top: 50%; transform: translateY(-50%); width: 340px; padding: 14px; border-radius: 16px; background: rgba(16, 38, 34, .96); border: 1.5px solid #7cc4ff; color: #f3efe6; z-index: 25; display: grid; gap: 8px; font-size: 13px; }
+.rent-head { display: flex; align-items: baseline; gap: 8px; }
+.rent-head b { color: #7cc4ff; font-size: 16px; } .rent-head span { flex: 1; font-size: 11px; color: #aab; }
+.rent-head button { background: none; border: 0; color: #fff; cursor: pointer; font-size: 16px; }
+.rent-row { display: flex; gap: 8px; align-items: center; padding: 8px; border-radius: 12px; background: #0d1d19; }
+.rent-row > div { display: grid; gap: 2px; flex: 1; } .rent-row small { color: #c9d4cf; font-size: 11px; }
+.rent-row button, .rent-primary { padding: 8px 10px; border-radius: 10px; border: 0; background: #7cc4ff; color: #0b1e2a; font-weight: 800; cursor: pointer; }
+.rent-row button:disabled { background: #445; color: #aab; cursor: default; }
+.rent-bill { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; padding: 8px; border-radius: 10px; background: #0d1d19; }
+.rent-warn { color: #ffcf7a; } .rent-note { color: #aab; font-size: 11px; }
+
+/* phone search */
+.map-search { position: absolute; left: 8px; right: 52px; top: 8px; z-index: 3; display: grid; gap: 4px; }
+.map-search input, .phone-search { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 12px; border: 1px solid #c9bfae; background: #fff; color: #222; font-size: 12px; }
+.phone-search { margin: 4px 0 8px; background: #fff !important; color: #222 !important; }
+.map-search ul { list-style: none; margin: 0; padding: 4px; border-radius: 12px; background: #fff; box-shadow: 0 4px 14px rgba(0,0,0,.18); max-height: 210px; overflow: auto; }
+.map-search li { padding: 6px 8px; border-radius: 8px; cursor: pointer; display: grid; color: #222; }
+.map-search li:hover { background: #eef3f6; }
+.map-search li b { font-size: 12px; } .map-search li small { font-size: 10px; color: #667; }
+.map-cancel { justify-self: start; padding: 5px 9px; border-radius: 10px; border: 0; background: #e5372a; color: #fff; font-size: 11px; font-weight: 700; cursor: pointer; }

@@ -32,6 +32,7 @@ function pickDestination(): Omit<Delivery, 'startedAt'> {
 
 export const jobActions = {
   accept() {
+    if (game.get().rental) { game.set({ dialog: null }); game.toast('Bạn đang thuê xe. Trả xe trước rồi mới nhận ship nhé.'); return; }
     if (game.get().driver) { game.set({ dialog: null }); game.toast('Bạn đang chạy Đen SM. Nghỉ ca Đen SM trong điện thoại trước rồi mới nhận ship được nhé.'); return; }
     bike.kind = 'wave';
     parkBikeAtShop();

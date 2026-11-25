@@ -1,4 +1,5 @@
 import type { VehicleKind } from './net';
+import type { Rental } from './rental';
 import { useSyncExternalStore } from 'react';
 import * as THREE from 'three';
 import type { Ride } from './ride';
@@ -41,6 +42,9 @@ type State = {
   ride: Ride | null;
   /** Working as an Đen SM driver (Đen Bike or Đen Car), if hired. */
   driver: DriverJob | null;
+  /** A scooter or car rented at Thuê Xe Hồ Gươm, and whether the rental counter is open. */
+  rental: Rental | null;
+  rentalOpen: boolean;
   /** Wallet history (newest first) and phone messages (newest first). */
   txns: Txn[];
   messages: Message[];
@@ -57,7 +61,7 @@ function load(): Pick<State, 'hunger' | 'thirst' | 'money'> {
   return { hunger: 72, thirst: 64, money: 300_000 };
 }
 
-let state: State = { ...load(), phase: 'none', order: {}, table: -1, eatProgress: 0, prompt: null, toast: null, dialog: null, job: null, phone: false, ride: null, driver: null, txns: [], messages: [], outfit: loadPlayerOutfit() };
+let state: State = { ...load(), phase: 'none', order: {}, table: -1, eatProgress: 0, prompt: null, toast: null, dialog: null, job: null, phone: false, ride: null, driver: null, rental: null, rentalOpen: false, txns: [], messages: [], outfit: loadPlayerOutfit() };
 
 // One-time gift of 500.000đ for existing and new saves.
 const BONUS_KEY = 'doi-viet-bonus-500k';

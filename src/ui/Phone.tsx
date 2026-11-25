@@ -5,6 +5,9 @@ import { nav, updateNav } from '../game/navigation';
 import { MIN_TRIP, places, quote, rideActions, taxi, VEHICLES, type Vehicle } from '../game/ride';
 import { formatVnd, game, player, useGame } from '../game/state';
 import { drawMap, headingUpRotation, mapBase } from './mapCanvas';
+import { searchPlaces } from '../game/search';
+import { RENTAL } from '../game/rental';
+import { RentalApp } from './RentalPanel';
 import { useVietnamClock, VIETNAM_TZ } from './vietnamTime';
 
 const fmtDist = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`);
@@ -38,7 +41,7 @@ export function Minimap({ onOpen }: { onOpen: () => void }) {
   </button>;
 }
 
-type App = 'home' | 'map' | 'orders' | 'wallet' | 'messages' | 'contacts' | 'den';
+type App = 'home' | 'map' | 'orders' | 'wallet' | 'messages' | 'contacts' | 'den' | 'rent';
 
 /** Full map app: north-up, drag to pan, wheel or buttons to zoom, follows the player until dragged. */
 function MapApp() {
@@ -59,15 +62,23 @@ function MapApp() {
       if (info.current) {
         const j = game.get().job;
         info.current.textContent = nav.route && nav.target
-          ? `${j?.stage === 'deliver' ? 'Giao cho' : 'Về'} ${nav.target.label} · ${fmtDist(nav.length)} · ~${Math.max(1, Math.round(nav.length / 7 / 60))} phút đi xe`
-          : 'Chưa có đơn giao. Gặp ông chủ Đức Anh ở quán để nhận việc ship.';
+          ? `${j?.stage === 'deliver' ? 'Giao cho' : nav.target === nav.custom ? 'Đến' : 'Về'} ${nav.target.label} · ${fmtDist(nav.length)} · ~${Math.max(1, Math.round(nav.length / 1.4 / 60))} phút đi bộ, ~${Math.max(1, Math.round(nav.length / 11 / 60))} phút đi xe`
+          : 'Nhập nơi muốn đến ở ô tìm kiếm phía trên để được chỉ đường.';
       }
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, []);
   const zoom = (k: number) => { state.current.scale = Math.min(6, Math.max(0.25, state.current.scale * k)); };
+  const [q, setQ] = useState('');
+  const hits = q.trim() ? searchPlaces(q, 6) : [];
+  const [, force] = useState(0);
   return <div className="app-map">
+    <div className="map-search">
+      <input value={q} placeholder="🔎 Nhập nơi muốn đến (có dấu hoặc không)" onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && hits[0]) { nav.custom = { x: hits[0].x, z: hits[0].z, label: hits[0].name }; setQ(''); updateNav(); state.current.follow = true; } }} />
+      {hits.length > 0 && <ul>{hits.map((h) => <li key={h.name + h.x} onClick={() => { nav.custom = { x: h.x, z: h.z, label: h.name }; setQ(''); updateNav(); state.current.follow = true; }}><b>{h.name}</b><small>{h.note} · ~{fmtDist(Math.hypot(h.x - player.position.x, h.z - player.position.z))}</small></li>)}</ul>}
+      {nav.custom && !hits.length && <button className="map-cancel" onClick={() => { nav.custom = null; updateNav(); force((n) => n + 1); }}>✕ Huỷ chỉ đường tới {nav.custom.label}</button>}
+    </div>
     <canvas ref={canvas}
       onWheel={(e) => zoom(e.deltaY < 0 ? 1.15 : 1 / 1.15)}
       onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture(e.pointerId); const s = state.current; s.drag = { x: e.clientX, y: e.clientY, cx: s.cx, cz: s.cz }; s.follow = false; }}
@@ -207,7 +218,8 @@ function DenRiderPanel() {
   const [pick, setPick] = useState<number | null>(null);
   const [vehicle, setVehicle] = useState<Vehicle>('bike');
   const [q, setQ] = useState<ReturnType<typeof quote> | undefined>(undefined);
-  const list = places();
+  const [query, setQuery] = useState('');
+  const list = query.trim() ? searchPlaces(query, 10) : places();
   const here = { x: player.position.x, z: player.position.z };
   const [, force] = useState(0);
   useEffect(() => { const id = setInterval(() => force((n) => n + 1), 1000); return () => clearInterval(id); }, []);
@@ -223,6 +235,7 @@ function DenRiderPanel() {
       {ride.stage !== 'riding' && <button className="danger-outline" onClick={() => rideActions.cancel()}>Huỷ chuyến</button>}
     </div> : <>
       <h4>Bạn muốn đi đâu?</h4>
+      <input className="phone-search" value={query} placeholder="Tìm địa điểm, tên phố… (vd: lotte, hang gai)" onChange={(e) => { setQuery(e.target.value); setPick(null); }} onKeyDown={(e) => e.stopPropagation()} />
       <ul className="den-places">{list.map((p, i) => <li key={p.name} className={pick === i ? 'picked' : ''} onClick={() => setPick(i)}>
         <span className="den-pin">📍</span><div><b>{p.name}</b><small>{p.note} · cách ~{fmtDist(Math.hypot(p.x - here.x, p.z - here.z))}</small></div><em>›</em>
       </li>)}</ul>
@@ -251,6 +264,7 @@ export function Phone({ onClose }: { onClose: () => void }) {
   const unread = useGame((s) => s.messages.length);
   const job = useGame((s) => s.job);
   const ride = useGame((s) => s.ride);
+  const rentalOn = useGame((s) => !!s.rental);
   useEffect(() => { if (document.pointerLockElement) document.exitPointerLock(); }, []);
   const battery = 87 - Math.floor((now.getMinutes() % 60) / 6);
   const apps: { id: App; name: string; icon: string; color: string; badge?: number | string }[] = [
@@ -260,6 +274,7 @@ export function Phone({ onClose }: { onClose: () => void }) {
     { id: 'messages', name: 'Tin nhắn', icon: '💬', color: '#7a4ff0', badge: unread || undefined },
     { id: 'contacts', name: 'Danh bạ', icon: '📞', color: '#f0a020' },
     { id: 'den', name: 'Đen SM', icon: '⚡', color: '#0b0b0c', badge: ride ? '•' : undefined },
+    { id: 'rent', name: 'Thuê xe', icon: '🔑', color: '#1f7fbf', badge: rentalOn ? '•' : undefined },
   ];
   return <div className="phone" role="dialog" aria-label="Điện thoại">
     <div className="phone-screen">
@@ -277,6 +292,7 @@ export function Phone({ onClose }: { onClose: () => void }) {
             {app === 'messages' && <MessagesApp />}
             {app === 'contacts' && <ContactsApp />}
             {app === 'den' && <DenSMApp />}
+            {app === 'rent' && <RentalApp onRoute={() => { nav.custom = { x: RENTAL.x, z: RENTAL.z, label: RENTAL.name }; setApp('map'); }} />}
           </div>}
       <div className="phone-homebar"><button onClick={() => (app === 'home' ? onClose() : setApp('home'))} aria-label={app === 'home' ? 'Cất điện thoại' : 'Màn hình chính'} /></div>
     </div>

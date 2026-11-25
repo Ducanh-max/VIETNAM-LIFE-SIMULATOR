@@ -54,6 +54,7 @@ export const driverActions = {
   /** Sign up from the Đen SM app. */
   accept(vehicle: 'bike' | 'car') {
     const s = game.get();
+    if (s.rental) { game.toast('Bạn đang thuê xe. Trả xe ở Thuê Xe Hồ Gươm rồi mới chạy Đen SM được (không dùng xe thuê để chạy).'); return; }
     if (s.job) { game.toast('Bạn đang ship bún chả cho quán. Nghỉ việc ship trước rồi mới chạy Đen SM được nhé.'); return; }
     if (s.ride) { game.toast('Bạn đang đặt một chuyến Đen SM, hoàn tất hoặc huỷ chuyến trước đã.'); return; }
     if (player.seat) { game.toast('Đứng dậy khỏi bàn trước đã nhé.'); return; }

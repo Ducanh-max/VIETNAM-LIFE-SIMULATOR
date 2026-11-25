@@ -11,6 +11,7 @@ import { DriverJob } from './world/DriverJob';
 import { Signs } from './world/Signs';
 import { Lotte } from './world/Lotte';
 import { Multiplayer } from './world/Multiplayer';
+import { Rental } from './world/Rental';
 import { Pedestrians } from './world/Pedestrians';
 import { Interaction, Job } from './world/Job';
 import { Restaurant } from './world/Restaurant';
@@ -107,6 +108,7 @@ export function World({ time, quality, paused, freeCamera, onFps, onPosition }: 
     <Signs />
     <Lotte />
     <Multiplayer />
+    <Rental />
     <DriverJob />
     <DenSM paused={paused} />
     <Pedestrians />

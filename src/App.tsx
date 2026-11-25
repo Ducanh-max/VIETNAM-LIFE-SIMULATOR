@@ -8,6 +8,7 @@ import { NameEntry, VietnamMap } from './ui/Entry';
 import { BossDialog, JobPanel, MenuPanel, NeedsHud, PromptAndToast, Speedometer } from './ui/Hud';
 import { LiftPanel } from './game/world/Lotte';
 import { MultiplayerPanel, roomFromUrl } from './ui/MultiplayerPanel';
+import { RentalPanel } from './ui/RentalPanel';
 import { joinGame, net, onNet } from './game/net';
 import { Minimap, Phone } from './ui/Phone';
 import { loadPlayerName, savePlayerName } from './ui/player';
@@ -135,6 +136,7 @@ function App() {
       <div className="game-bottom"><span>W A S D <b>{freeCamera ? 'Bay ngang' : 'Di chuyển'}</b></span><span>← ↑ ↓ → <b>Xoay góc nhìn</b></span><span>{freeCamera ? 'SPACE / CTRL' : 'SHIFT'} <b>{freeCamera ? 'Lên / xuống' : 'Chạy'}</b></span><span>V <b>{freeCamera ? 'Về nhân vật' : 'Bật drone'}</b></span>{!freeCamera && <span>E <b>Tương tác</b></span>}{!freeCamera && <span>F <b>Lên / xuống xe</b></span>}{!freeCamera && <span>P <b>Điện thoại</b></span>}<span className="fps-pill">{position[0].toFixed(0)} : {position[1].toFixed(0)} · {fps || '—'} FPS</span></div>
       <NeedsHud />
       <Speedometer />
+      <RentalPanel />
       {mpOpen && <MultiplayerPanel onClose={() => setMpOpen(false)} />}
       <LiftPanel />
       <PromptAndToast />
