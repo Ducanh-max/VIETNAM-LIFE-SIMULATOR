@@ -71,6 +71,8 @@ export const lotteDoor = (): Point => fromTower(TOWER.halfU + 4, 0);
 
 // ---- plan layout (tower local) ----
 const inner = (u: number, v: number, f: number) => { const s = taper(floorY(f)); return Math.abs(u) < TOWER.halfU * s - 0.8 && Math.abs(v) < TOWER.halfV * s - 0.8; };
+/** Half width of the lobby entrance on the tower's east face (a 9 m glass front with sliding doors). */
+export const DOOR_HALF = 4.5;
 export const CORE = { halfU: 7, halfV: 4.5 };
 export const CABIN = { u0: -1.3, u1: 1.3, v0: 2.0, v1: 4.1 }; // the lift cabin, its door at v = 4.5 facing +v
 const inCore = (u: number, v: number) => Math.abs(u) < CORE.halfU && Math.abs(v) < CORE.halfV;
@@ -132,7 +134,7 @@ export function lotteBlocks(p: Point): boolean {
     if (!here) return true; // upper floors: only the tower's floor plate
   } else {
     const towerOuter = Math.abs(u) < TOWER.halfU + 0.3 && Math.abs(v) < TOWER.halfV + 0.3;
-    const door = u > TOWER.halfU - 1.5 && u < TOWER.halfU + 1 && Math.abs(v) < 2.6;
+    const door = u > TOWER.halfU - 1.5 && u < TOWER.halfU + 1 && Math.abs(v) < DOOR_HALF;
     const inPodium = insidePolygon([u, v], frame.podiumRing) || (u > -TOWER.halfU - 0.5 && u < -TOWER.halfU + 0.1 && Math.abs(v) < TOWER.halfV);
     if ((inPodium || towerOuter) && !here && !door) return true;
   }
@@ -150,6 +152,8 @@ export function lotteHeight(p: Point): number | null {
   if ((inCabin(u, v) || inDoorway(u, v)) && (lift.riding || cabinAt(lift.playerFloor))) return GROUND_HEIGHT + lift.cabinY;
   return GROUND_HEIGHT + floorY(lift.playerFloor);
 }
+/** Inside the tower's footprint (plan only, any floor). */
+export function insideTowerPlan(p: Point) { if (!frame) return false; const [u, v] = toTower(p); return Math.abs(u) < TOWER.halfU + 1 && Math.abs(v) < TOWER.halfV + 1; }
 /** Inside the tower's walkable plate (for camera limits and showing the interior). */
 export function insideTower(p: Point) {
   const [u, v] = toTower(p);

@@ -2,7 +2,7 @@ import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GROUND_HEIGHT, registerBlocker, registerHeight } from '../geo';
-import { CABIN, cabinAt, cabinFloorShown, CORE, floorY, FLOOR_H, FLOORS, inCabin, insideTower, LOTTE, lift, lotteBlocks, lotteHeight, sendLift, stepLift, taper, toTower, TOWER, TOWER_TOP } from '../lotte';
+import { DOOR_HALF, CABIN, cabinAt, cabinFloorShown, CORE, floorY, FLOOR_H, FLOORS, inCabin, insideTower, LOTTE, lift, lotteBlocks, lotteHeight, sendLift, stepLift, taper, toTower, TOWER, TOWER_TOP } from '../lotte';
 import { game, player, useGame } from '../state';
 
 /*
@@ -12,7 +12,17 @@ import { game, player, useGame } from '../state';
  * Only the player's floor and the cabin are drawn inside; the outside is one merged shaft mesh.
  */
 const ROUND = 7;
+/** Rounded-rectangle outline; long straight sides are split into ≤ 2 m pieces so a doorway can be cut out of one. */
 function roundedRing(hu: number, hv: number, r: number, seg = 5) {
+  const raw = roundedRingRaw(hu, hv, r, seg);
+  const pts: [number, number][] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const a = raw[i], b = raw[(i + 1) % raw.length]; const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 2));
+    for (let k = 0; k < n; k++) pts.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]);
+  }
+  return pts;
+}
+function roundedRingRaw(hu: number, hv: number, r: number, seg = 5) {
   const pts: [number, number][] = [];
   const corners: [number, number, number][] = [[hu - r, hv - r, 0], [-hu + r, hv - r, Math.PI / 2], [-hu + r, -hv + r, Math.PI], [hu - r, -hv + r, Math.PI * 1.5]];
   for (const [cx, cz, a0] of corners) for (let i = 0; i <= seg; i++) { const a = a0 + (i / seg) * (Math.PI / 2); pts.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); }
@@ -48,7 +58,7 @@ function lobbyBand() {
   for (let i = 0; i < ring.length; i++) {
     const a = ring[i], b = ring[(i + 1) % ring.length]; const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
     const u0 = acc / 8, u1 = (acc + l) / 8; acc += l;
-    if (a[0] > TOWER.halfU - 0.5 && b[0] > TOWER.halfU - 0.5 && Math.abs((a[1] + b[1]) / 2) < 2.6) continue; // the door
+    if (a[0] > TOWER.halfU - 0.5 && b[0] > TOWER.halfU - 0.5 && Math.abs((a[1] + b[1]) / 2) < DOOR_HALF) continue; // the door
     // counter-clockwise ring seen from above: this winding faces outward
     pos.push(a[0], y0, a[1], a[0], y1, a[1], b[0], y0, b[1], b[0], y0, b[1], a[0], y1, a[1], b[0], y1, b[1]);
     uv.push(u0, 0, u0, 1, u1, 0, u1, 0, u0, 1, u1, 1);
@@ -138,7 +148,7 @@ function Interior({ f, doorsRef, display }: { f: number; doorsRef: React.RefObje
     const pos: number[] = [];
     for (let i = 0; i < ring.length; i++) {
       const a = ring[i], b = ring[(i + 1) % ring.length];
-      if (f === 1 && a[0] > hu && b[0] > hu && Math.abs((a[1] + b[1]) / 2) < 2.6) continue;
+      if (f === 1 && a[0] > hu && b[0] > hu && Math.abs((a[1] + b[1]) / 2) < DOOR_HALF) continue;
       pos.push(a[0], 0, a[1], b[0], 0, b[1], b[0], H, b[1], a[0], 0, a[1], b[0], H, b[1], a[0], H, a[1]);
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g;
@@ -202,6 +212,8 @@ export function Lotte() {
     };
   }, []);
   const cabin = useRef<THREE.Group>(null);
+  const entry = useRef<THREE.Group>(null);
+  const wasInCab = useRef(false);
   const cabinDoors = useRef<THREE.Group[]>([]);
   const landingDoors = useRef<THREE.Group[]>([]);
   const [floor, setFloor] = useState(1);
@@ -222,6 +234,11 @@ export function Lotte() {
     lift.inside = inside;
     if (!inside && lift.playerFloor !== 1 && !lift.riding) lift.playerFloor = 1;
     if (lift.playerFloor !== floor) setFloor(lift.playerFloor);
+    // sliding entrance doors: open when someone is within 6 m of them
+    if (entry.current) {
+      const open = lift.playerFloor === 1 && Math.abs(u - TOWER.halfU) < 6 && Math.abs(v) < DOOR_HALF + 2 ? 1 : 0;
+      entry.current.children.forEach((d, i) => { const s = i ? 1 : -1; const target = s * (DOOR_HALF / 2 + open * (DOOR_HALF - 0.4)); d.position.z = THREE.MathUtils.damp(d.position.z, target, 6, dt); });
+    }
     // cabin and doors
     if (cabin.current) cabin.current.position.y = GROUND_HEIGHT + lift.cabinY;
     const open = lift.doors;
@@ -243,16 +260,22 @@ export function Lotte() {
     // prompts
     const s = game.get();
     if (s.ride || player.seat) return;
+    // walking into the cabin opens the floor panel by itself (once per entry)
+    if (inCab && !lift.riding && !wasInCab.current && !lift.panel) { lift.panel = true; lift.doorWant = 1; lift.doorTimer = 999; if (document.pointerLockElement) document.exitPointerLock(); game.set({}); }
+    wasInCab.current = inCab && !lift.riding;
+    // standing in front of the lift with the cabin here: the doors open for you, like a real lift button
+    const atLanding = inside && Math.abs(u) < 6 && v > CABIN.v1 - 0.2 && v < CORE.halfV + 6;
+    if (atLanding && cabinAt(lift.playerFloor) && !lift.panel) { lift.doorWant = 1; lift.doorTimer = Math.max(lift.doorTimer, 2); }
     if (inCab && !lift.riding) {
       game.offer({ id: 'lift-panel', text: `Thang máy Lotte · tầng ${lift.cabinFloor}: chọn tầng (1–${FLOORS})`, key: 'E', priority: 9, run: () => { lift.panel = true; lift.doorWant = 1; lift.doorTimer = 999; if (document.pointerLockElement) document.exitPointerLock(); game.set({}); } });
     } else if (lift.riding) {
       game.offer({ id: 'lift-ride', text: `Đang lên/xuống… tầng ${cabinFloorShown()} → ${lift.target}`, key: null, priority: 9 });
-    } else if (inside && Math.abs(u) < 2.5 && v > CORE.halfV && v < CORE.halfV + 3) {
+    } else if (atLanding) {
       game.offer(cabinAt(lift.playerFloor) && lift.doors > 0.5
-        ? { id: 'lift-in', text: 'Bước vào thang máy', key: null, priority: 8 }
+        ? { id: 'lift-in', text: 'Cửa thang đã mở · bước vào thang máy', key: null, priority: 8 }
         : { id: 'lift-call', text: lift.moving ? `Thang đang tới · tầng ${cabinFloorShown()}` : 'Gọi thang máy', key: lift.moving ? null : 'E', priority: 8, run: () => sendLift(lift.playerFloor, false) });
     } else if (inside) {
-      game.offer({ id: 'lotte-floor', text: `Lotte Center · tầng ${lift.playerFloor} · ${FLOOR_NAME[floorKind(lift.playerFloor)]}`, key: null, priority: 1 });
+      game.offer({ id: 'lotte-floor', text: `Lotte Center · tầng ${lift.playerFloor} · ${FLOOR_NAME[floorKind(lift.playerFloor)]} · thang máy ở giữa sảnh`, key: null, priority: 1 });
     }
   });
   if (!LOTTE || !geo) return null;
@@ -266,9 +289,14 @@ export function Lotte() {
     {geo.parapet.filter((_, i) => i % 3 === 0).map(([x, z], i) => <mesh key={i} material={m.frame} position={[x, GROUND_HEIGHT + (268.5 + TOWER_TOP) / 2, z]}><boxGeometry args={[0.35, TOWER_TOP - 268.5, 0.35]} /></mesh>)}
     <mesh material={m.sign} position={[TOWER.halfU * taper(270) + 0.1, GROUND_HEIGHT + 258, 0]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[16, 3]} /></mesh>
     {/* entrance: canopy on two posts over the lobby door, the name above it */}
-    <mesh material={m.frame} position={[TOWER.halfU + 1.5, GROUND_HEIGHT + 3.4, 0]}><boxGeometry args={[3, 0.2, 6]} /></mesh>
-    {[-2.8, 2.8].map((v) => <mesh key={v} material={m.frame} position={[TOWER.halfU + 2.9, GROUND_HEIGHT + 1.7, v]}><cylinderGeometry args={[0.08, 0.08, 3.4, 8]} /></mesh>)}
-    <mesh material={m.sign} position={[TOWER.halfU + 0.12, GROUND_HEIGHT + 4.6, 0]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[6, 1.1]} /></mesh>
+    <mesh material={m.frame} position={[TOWER.halfU + 2, GROUND_HEIGHT + 3.6, 0]}><boxGeometry args={[4, 0.22, DOOR_HALF * 2 + 2]} /></mesh>
+    {[-DOOR_HALF - 0.6, DOOR_HALF + 0.6].map((v) => <mesh key={v} material={m.frame} position={[TOWER.halfU + 3.8, GROUND_HEIGHT + 1.8, v]}><cylinderGeometry args={[0.1, 0.1, 3.6, 8]} /></mesh>)}
+    <mesh material={m.sign} position={[TOWER.halfU + 0.12, GROUND_HEIGHT + 4.6, 0]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[7, 1.25]} /></mesh>
+    {/* door frame and the sliding glass doors (they part as you walk up) */}
+    {[-DOOR_HALF, DOOR_HALF].map((v) => <mesh key={`jamb${v}`} material={m.frame} position={[TOWER.halfU, GROUND_HEIGHT + 1.5, v]}><boxGeometry args={[0.5, 3, 0.25]} /></mesh>)}
+    <mesh material={m.frame} position={[TOWER.halfU, GROUND_HEIGHT + 3.05, 0]}><boxGeometry args={[0.5, 0.2, DOOR_HALF * 2]} /></mesh>
+    <group ref={entry}>{[-1, 1].map((s) => <mesh key={`sd${s}`} material={m.window} position={[TOWER.halfU, GROUND_HEIGHT + 1.45, s * DOOR_HALF / 2]}><boxGeometry args={[0.06, 2.9, DOOR_HALF - 0.1]} /></mesh>)}</group>
+    <mesh position={[TOWER.halfU + 2.2, GROUND_HEIGHT + 0.02, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}><planeGeometry args={[DOOR_HALF * 2 - 1, 3.5]} /><meshStandardMaterial color="#7a1f2a" roughness={0.9} /></mesh>
     {near && <>
       <Interior key={floor} f={floor} doorsRef={landingDoors} display={display} />
       <group position={[0, 0, 0]}><Cabin cabin={cabin} doors={cabinDoors} /></group>

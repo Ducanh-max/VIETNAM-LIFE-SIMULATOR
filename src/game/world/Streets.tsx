@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { insideTowerPlan } from '../lotte';
 import * as THREE from 'three';
 import { distanceToShore, GROUND_HEIGHT, insidePolygon, type Point } from '../geo';
 import { insideBuilding, parks, roadClearance, roads, type Road } from '../osm';
@@ -90,6 +91,8 @@ function Roads() {
     const zebra: THREE.Matrix4[] = [];
     for (const road of roads) {
       const half = road.width / 2;
+      // driveways mapped through the Lotte tower's ground floor would show through the lobby floor
+      if (road.kind === 'service' && road.points.some((q) => insideTowerPlan(q))) continue;
       pushRibbon(kerb, road.points, half + 0.35, ROAD_Y - 0.02); // kerb strip: lower and never pulled forward, so a crossing street's asphalt always covers it at junctions
       pushRibbon(asphalt, road.points, half, ROAD_Y);
       if (!road.oneway && road.width >= 8 && road.kind !== 'service') {
