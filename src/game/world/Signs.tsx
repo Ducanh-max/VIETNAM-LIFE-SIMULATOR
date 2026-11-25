@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { distanceToShore, GROUND_HEIGHT, type Point } from '../geo';
 import { insideBuilding, osmNodes, roadClearance, roads, type Road } from '../osm';
 import { TOWER, toTower } from '../lotte';
+import { RESTAURANT, worldToRestaurant } from '../osm';
 import { Instances, trs, unitBox, unitCylinder } from './Instances';
 
 /*
@@ -85,7 +86,7 @@ function layout() {
   // Signs go on the pavement: at least 0.6 m outside every carriageway (including crossing streets) and not
   // inside a building. Try the right-hand verge, a little further out, then a few metres along the road.
   // the driveway and drop-off in front of Lotte's entrance: no sign posts standing in it
-  const lotteForecourt = (q: Point) => { const [u, v] = toTower(q); return u > TOWER.halfU - 1 && u < TOWER.halfU + 30 && Math.abs(v) < 14; };
+  const lotteForecourt = (q: Point) => { const [u, v] = toTower(q); if (u > TOWER.halfU - 1 && u < TOWER.halfU + 30 && Math.abs(v) < 14) return true; const [rx, rz] = worldToRestaurant(q); return Math.abs(rx) < RESTAURANT.width / 2 + 9.5 && rz > RESTAURANT.depth / 2 - 1 && rz < RESTAURANT.depth / 2 + 6; }; // also the pavement in front of Bún chả Đức Anh's row of shops
   const spot = (p: Point, d: Point, n: Point, o: number): Point | null => {
     audit.total++;
     if (roadClearance([p[0] + n[0] * o, p[1] + n[1] * o]) < 0.3) audit.oldInRoad++; // where the old rule put it

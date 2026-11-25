@@ -344,3 +344,24 @@
 .chat-input input { flex: 1; padding: 8px 10px; border-radius: 18px; border: 1px solid #ccd; font-size: 13px; }
 .chat-input button { width: 36px; border-radius: 50%; border: 0; background: #7a4ff0; color: #fff; cursor: pointer; }
 .chat-off { padding: 16px 4px; color: #445; display: grid; gap: 6px; } .chat-off small { color: #778; }
+
+/* phone: Food app */
+.food-app { display: grid; gap: 8px; font-size: 13px; }
+.food-app h3 { margin: 2px 0; }
+.food-app .menu-list { max-height: 250px; overflow: auto; }
+.food-hint { color: #556; margin: 0; }
+.food-shops { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.food-shops button { width: 100%; display: grid; grid-template-columns: 14px 1fr auto; gap: 10px; align-items: center; text-align: left; padding: 10px; border: 1px solid #e3e3ea; border-radius: 12px; background: #fff; cursor: pointer; }
+.food-shops strong { display: block; } .food-shops small { color: #778; }
+.food-dot { width: 14px; height: 14px; border-radius: 50%; }
+.food-sum { display: grid; gap: 3px; padding: 8px 10px; border-radius: 10px; background: #f6f2ea; }
+.food-sum span { display: flex; justify-content: space-between; } .food-total { font-size: 15px; border-top: 1px solid #ddd3c0; padding-top: 4px; }
+.food-status { display: grid; gap: 4px; padding: 12px; border-radius: 12px; background: #fff3ec; border: 1px solid #ffc9b0; }
+.food-status b { color: #d4471c; } .food-status small { color: #778; }
+.food-app .menu-list { padding: 0; margin: 0; }
+.food-app .menu-list li { background: #fff; color: #222; border: 1px solid #ece7dc; border-radius: 10px; padding: 8px; }
+.food-app .menu-info strong, .food-app .qty b { color: #1f1f24; }
+.food-app .menu-info small { color: #667; }
+.food-app .menu-price { color: #c2410c; }
+.food-app .qty button { background: #f3efe6; color: #1f1f24; border-color: #d9d2c2; }
+.food-app .text-button { color: #2f6fd0; justify-self: start; padding: 0; }

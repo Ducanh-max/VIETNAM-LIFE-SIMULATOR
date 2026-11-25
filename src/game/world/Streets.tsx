@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { insideTowerPlan } from '../lotte';
 import * as THREE from 'three';
 import { distanceToShore, GROUND_HEIGHT, insidePolygon, registerBlocker, type Point } from '../geo';
-import { inLake, insideBuilding, isAlley, lakes, lawns, parks, roadClearance, roads, type Park, type Road } from '../osm';
+import { inLake, insideBuilding, isAlley, lakes, lawns, parks, RESTAURANT, roadClearance, roads, worldToRestaurant, type Park, type Road } from '../osm';
 import { Instances, trs, unitBox, unitCylinder } from './Instances';
 import { materials } from './materials';
 import { asphaltTexture, concreteTexture, grassTexture, rng } from './textures';
@@ -297,7 +297,10 @@ function StreetTrees() {
           const q: Point = [p[0] - d[1] * off * side, p[1] + d[0] * off * side];
           if (distanceToShore(q) < 15 || insideBuilding(q, 1.4) || roadClearance(q) < 0.8) continue;
           if (r() < 0.25) continue;
-          list.push({ x: q[0], z: q[1], y: GROUND_HEIGHT, kind: r() < 0.08 ? 'blossom' : 'shade', scale: 0.75 + r() * 0.3 });
+          // keep the pavement in front of Bún chả Đức Anh and its neighbouring shops clear, so the shopfronts show
+          const [rx, rz] = worldToRestaurant(q);
+          if (Math.abs(rx) < RESTAURANT.width / 2 + 9.5 && rz > RESTAURANT.depth / 2 - 1 && rz < RESTAURANT.depth / 2 + 7) continue;
+          list.push({ x: q[0], z: q[1], y: GROUND_HEIGHT, kind: 'shade', scale: 0.75 + r() * 0.3 });
         }
       });
     }

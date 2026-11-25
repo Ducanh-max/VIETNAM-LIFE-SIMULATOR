@@ -1,14 +1,16 @@
 import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { GROUND_HEIGHT, registerObstacles, type Obstacle, type Point } from '../geo';
+import { GROUND_HEIGHT, registerHeight, registerObstacles, type Obstacle, type Point } from '../geo';
 import { RESTAURANT, restaurantToWorld, worldToRestaurant } from '../osm';
 import { jobActions } from '../job';
 import { drinkLevels, firstDrink, mealDuration, SEAT_Z, SET, STOOL_TOP, TABLE_D, TABLE_TOP, TABLE_W } from '../meal';
 import { actions, bike, game, MENU, player, useGame, type MenuId, type Order } from '../state';
 import { Bottle, BunChaSet, DishStack, DrinkSet, GrillClamp, Tray } from './food';
 import { NameTag, Person, type PersonAnim } from './Person';
-import { facadeTexture, rng } from './textures';
+import { SHOP_DEPTH, shopObstacles, StreetShops, walkInShops } from './StreetShops';
+import { shopStore } from '../shops';
+import { rng } from './textures';
 
 /* Local frame: x along Phố Đinh Tiên Hoàng, +z out of the shopfront toward the lake. Units: metres. */
 const W = RESTAURANT.width; // 9
@@ -19,13 +21,23 @@ const H1 = 3.6; // ground floor height
 const UPPER = 2; // upper storeys
 const STOREY = 3.3;
 
-type Table = { x: number; z: number; npc?: { side: 1 | -1; shirt: string; pants: string; hair?: string; seed: number }; outside?: boolean };
+type Table = { x: number; z: number; npc?: { side: 1 | -1; shirt: string; pants: string; hair?: string; seed: number }; outside?: boolean; up?: boolean };
 const TABLES: Table[] = [
   { x: -2.1, z: 4.4 }, { x: 2.1, z: 4.4, npc: { side: -1, shirt: '#3c6e9e', pants: '#2a2a2a', seed: 1 } },
   { x: -2.1, z: 1.2 }, { x: 2.1, z: 1.2 },
   { x: -2.1, z: -2.0, npc: { side: 1, shirt: '#b8433a', pants: '#3a3f4a', hair: '#2b1d14', seed: 2 } }, { x: 2.1, z: -2.0 },
   { x: -0.6, z: HD + 1.5, outside: true },
+  // the dining room upstairs (tầng 2)
+  { x: -2.4, z: 5.2, up: true }, { x: 0.6, z: 5.2, up: true }, { x: -2.4, z: 2.0, up: true, npc: { side: 1, shirt: '#6a8a3a', pants: '#2a2a2a', hair: '#1c1c1c', seed: 5 } },
+  { x: 0.6, z: 2.0, up: true }, { x: -2.4, z: -1.2, up: true }, { x: 0.6, z: -1.2, up: true },
 ];
+/* Tầng 2: a straight stair up the right-hand wall from the dining room, a dining room upstairs open to the
+   street behind a balcony rail (the floor above stays the family's). */
+const F2 = H1 + 0.12; // upstairs floor level
+const STAIR = { x0: 3.15, x1: 4.34, zBottom: 2.6, zTop: -3.2 };
+const onStair = (x: number, z: number) => x > STAIR.x0 && x < STAIR.x1 && z < STAIR.zBottom && z > STAIR.zTop;
+const stairY = (z: number) => F2 * Math.min(1, Math.max(0, (STAIR.zBottom - z) / (STAIR.zBottom - STAIR.zTop)));
+const inRoom = (x: number, z: number) => Math.abs(x) < HW - 0.15 && z > -HD + 0.15 && z < HD - 0.1;
 const HOME: Point = [1.0, -4.3];
 const GRILL: Point = [-3.4, HD + 1.4];
 const DESK: Point = [-3.3, -3.8];
@@ -202,20 +214,45 @@ function Grill({ mats, fan }: { mats: ReturnType<typeof useRestaurantMaterials>;
   </group>;
 }
 
+/** The tiled stair up the right-hand wall to tầng 2, with a handrail and, upstairs, a rail round the stairwell. */
+function Stairs({ mats }: { mats: ReturnType<typeof useRestaurantMaterials> }) {
+  const n = 20; const run = (STAIR.zBottom - STAIR.zTop) / n; const w = STAIR.x1 - STAIR.x0; const xc = (STAIR.x0 + STAIR.x1) / 2;
+  const len = Math.hypot(STAIR.zBottom - STAIR.zTop, F2); const tilt = Math.atan2(F2, STAIR.zBottom - STAIR.zTop);
+  return <group>
+    {Array.from({ length: n }, (_, k) => { const top = (F2 * (k + 1)) / n; return <mesh key={k} position={[xc, top / 2, STAIR.zBottom - (k + 0.5) * run]} material={k % 2 ? mats.floor : mats.wood} castShadow receiveShadow><boxGeometry args={[w, top, run + 0.01]} /></mesh>; })}
+    {/* handrail on the open side, then the rail round the stairwell upstairs */}
+    <mesh position={[STAIR.x0 + 0.04, F2 / 2 + 0.9, (STAIR.zBottom + STAIR.zTop) / 2]} rotation={[tilt, 0, 0]} material={mats.dark}><boxGeometry args={[0.05, 0.05, len]} /></mesh>
+    {Array.from({ length: 6 }, (_, i) => { const z = STAIR.zBottom - 0.3 - i * ((STAIR.zBottom - STAIR.zTop - 0.6) / 5); return <mesh key={i} position={[STAIR.x0 + 0.04, stairY(z) + 0.45, z]} material={mats.dark}><boxGeometry args={[0.03, 0.9, 0.03]} /></mesh>; })}
+    <mesh position={[STAIR.x0 - 0.04, F2 + 0.95, (STAIR.zBottom + STAIR.zTop) / 2 + 0.3]} material={mats.dark}><boxGeometry args={[0.05, 0.05, STAIR.zBottom - STAIR.zTop - 0.6]} /></mesh>
+    <mesh position={[xc, F2 + 0.95, STAIR.zBottom + 0.02]} material={mats.dark}><boxGeometry args={[w, 0.05, 0.05]} /></mesh>
+    {Array.from({ length: 7 }, (_, i) => <mesh key={`r${i}`} position={[STAIR.x0 - 0.04, F2 + 0.47, STAIR.zTop + 0.6 + i * ((STAIR.zBottom - STAIR.zTop - 0.6) / 6)]} material={mats.dark}><boxGeometry args={[0.03, 0.95, 0.03]} /></mesh>)}
+  </group>;
+}
+
 function Building({ mats }: { mats: ReturnType<typeof useRestaurantMaterials> }) {
   const upperH = UPPER * STOREY;
   const fan = useRef<THREE.Group>(null);
   useFrame((_, dt) => { if (fan.current) fan.current.rotation.y += dt * 6; });
-  const facade = useMemo(() => { const m = mats.facade.clone(); m.map = mats.facade.map!.clone(); m.map.needsUpdate = true; m.map.wrapS = THREE.RepeatWrapping; m.map.repeat.set(1, 1); return m; }, [mats.facade]);
+  const facade = useMemo(() => { const m = mats.facade.clone(); m.map = mats.facade.map!.clone(); m.map.needsUpdate = true; m.map.wrapS = THREE.RepeatWrapping; m.map.repeat.set(1, 0.5); m.map.offset.set(0, 0.5); return m; }, [mats.facade]); // top storey only: tầng 2 is open
   return <group>
     {/* floor and ceiling */}
     <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} material={mats.floor} receiveShadow><planeGeometry args={[W - 0.3, D]} /></mesh>
-    <mesh position={[0, H1, 0]} rotation={[Math.PI / 2, 0, 0]} material={mats.ceiling}><planeGeometry args={[W - 0.3, D]} /></mesh>
+    {/* the upstairs floor slab (its underside is the dining room ceiling) with the stairwell left open */}
+    <mesh position={[(-HW + 0.1 + STAIR.x0) / 2, H1 + 0.06, 0]} material={mats.ceiling} receiveShadow><boxGeometry args={[STAIR.x0 + HW - 0.1, 0.12, D]} /></mesh>
+    {[[-HD, STAIR.zTop], [STAIR.zBottom, HD]].map(([z0, z1]) => <mesh key={z0} position={[(STAIR.x0 + HW - 0.1) / 2, H1 + 0.06, (z0 + z1) / 2]} material={mats.ceiling}><boxGeometry args={[HW - 0.1 - STAIR.x0, 0.12, z1 - z0]} /></mesh>)}
+    <mesh position={[(-HW + 0.1 + STAIR.x0) / 2, F2 + 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]} material={mats.floor} receiveShadow><planeGeometry args={[STAIR.x0 + HW - 0.1, D - 0.2]} /></mesh>
+    <Stairs mats={mats} />
     {/* side and back walls */}
     {[-1, 1].map((s) => <mesh key={s} position={[s * (HW - 0.08), H1 / 2, 0]} material={mats.wall} receiveShadow castShadow><boxGeometry args={[0.16, H1, D]} /></mesh>)}
     <mesh position={[0, H1 / 2, -HD + 0.08]} material={mats.wall} receiveShadow><boxGeometry args={[W, H1, 0.16]} /></mesh>
-    {/* upper storeys */}
-    <mesh position={[0, H1 + upperH / 2, 0]} castShadow receiveShadow material={[mats.side, mats.side, mats.side, mats.side, facade, mats.side]}><boxGeometry args={[W, upperH, D]} /></mesh>
+    {/* tầng 2: walls, balcony rail, strip lights; then the family's floor above */}
+    {[-1, 1].map((s) => <mesh key={s} position={[s * (HW - 0.08), F2 + (STOREY - 0.12) / 2, 0]} material={mats.wall} receiveShadow castShadow><boxGeometry args={[0.16, STOREY - 0.12, D]} /></mesh>)}
+    <mesh position={[0, F2 + (STOREY - 0.12) / 2, -HD + 0.08]} material={mats.wall}><boxGeometry args={[W, STOREY - 0.12, 0.16]} /></mesh>
+    <mesh position={[0, H1 + STOREY - 0.01, 0]} rotation={[Math.PI / 2, 0, 0]} material={mats.ceiling}><planeGeometry args={[W - 0.3, D]} /></mesh>
+    <mesh position={[0, F2 + 1.0, HD - 0.12]} material={mats.dark} castShadow><boxGeometry args={[W - 0.3, 0.06, 0.08]} /></mesh>
+    {Array.from({ length: 22 }, (_, i) => <mesh key={i} position={[-HW + 0.35 + i * ((W - 0.7) / 21), F2 + 0.5, HD - 0.12]} material={mats.dark}><boxGeometry args={[0.03, 1.0, 0.03]} /></mesh>)}
+    {[-1.5, 1.5].flatMap((x) => [-3.5, 0, 3.5].map((z) => <mesh key={`u${x}${z}`} position={[x, H1 + STOREY - 0.05, z]} material={mats.tube}><boxGeometry args={[0.06, 0.04, 1.2]} /></mesh>))}
+    <mesh position={[0, H1 + STOREY + (upperH - STOREY) / 2, 0]} castShadow receiveShadow material={[mats.side, mats.side, mats.side, mats.side, facade, mats.side]}><boxGeometry args={[W, upperH - STOREY, D]} /></mesh>
     <mesh position={[0, H1 + upperH + 0.45, HD - 0.1]} material={mats.side} castShadow><boxGeometry args={[W, 0.9, 0.2]} /></mesh>
     {/* front lintel with the main signboard, rolled-up shutter */}
     <mesh position={[0, H1 + 0.55, HD + 0.32]} material={mats.sign} castShadow><boxGeometry args={[W - 0.2, 1.1, 0.12]} /></mesh>
@@ -223,7 +260,7 @@ function Building({ mats }: { mats: ReturnType<typeof useRestaurantMaterials> })
     {/* vertical lightbox at the corner */}
     <mesh position={[HW + 0.35, H1 + 1.9, HD - 0.4]} rotation={[0, Math.PI / 2, 0]} material={mats.vertical} castShadow><boxGeometry args={[0.7, 2.8, 0.18]} /></mesh>
     {/* menu board on the right wall */}
-    <mesh position={[HW - 0.18, 2.0, 1.0]} rotation={[0, -Math.PI / 2, 0]} material={mats.menu}><planeGeometry args={[1.5, 1.875]} /></mesh>
+    <mesh position={[-HW + 0.18, 2.0, 1.2]} rotation={[0, Math.PI / 2, 0]} material={mats.menu}><planeGeometry args={[1.5, 1.875]} /></mesh>
     {/* fluorescent tubes and a ceiling fan */}
     {[-1.5, 1.5].flatMap((x) => [-3.5, 0, 3.5].map((z) => <mesh key={`${x}${z}`} position={[x, H1 - 0.05, z]} material={mats.tube}><boxGeometry args={[0.06, 0.04, 1.2]} /></mesh>))}
     <group position={[0, H1 - 0.35, 1.2]}>
@@ -248,26 +285,11 @@ function Building({ mats }: { mats: ReturnType<typeof useRestaurantMaterials> })
       <mesh position={[0, 0.95, 0]} material={mats.steel} castShadow><boxGeometry args={[0.9, 1.9, 0.7]} /></mesh>
       <mesh position={[0, 0.95, 0.36]} material={mats.fridge}><planeGeometry args={[0.8, 1.75]} /></mesh>
     </group>
-    <Neighbours />
+    <StreetShops />
     {/* cashier desk and an altar to Thần Tài, as in most Hà Nội shops */}
     <mesh position={[DESK[0], 0.5, DESK[1]]} material={mats.wood} castShadow><boxGeometry args={[0.9, 1.0, 1.4]} /></mesh>
     <mesh position={[-HW + 0.45, 1.9, -5.0]} material={mats.red}><boxGeometry args={[0.5, 0.45, 0.6]} /></mesh>
   </group>;
-}
-
-/** Narrow tube houses either side, so the shop sits in a proper street row. */
-const NEIGHBOURS = [
-  { x: -(HW + 2.1), w: 4.2, floors: 4, variant: 0 }, { x: -(HW + 6.4), w: 4.2, floors: 5, variant: 1 },
-  { x: HW + 2.1, w: 4.2, floors: 5, variant: 2 }, { x: HW + 6.4, w: 4.2, floors: 3, variant: 1 },
-];
-function Neighbours() {
-  const parts = useMemo(() => NEIGHBOURS.map((n) => {
-    const tex = facadeTexture('tube', n.variant, n.floors).clone(); tex.needsUpdate = true;
-    const front = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.88 });
-    const side = new THREE.MeshStandardMaterial({ color: '#d4c8b0', roughness: 0.95 });
-    return { ...n, h: n.floors * 3.4, materials: [side, side, side, side, front, side] };
-  }), []);
-  return <>{parts.map((p, i) => <mesh key={i} position={[p.x, p.h / 2, 0]} material={p.materials} castShadow receiveShadow><boxGeometry args={[p.w - 0.1, p.h, D]} /></mesh>)}</>;
 }
 
 /** One waiter state for the whole restaurant. */
@@ -310,18 +332,37 @@ export function Restaurant({ paused }: { paused: boolean }) {
   const dinerAnims = useRef<PersonAnim[]>(TABLES.map(() => ({ mode: 'eat', speed: 0 })));
   const task = useRef<WaiterTask>({ route: [HOME], leg: 0, mode: 'idle', wait: 0 });
 
-  // Walls, counter, fridge, desk, tables and the grill block the player.
+  // Which floor the player is on (the stair runs up the right-hand wall to tầng 2).
+  const upstairs = useRef(false);
+  const [floor, setFloor] = useState(0);
+  useEffect(() => registerHeight((p) => {
+    if (bike.riding) return null;
+    const [lx, lz] = worldToRestaurant(p);
+    if (Math.abs(lx) > HW + 1 || Math.abs(lz) > HD + 1) return null;
+    if (onStair(lx, lz)) return GROUND_HEIGHT + stairY(lz);
+    return upstairs.current && inRoom(lx, lz) ? GROUND_HEIGHT + F2 : null;
+  }), []);
+
+  // Walls, counter, fridge, desk, tables and the grill block the player; upstairs, the walls, tables and rails.
   useEffect(() => {
-    const local: [number, number, number, number][] = [
-      [-(HW - 0.08), 0, 0.12, HD], [HW - 0.08, 0, 0.12, HD], [0, -HD + 0.08, HW, 0.12],
+    const walls: [number, number, number, number][] = [[-(HW - 0.08), 0, 0.12, HD], [HW - 0.08, 0, 0.12, HD], [0, -HD + 0.08, HW, 0.12]];
+    const tables = (up: boolean) => TABLES.filter((t) => !!t.up === up).map((t): [number, number, number, number] => [t.x, t.z, TABLE_W / 2, TABLE_D / 2]);
+    const local: [number, number, number, number][] = floor === 0 ? [
+      ...walls,
       [1.6, -5.3, 2.3, 0.4], [-3.6, -6.4, 0.45, 0.35], [DESK[0], DESK[1], 0.45, 0.7], [BOSS[0], BOSS[1], 0.25, 0.25],
       [GRILL[0], GRILL[1], 0.45, 0.4], [GRILL[0] + 0.6, GRILL[1], 0.2, 0.2], [GRILL[0] - 0.65, GRILL[1], 0.25, 0.25],
-      ...TABLES.map((t): [number, number, number, number] => [t.x, t.z, TABLE_W / 2, TABLE_D / 2]),
-      ...NEIGHBOURS.map((n): [number, number, number, number] => [n.x, 0, n.w / 2, HD]),
+      ...tables(false),
+      [STAIR.x0 - 0.04, (STAIR.zTop + STAIR.zBottom - 1.2) / 2, 0.06, (STAIR.zBottom - 1.2 - STAIR.zTop) / 2], // the side of the stair
+      ...shopObstacles(),
+    ] : [
+      ...walls, [0, HD - 0.12, HW, 0.1], // balcony rail
+      ...tables(true),
+      [STAIR.x0 - 0.04, (STAIR.zTop + 0.6 + STAIR.zBottom) / 2, 0.06, (STAIR.zBottom - STAIR.zTop - 0.6) / 2], [(STAIR.x0 + STAIR.x1) / 2, STAIR.zBottom + 0.05, (STAIR.x1 - STAIR.x0) / 2, 0.08],
+      ...shopObstacles(),
     ];
     const list = local.map(([x, z, hx, hz]): Obstacle => { const [wx, wz] = restaurantToWorld(x, z); return { x: wx, z: wz, hx, hz, angle: RESTAURANT.angle }; });
     return registerObstacles(list);
-  }, []);
+  }, [floor]);
 
   // M orders more once the meal is finished.
   useEffect(() => {
@@ -345,7 +386,8 @@ export function Restaurant({ paused }: { paused: boolean }) {
     const side = local[1] > t.z ? 1 : -1; // the stool nearest to where the player stands
     const [sx, sz] = restaurantToWorld(t.x, t.z + side * SEAT_Z);
     const [lx, lz] = restaurantToWorld(t.x, t.z);
-    player.seat = { position: new THREE.Vector3(sx, GROUND_HEIGHT, sz), facing: RESTAURANT.angle + (side > 0 ? Math.PI : 0), look: new THREE.Vector3(lx, GROUND_HEIGHT + TABLE_TOP + 0.05, lz) };
+    const fy = t.up ? F2 : 0;
+    player.seat = { position: new THREE.Vector3(sx, GROUND_HEIGHT + fy, sz), facing: RESTAURANT.angle + (side > 0 ? Math.PI : 0), look: new THREE.Vector3(lx, GROUND_HEIGHT + fy + TABLE_TOP + 0.05, lz) };
     if (document.pointerLockElement) document.exitPointerLock();
     game.set({ phase: 'menu', table: i, order: {} });
   };
@@ -354,18 +396,26 @@ export function Restaurant({ paused }: { paused: boolean }) {
     const dt = Math.min(delta, 0.05);
     const s = game.get();
     const local = worldToRestaurant([player.position.x, player.position.z]);
-    const inside = Math.abs(local[0]) < HW && local[1] > -HD && local[1] < HD + 0.3;
+    const inShop = walkInShops.find((sh) => Math.abs(local[0] - sh.x) < sh.w / 2 - 0.15 && local[1] > HD - SHOP_DEPTH && local[1] < HD + 0.3);
+    const inside = (Math.abs(local[0]) < HW && local[1] > -HD && local[1] < HD + 0.3) || !!inShop;
     if (inside && !bike.riding) player.cameraMax = 3.4; else if (player.cameraMax === 3.4) player.cameraMax = Infinity;
     const near = (p: Point, r: number) => Math.hypot(local[0] - p[0], local[1] - p[1]) < r;
+    // up or down the stair
+    if (onStair(local[0], local[1])) {
+      if (local[1] < STAIR.zTop + 0.5) upstairs.current = true; else if (local[1] > STAIR.zBottom - 0.6) upstairs.current = false;
+    } else if (!inRoom(local[0], local[1])) upstairs.current = false;
+    if ((upstairs.current ? 1 : 0) !== floor) setFloor(upstairs.current ? 1 : 0);
+    const up = upstairs.current;
 
     // ---- context actions
     if (!bike.riding) {
       if (s.phase === 'none') {
         let best = -1; let bestD = 1.4;
-        TABLES.forEach((t, i) => { if (t.npc) return; const d = Math.hypot(local[0] - t.x, local[1] - t.z); if (d < bestD) { bestD = d; best = i; } });
+        TABLES.forEach((t, i) => { if (t.npc || !!t.up !== up) return; const d = Math.hypot(local[0] - t.x, local[1] - t.z); if (d < bestD) { bestD = d; best = i; } });
         if (best >= 0) game.offer({ id: `sit${best}`, text: 'Ngồi xuống & gọi món', key: 'E', priority: 5, run: () => sitAt(best) });
-        else if (near([BOSS[0] + 1.4, BOSS[1]], 1.7)) game.offer({ id: 'boss', text: 'Nói chuyện với ông chủ Đức Anh', key: 'E', priority: 6, run: () => { if (document.pointerLockElement) document.exitPointerLock(); game.set({ dialog: 'boss' }); } });
+        else if (!up && near([BOSS[0] + 1.4, BOSS[1]], 1.7)) game.offer({ id: 'boss', text: 'Nói chuyện với ông chủ Đức Anh', key: 'E', priority: 6, run: () => { if (document.pointerLockElement) document.exitPointerLock(); game.set({ dialog: 'boss' }); } });
         else if (s.job?.stage === 'pickup' && near([GRILL[0] - 0.2, GRILL[1] + 0.9], 2.0)) game.offer({ id: 'pickup', text: 'Nhận túi bún chả từ anh Đạt', key: 'E', priority: 6, run: () => jobActions.pickup() });
+        else if (inShop && !shopStore.get().counter) game.offer({ id: `shop-${inShop.id}`, text: `Mua ở ${inShop.name} (${inShop.seller})`, key: 'E', priority: 6, run: () => { if (document.pointerLockElement) document.exitPointerLock(); shopStore.set({ counter: inShop.id }); } });
         else if (Math.abs(local[0]) < HW + 4 && local[1] > -HD && local[1] < HD + 6 && !s.job) game.offer({ id: 'info-shop', text: 'Bún chả Đức Anh — ngồi bàn trống để gọi món, hoặc gặp ông chủ ở quầy để xin việc ship', key: null, priority: 1 });
       } else if (s.phase === 'cooking') game.offer({ id: 'cooking', text: 'Anh Đạt đang nướng chả trên than hoa…', key: null, priority: 4 });
       else if (s.phase === 'serving') game.offer({ id: 'serving', text: 'Anh Khánh đang bưng món ra bàn…', key: null, priority: 4 });
@@ -390,7 +440,8 @@ export function Restaurant({ paused }: { paused: boolean }) {
         if (tk.wait <= 0 && s.phase === 'cooking' && s.table >= 0) {
           const t = TABLES[s.table];
           const side = t.x > 0 ? 1 : -1;
-          const route: Point[] = t.outside ? [HOME, [1.05, -4.0], [1.05, HD + 0.5], [t.x + TABLE_W / 2 + 0.35, t.z]] : [HOME, [side * 1.0, -4.0], [side * 1.0, t.z]];
+          // upstairs the food goes up the stair with Khánh's colleague (the tray simply arrives at the table)
+          const route: Point[] = t.up ? [HOME] : t.outside ? [HOME, [1.05, -4.0], [1.05, HD + 0.5], [t.x + TABLE_W / 2 + 0.35, t.z]] : [HOME, [side * 1.0, -4.0], [side * 1.0, t.z]];
           task.current = { route, leg: 0, mode: 'out', wait: 0 };
           setCarrying(true);
           game.set({ phase: 'serving' });
@@ -429,7 +480,7 @@ export function Restaurant({ paused }: { paused: boolean }) {
 
   return <group position={[RESTAURANT.center[0], GROUND_HEIGHT, RESTAURANT.center[1]]} rotation={[0, RESTAURANT.angle, 0]}>
     <Building mats={mats} />
-    {TABLES.map((tb, i) => <DiningTable key={i} t={tb} mats={mats} bare={served && i === table} />)}
+    {TABLES.map((tb, i) => <group key={i} position={[0, tb.up ? F2 : 0, 0]}><DiningTable t={tb} mats={mats} bare={served && i === table} /></group>)}
     <Grill mats={mats} fan={cookAnim.current} />
     {/* Đạt, the grill cook, fanning the coals in a nón lá */}
     <group position={[GRILL[0] - 0.65, 0, GRILL[1]]} rotation={[0, Math.PI / 2, 0]}>
@@ -443,7 +494,7 @@ export function Restaurant({ paused }: { paused: boolean }) {
       <NameTag name="Đức Anh" role="Ông chủ quán" y={1.9} color="#ffd35c" />
     </group>
     {/* diners already eating */}
-    {TABLES.map((tb, i) => tb.npc ? <group key={`n${i}`}>
+    {TABLES.map((tb, i) => tb.npc ? <group key={`n${i}`} position={[0, tb.up ? F2 : 0, 0]}>
       <group position={[tb.x, 0, tb.z + tb.npc.side * SEAT_Z]} rotation={[0, tb.npc.side > 0 ? Math.PI : 0, 0]}>
         <Person anim={dinerAnims.current[i]} shirt={tb.npc.shirt} pants={tb.npc.pants} hair={tb.npc.hair} seed={tb.npc.seed} />
       </group>
@@ -458,7 +509,7 @@ export function Restaurant({ paused }: { paused: boolean }) {
       <NameTag name="Khánh" role="Phục vụ" />
       {carrying && <group position={[0, 0.78, 0.36]}><Tray><TrayLoad order={order} /></Tray></group>}
     </group>
-    {served && t && <group position={[t.x, TABLE_TOP, t.z]} rotation={[0, playerSide > 0 ? 0 : Math.PI, 0]}><TableSpread order={order} progress={phase === 'finished' ? 1 : eatProgress} inHand={inHand} /></group>}
+    {served && t && <group position={[t.x, TABLE_TOP + (t.up ? F2 : 0), t.z]} rotation={[0, playerSide > 0 ? 0 : Math.PI, 0]}><TableSpread order={order} progress={phase === 'finished' ? 1 : eatProgress} inHand={inHand} /></group>}
   </group>;
 }
 /** Quạt nan: a half-round woven bamboo fan on a bamboo handle (held at the palm anchor, blade beyond the fingers). */

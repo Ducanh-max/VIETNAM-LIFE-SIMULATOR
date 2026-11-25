@@ -10,6 +10,8 @@ import { drawMap, headingUpRotation, mapBase } from './mapCanvas';
 import { searchPlaces } from '../game/search';
 import { RENTAL } from '../game/rental';
 import { RentalApp } from './RentalPanel';
+import { FoodApp } from './ShopPanel';
+import { useShops } from '../game/shops';
 import { useVietnamClock, VIETNAM_TZ } from './vietnamTime';
 
 const fmtDist = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`);
@@ -43,7 +45,7 @@ export function Minimap({ onOpen }: { onOpen: () => void }) {
   </button>;
 }
 
-type App = 'home' | 'map' | 'orders' | 'wallet' | 'messages' | 'contacts' | 'den' | 'rent';
+type App = 'home' | 'map' | 'orders' | 'food' | 'wallet' | 'messages' | 'contacts' | 'den' | 'rent';
 
 /** Full map app: north-up, drag to pan, wheel or buttons to zoom, follows the player until dragged. */
 function MapApp() {
@@ -112,7 +114,7 @@ function OrdersApp() {
   const d = job?.delivery;
   const earnings = txns.filter((t) => t.text.startsWith('Tiền ship') || t.text.includes('bo thêm'));
   return <div className="app-page">
-    <h3>Đơn giao hàng</h3>
+    <h3>Shipper · đơn bún chả</h3>
     {!job && <p className="app-empty">Bạn chưa nhận việc. Vào quán Bún chả Đức Anh, nói chuyện với ông chủ ở quầy thu ngân để làm shipper.</p>}
     {job && !d && <div className="order-card"><b>Về quán lấy đơn</b><span>Anh Đạt đang gói bún chả ở bếp than trước cửa.</span><span>Còn cách {fmtDist(nav.length || 0)}</span></div>}
     {d && <div className="order-card active">
@@ -289,11 +291,13 @@ export function Phone({ onClose }: { onClose: () => void }) {
   const job = useGame((s) => s.job);
   const ride = useGame((s) => s.ride);
   const rentalOn = useGame((s) => !!s.rental);
+  const foodOn = useShops((s) => !!s.food);
   useEffect(() => { if (document.pointerLockElement) document.exitPointerLock(); }, []);
   const battery = 87 - Math.floor((now.getMinutes() % 60) / 6);
   const apps: { id: App; name: string; icon: string; color: string; badge?: number | string }[] = [
     { id: 'map', name: 'Bản đồ', icon: '🗺️', color: '#2f8cff' },
-    { id: 'orders', name: 'Đơn giao', icon: '🛵', color: '#e8542f', badge: job?.delivery ? '1' : undefined },
+    { id: 'food', name: 'Food', icon: '🍜', color: '#ff6a3d', badge: foodOn ? '•' : undefined },
+    { id: 'orders', name: 'Shipper', icon: '🛵', color: '#e8542f', badge: job?.delivery ? '1' : undefined },
     { id: 'wallet', name: 'Ví tiền', icon: '💰', color: '#1f9d55' },
     { id: 'messages', name: 'Tin nhắn', icon: '💬', color: '#7a4ff0', badge: unread || undefined },
     { id: 'contacts', name: 'Danh bạ', icon: '📞', color: '#f0a020' },
@@ -312,6 +316,7 @@ export function Phone({ onClose }: { onClose: () => void }) {
             <div className="app-bar"><button onClick={() => setApp('home')} aria-label="Quay lại">‹</button><b>{apps.find((a) => a.id === app)?.name}</b></div>
             {app === 'map' && <MapApp />}
             {app === 'orders' && <OrdersApp />}
+            {app === 'food' && <FoodApp />}
             {app === 'wallet' && <WalletApp />}
             {app === 'messages' && <MessagesApp />}
             {app === 'contacts' && <ContactsApp />}

@@ -393,7 +393,7 @@ export function insideBuilding(p: Point, skin = 0.25) {
 
 export const parks: Park[] = (osm.parks as RawPark[])
   .map((p) => ({ ring: p.p as Point[], name: p.n }))
-  .filter((p) => !insidePolygon(centroid(p.ring), shore) && polygonArea(p.ring) > 80 && polygonArea(p.ring) < 400_000 && inWorld(centroid(p.ring)));
+  .filter((p) => !insidePolygon(centroid(p.ring), shore) && polygonArea(p.ring) > 80 && polygonArea(p.ring) < 400_000 && inWorld(centroid(p.ring)) && !overlapsRect(p.ring, restaurantRect));
 
 /** Lakes and ponds other than Hồ Gươm (Hồ Thủ Lệ, Hồ Giảng Võ, Hồ Văn, Hồ Thiền Quang, Hồ Linh Chiểu…); rivers left out. */
 export const lakes: Park[] = ((osm as { water?: RawPark[] }).water ?? [])
@@ -402,7 +402,8 @@ export const lakes: Park[] = ((osm as { water?: RawPark[] }).water ?? [])
 /** Lawns (landuse=grass), e.g. the grass squares round Lăng Bác. */
 export const lawns: Park[] = ((osm as { grass?: RawPark[] }).grass ?? [])
   .map((p) => ({ ring: p.p as Point[], name: p.n }))
-  .filter((p) => polygonArea(p.ring) > 6 && polygonArea(p.ring) < 60_000 && inWorld(centroid(p.ring)) && !insidePolygon(centroid(p.ring), shore));
+  // (a lawn mapped over the plot of Bún chả Đức Anh and its neighbours showed through the shop floors)
+  .filter((p) => polygonArea(p.ring) > 6 && polygonArea(p.ring) < 60_000 && inWorld(centroid(p.ring)) && !insidePolygon(centroid(p.ring), shore) && !overlapsRect(p.ring, restaurantRect));
 const lakeGrid = new Map<string, number[]>();
 lakes.forEach((l, index) => {
   let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
