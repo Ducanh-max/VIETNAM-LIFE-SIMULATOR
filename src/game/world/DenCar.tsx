@@ -63,6 +63,8 @@ function make() {
   };
 }
 const M = () => (mats ??= make());
+const carPaints = new Map<string, THREE.Material>();
+function carPaint(c: string) { let p = carPaints.get(c); if (!p) carPaints.set(c, (p = new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.3, metalness: 0.25, clearcoat: 1, clearcoatRoughness: 0.08 }))); return p as THREE.MeshPhysicalMaterial; }
 
 function CarWheel() {
   const m = M();
@@ -74,8 +76,10 @@ function CarWheel() {
   </group>;
 }
 
-export function DenCarModel({ pose, children }: { pose: BikePose; children?: ReactNode }) {
-  const m = M();
+/** `plain`: a rental car in `color`, without the Đen SM logo, stripe or roof sign. */
+export function DenCarModel({ pose, children, plain = false, color }: { pose: BikePose; children?: ReactNode; plain?: boolean; color?: string }) {
+  const base = M();
+  const m = plain ? { ...base, body: carPaint(color ?? '#e8e8e6'), green: base.trim, logo: carPaint(color ?? '#e8e8e6') } : base;
   const root = useRef<THREE.Group>(null);
   const wheels = useRef<THREE.Group[]>([]);
   const steerers = useRef<THREE.Group[]>([]);
@@ -141,8 +145,8 @@ export function DenCarModel({ pose, children }: { pose: BikePose; children?: Rea
     <mesh material={m.tail} position={[0, 0.86, -2.15]}><boxGeometry args={[1.56, 0.05, 0.04]} /></mesh>
     <mesh material={m.plate} position={[0, 0.48, 2.2]}><planeGeometry args={[0.5, 0.12]} /></mesh>
     <mesh material={m.plate} position={[0, 0.58, -2.2]} rotation={[0, Math.PI, 0]}><planeGeometry args={[0.5, 0.12]} /></mesh>
-    {/* lit roof sign */}
-    <group position={[0, 1.66, -0.4]}>
+    {/* lit roof sign (Đen SM only) */}
+    <group position={[0, 1.66, -0.4]} visible={!plain}>
       <RoundedBox args={[0.5, 0.17, 0.2]} radius={0.04} smoothness={3} material={m.body} />
       {[-1, 1].map((s) => <mesh key={s} material={m.logo} position={[0, 0, s * 0.101]} rotation={[0, s > 0 ? 0 : Math.PI, 0]}><planeGeometry args={[0.44, 0.12]} /></mesh>)}
     </group>

@@ -7,6 +7,8 @@ import { actions, game, useGame } from './game/state';
 import { NameEntry, VietnamMap } from './ui/Entry';
 import { BossDialog, JobPanel, MenuPanel, NeedsHud, PromptAndToast, Speedometer } from './ui/Hud';
 import { LiftPanel } from './game/world/Lotte';
+import { MultiplayerPanel, roomFromUrl } from './ui/MultiplayerPanel';
+import { joinGame, net, onNet } from './game/net';
 import { Minimap, Phone } from './ui/Phone';
 import { loadPlayerName, savePlayerName } from './ui/player';
 import { vietnamTimeOfDay } from './ui/vietnamTime';
@@ -34,6 +36,11 @@ function App() {
   const [panel, setPanel] = useState<Panel>(null);
   const [time, setTime] = useState<TimeOfDay>(() => (import.meta.env.DEV && (new URLSearchParams(location.search).get('time') as TimeOfDay | null)) || vietnamTimeOfDay()); // ?time=day for tests
   const [playerName, setPlayerName] = useState(loadPlayerName);
+  const [mpOpen, setMpOpen] = useState(() => !!roomFromUrl());
+  const [netCount, setNetCount] = useState(0);
+  useEffect(() => onNet(() => setNetCount(net.room ? net.remotes.size + 1 : 0)), []);
+  // an invite link (?room=CODE) joins that room as soon as the game starts
+  useEffect(() => { const c = roomFromUrl(); if (mode === 'game' && c && !net.room && net.status !== 'full') void joinGame(c); }, [mode]);
   const [renaming, setRenaming] = useState(false);
   const [quality, setQuality] = useState<Quality>('medium');
   const [freeCamera, setFreeCamera] = useState(false);
@@ -121,13 +128,14 @@ function App() {
     ) : <>
       <header className="game-header">
         <div className="game-brand" onClick={returnHome} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') returnHome(); }}>ĐỜI VIỆT<span> / HÀ NỘI 3D</span></div>
-        <div className="game-actions"><button title="Điện thoại (P)" aria-label="Điện thoại" onClick={() => game.set({ phone: !phone })}>📱</button><button title="Trợ giúp" aria-label="Trợ giúp" onClick={() => openPanel('help')}>?</button><button title="Cài đặt" aria-label="Cài đặt" onClick={() => openPanel('settings')}><Icon name="settings" /></button><button title={paused ? 'Tiếp tục' : 'Tạm dừng'} aria-label={paused ? 'Tiếp tục' : 'Tạm dừng'} onClick={() => { if (document.pointerLockElement) document.exitPointerLock(); setPaused(!paused); }}><Icon name={paused ? 'play' : 'pause'} /></button></div>
+        <div className="game-actions"><button title="Chơi cùng bạn bè" aria-label="Chơi cùng bạn bè" className={netCount ? 'mp-on' : ''} onClick={() => { if (document.pointerLockElement) document.exitPointerLock(); setMpOpen(!mpOpen); }}>👥{netCount ? <small>{netCount}</small> : null}</button><button title="Điện thoại (P)" aria-label="Điện thoại" onClick={() => game.set({ phone: !phone })}>📱</button><button title="Trợ giúp" aria-label="Trợ giúp" onClick={() => openPanel('help')}>?</button><button title="Cài đặt" aria-label="Cài đặt" onClick={() => openPanel('settings')}><Icon name="settings" /></button><button title={paused ? 'Tiếp tục' : 'Tạm dừng'} aria-label={paused ? 'Tiếp tục' : 'Tạm dừng'} onClick={() => { if (document.pointerLockElement) document.exitPointerLock(); setPaused(!paused); }}><Icon name={paused ? 'play' : 'pause'} /></button></div>
       </header>
       <div className="area-tag"><Icon name="compass" /><span>{freeCamera ? 'CHẾ ĐỘ DRONE' : 'ĐANG KHÁM PHÁ'}<strong>Hồ Hoàn Kiếm, Hà Nội</strong>{playerName && <em className="area-player">{playerName}</em>}<small>Commit {buildLabel}</small></span></div>
       {freeCamera && <div className="drone-reticle" aria-hidden="true">+</div>}
       <div className="game-bottom"><span>W A S D <b>{freeCamera ? 'Bay ngang' : 'Di chuyển'}</b></span><span>← ↑ ↓ → <b>Xoay góc nhìn</b></span><span>{freeCamera ? 'SPACE / CTRL' : 'SHIFT'} <b>{freeCamera ? 'Lên / xuống' : 'Chạy'}</b></span><span>V <b>{freeCamera ? 'Về nhân vật' : 'Bật drone'}</b></span>{!freeCamera && <span>E <b>Tương tác</b></span>}{!freeCamera && <span>F <b>Lên / xuống xe</b></span>}{!freeCamera && <span>P <b>Điện thoại</b></span>}<span className="fps-pill">{position[0].toFixed(0)} : {position[1].toFixed(0)} · {fps || '—'} FPS</span></div>
       <NeedsHud />
       <Speedometer />
+      {mpOpen && <MultiplayerPanel onClose={() => setMpOpen(false)} />}
       <LiftPanel />
       <PromptAndToast />
       <JobPanel />

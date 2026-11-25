@@ -88,6 +88,9 @@ function makeMats() {
   };
 }
 const M = () => (mats ??= makeMats());
+const paints = new Map<string, THREE.Material>();
+/** Gloss body paint of a given colour (rental bikes), shared per colour. */
+function paint(c: string) { let p = paints.get(c); if (!p) paints.set(c, (p = new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.25, metalness: 0.1, clearcoat: 1, clearcoatRoughness: 0.08 }))); return p; }
 
 /** Side-profile panel: a 2D (z, y) outline extruded `width` across x, centred, softly bevelled. */
 function profilePanel(points: [number, number][], width: number, bevel = 0.02) {
@@ -141,10 +144,11 @@ function Shock({ from, to }: { from: THREE.Vector3; to: THREE.Vector3 }) {
 
 export type BikePose = { position: THREE.Vector3; heading: number; steer: number; lean: number; wheel: number; riding: boolean };
 
-export function ScooterModel({ pose, livery = 'shop', children }: { pose: BikePose; livery?: 'shop' | 'den'; children?: React.ReactNode }) {
+export function ScooterModel({ pose, livery = 'shop', color, children }: { pose: BikePose; livery?: 'shop' | 'den' | 'rent'; color?: string; children?: React.ReactNode }) {
   const base = M();
-  // Đen SM bikes: gloss black body with green trim, electric (no exhaust, no delivery box)
-  const m = livery === 'den' ? { ...base, red: denMats().body, box: denMats().body } : base;
+  // Đen SM bikes: gloss black body with green trim, electric (no exhaust, no delivery box); rental bikes: plain paint, no box, no logo
+  const m = livery === 'den' ? { ...base, red: denMats().body, box: denMats().body } : livery === 'rent' ? { ...base, red: paint(color ?? '#2f6fb3') } : base;
+  const rent = livery === 'rent';
   const den = livery === 'den';
   const root = useRef<THREE.Group>(null);
   const steerGroup = useRef<THREE.Group>(null);
@@ -199,7 +203,7 @@ export function ScooterModel({ pose, livery = 'shop', children }: { pose: BikePo
     {[-1, 1].map((s) => <mesh key={`rk${s}`} material={m.alloy} position={[s * 0.12, 0.79, -0.72]}><boxGeometry args={[0.018, 0.018, 0.34]} /></mesh>)}
     {[-0.58, -0.72, -0.86].map((z) => <mesh key={`rb${z}`} material={m.alloy} position={[0, 0.79, z]}><boxGeometry args={[0.26, 0.014, 0.014]} /></mesh>)}
     {/* insulated delivery box (shop bike) or a green Đen SM decal stripe */}
-    {den ? <>{[-1, 1].map((s) => <mesh key={`dn${s}`} material={denMats().decal} position={[s * 0.158, 0.6, -0.45]} rotation={[0, s * Math.PI / 2, 0]}><planeGeometry args={[0.42, 0.11]} /></mesh>)}</> : <group position={[0, 0.8 + 0.215, -0.73]}>
+    {rent ? null : den ? <>{[-1, 1].map((s) => <mesh key={`dn${s}`} material={denMats().decal} position={[s * 0.158, 0.6, -0.45]} rotation={[0, s * Math.PI / 2, 0]}><planeGeometry args={[0.42, 0.11]} /></mesh>)}</> : <group position={[0, 0.8 + 0.215, -0.73]}>
       <RoundedBox args={[0.44, 0.43, 0.42]} radius={0.04} smoothness={4} material={m.box} castShadow />
       <mesh position={[0, 0.16, 0]} material={m.black}><boxGeometry args={[0.452, 0.012, 0.432]} /></mesh>
       <mesh position={[0, 0.1, -0.215]} material={m.chrome}><boxGeometry args={[0.07, 0.03, 0.012]} /></mesh>

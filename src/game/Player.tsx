@@ -335,5 +335,5 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
     camera.lookAt(cf.x, cf.y + 1.1, cf.z);
   });
 
-  return <group ref={avatar} position={position.current.toArray()}><Avatar speed={speed} /></group>;
+  return <group ref={(g) => { avatar.current = g; player.avatar = g; }} position={position.current.toArray()}><Avatar speed={speed} /></group>;
 }

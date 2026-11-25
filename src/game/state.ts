@@ -132,6 +132,8 @@ export const player = {
   /** Indoors the follow camera is pulled in so walls don't hide the avatar. */
   cameraMax: Infinity,
   teleport: null as null | ((x: number, z: number) => void),
+  /** The avatar's root object (its world pose is what other players see). */
+  avatar: null as THREE.Object3D | null,
 };
 
 /** Restaurant flow, called from the menu UI and the in-world prompts. */

@@ -250,3 +250,27 @@
 .lift-grid button.deck { border-color: #16a0c7; }
 .lift-foot { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 10px; color: #aab1b6; }
 .lift-foot button { padding: 6px 12px; border-radius: 10px; border: 1px solid #8d9399; background: transparent; color: #fff; }
+
+/* multiplayer */
+.game-actions button.mp-on { background: #16a34a; }
+.game-actions button small { position: absolute; margin: -14px 0 0 10px; font-size: 10px; font-weight: 800; }
+.mp-panel { position: fixed; left: 24px; top: 210px; width: 300px; padding: 14px; border-radius: 16px; background: rgba(16, 38, 34, .95); border: 1.5px solid rgba(230, 189, 131, .6); color: #f3efe6; z-index: 25; display: flex; flex-direction: column; gap: 8px; }
+.mp-head { display: flex; justify-content: space-between; align-items: center; }
+.mp-head b { color: #e6bd83; letter-spacing: .04em; }
+.mp-head button { background: none; border: 0; color: #fff; font-size: 16px; cursor: pointer; }
+.mp-note { font-size: 11px; color: #c9d4cf; margin: 0; }
+.mp-primary { padding: 9px; border-radius: 10px; border: 0; background: #e6bd83; color: #10261f; font-weight: 800; cursor: pointer; }
+.mp-join { display: flex; gap: 6px; }
+.mp-join input, .mp-chat input { flex: 1; padding: 8px; border-radius: 9px; border: 1px solid #5b6f68; background: #0d1d19; color: #fff; text-transform: uppercase; }
+.mp-chat input { text-transform: none; width: 100%; box-sizing: border-box; }
+.mp-join button { padding: 8px 10px; border-radius: 9px; border: 1px solid #e6bd83; background: transparent; color: #e6bd83; font-weight: 700; cursor: pointer; }
+.mp-code { display: flex; justify-content: space-between; align-items: baseline; }
+.mp-code strong { font-size: 24px; letter-spacing: .18em; color: #fff; }
+.mp-status { font-size: 12px; margin: 0; color: #9fe0b5; }
+.mp-status.full, .mp-status.error { color: #ffb4a0; }
+.mp-list { list-style: none; margin: 0; padding: 0; font-size: 13px; display: grid; gap: 3px; }
+.mp-list .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #8a8; }
+.mp-list .dot.me { background: #e6bd83; } .mp-list .dot.on { background: #3fd07a; } .mp-list .dot.lag { background: #f0a030; }
+.mp-count { font-size: 11px; color: #aab; }
+.mp-chat { display: grid; gap: 3px; font-size: 12px; }
+.mp-leave { padding: 7px; border-radius: 9px; border: 1px solid #e5372a; background: transparent; color: #ff9a8f; cursor: pointer; }

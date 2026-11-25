@@ -37,8 +37,11 @@ export const net = {
   chat: [] as { from: string; text: string; at: number }[],
   pendingSeat: null as null | ((r: { ok: boolean; seat: number; reason?: string }) => void),
 };
-const notify = () => net.listeners.forEach((f) => f());
-export function onNet(f: () => void) { net.listeners.add(f); return () => net.listeners.delete(f); }
+const notify = () => {
+  if (net.status === 'online') net.message = net.remotes.size ? `Đã vào phòng ${net.code} · ${net.remotes.size + 1}/${MAX_PLAYERS} người` : `Phòng ${net.code} đã mở. Gửi mã hoặc link cho bạn bè (chưa có ai khác).`;
+  net.listeners.forEach((f) => f());
+};
+export function onNet(f: () => void) { net.listeners.add(f); return () => { net.listeners.delete(f); }; }
 
 export function makeCode() {
   const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';

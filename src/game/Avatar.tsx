@@ -6,7 +6,7 @@ import { AnimMachine, GAIT, type AnimState } from './character/animState';
 import { BlobShadow } from './character/ChibiModel';
 import { FACE, surf } from './character/chibiGeometry';
 import { Phone3D } from './character/Phone3D';
-import { uniformFor } from './character/outfit';
+import { uniformFor, type Outfit } from './character/outfit';
 import { CAN_OFFSET, drinkLevels, firstDrink, GLASS_OFFSET, lerpN, lerpV, mealAt, POUR, SEAT_DROP, SET, setToBody, track } from './meal';
 import { PLAYER_DIMENSIONS as PD, PlayerModel, type Expression, type HandPose, type PlayerRig } from './PlayerModel';
 import { taxi } from './ride';
@@ -70,7 +70,7 @@ function solveArm(side: number, hand: THREE.Vector3, upper: THREE.Group, fore: T
 }
 
 /** Debug hook: the current animation state (read by tests). */
-export const avatarAnim = { state: 'IDLE' as AnimState };
+export const avatarAnim = { state: 'IDLE' as AnimState, outfit: null as Outfit | null, expr: 'neutral' as string };
 
 export function Avatar({ speed, expressionOverride }: { speed: { current: number }; expressionOverride?: { current: Expression | null } }) {
   const body = useRef<THREE.Group>(null);
@@ -83,6 +83,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
   const ownOutfit = useGame((s) => s.outfit);
   // hired → wear the work uniform; quit → back to the outfit chosen in the character panel
   const outfit = useMemo(() => (shipping ? uniformFor(ownOutfit, 'shipper') : driverVehicle ? uniformFor(ownOutfit, driverVehicle === 'car' ? 'denCar' : 'denBike') : ownOutfit), [ownOutfit, shipping, driverVehicle]);
+  avatarAnim.outfit = outfit;
   const [idleLook, setIdleLook] = useState(false);
   const sitBlend = useRef(0);
   const phone3d = useRef<THREE.Group>(null);
@@ -382,6 +383,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
       : s.phone ? 'smile'
       : s.hunger < 15 || s.thirst < 15 ? 'sad' : 'neutral';
     if (expression.current !== expr) setExpr(expression.current);
+    avatarAnim.expr = expression.current;
     R0.head.rotation.x = THREE.MathUtils.damp(R0.head.rotation.x, headPitch, 10, dt);
     if (sticks.current) sticks.current.visible = showSticks;
     if (morsel.current) morsel.current.visible = showMorsel;
