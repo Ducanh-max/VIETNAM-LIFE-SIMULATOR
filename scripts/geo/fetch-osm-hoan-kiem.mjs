@@ -96,3 +96,4 @@ for (const el of data.elements) {
 const out = { source: 'OpenStreetMap contributors (ODbL 1.0)', fetched: new Date().toISOString().slice(0, 10), bbox: `${bbox} + ${corridor}`, roads, buildings, parks, nodes };
 await writeFile(new URL('../../src/data/hoanKiemOsm.json', import.meta.url), JSON.stringify(out));
 console.log(`roads ${roads.length}, buildings ${buildings.length}, parks ${parks.length}, nodes ${nodes.length} (${[...new Set(nodes.map((n) => n.t))].map((k) => `${k} ${nodes.filter((n) => n.t === k).length}`).join(', ')})`);
+await import("./fix-roads.mjs");

@@ -1,0 +1,14 @@
+{
+ "roads": 3755,
+ "segments": 9669,
+ "components": 13,
+ "largestComponentNodes": 8620,
+ "smallComponents": 10,
+ "deadEnds": 1092,
+ "gapsUnder4m": 3,
+ "duplicateSegments": 0,
+ "crossingsWithoutNode": 0,
+ "segmentsThroughBuildings": 11,
+ "oddWidthTags": 8,
+ "oneway": 1093
+}

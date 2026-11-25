@@ -90,11 +90,15 @@ function Roads() {
     const zebra: THREE.Matrix4[] = [];
     for (const road of roads) {
       const half = road.width / 2;
-      pushRibbon(kerb, road.points, half + 0.35, ROAD_Y - 0.008);
+      pushRibbon(kerb, road.points, half + 0.35, ROAD_Y - 0.02); // kerb strip: lower and never pulled forward, so a crossing street's asphalt always covers it at junctions
       pushRibbon(asphalt, road.points, half, ROAD_Y);
       if (!road.oneway && road.width >= 8 && road.kind !== 'service') {
+        const L = roadLength(road);
+        let walked = 0;
         along(road.points, 7, 3, (p, d) => {
-          if (roadClearance(p, road) < -1) return; // keep junctions clean
+          walked += 7;
+          if (walked < 10 || walked > L - 10) return; // no dashes in the junction mouths at either end
+          if (roadClearance(p, road) < 0.5) return; // nor where another street crosses or runs alongside
           dashes.push(trs(p[0], ROAD_Y + 0.02, p[1], -Math.atan2(d[1], d[0]), 3.2, 0.02, 0.16));
         });
       }
@@ -116,14 +120,16 @@ function Roads() {
     return { asphalt: flatGeometry(asphalt, 1 / 6), kerb: flatGeometry(kerb), dashes, zebra };
   }, []);
   const mats = useMemo(() => ({
-    asphalt: new THREE.MeshStandardMaterial({ map: repeated(asphaltTexture(), 1, 1), roughness: 0.92, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
-    kerb: new THREE.MeshStandardMaterial({ color: '#c3bdb1', roughness: 0.85, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
+    asphalt: new THREE.MeshStandardMaterial({ map: repeated(asphaltTexture(), 1, 1), roughness: 0.92, side: THREE.DoubleSide, depthFunc: THREE.AlwaysDepth }),
+    kerb: new THREE.MeshStandardMaterial({ color: '#c3bdb1', roughness: 0.85, side: THREE.DoubleSide }),
     // paint sits above the asphalt's polygon offset so stripes are never partly swallowed by an overlapping street
-    paint: new THREE.MeshStandardMaterial({ color: '#f1eee4', roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 }),
+    paint: new THREE.MeshStandardMaterial({ color: '#f1eee4', roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8 }),
   }), []);
   return <group>
-    <mesh geometry={data.kerb} material={mats.kerb} receiveShadow />
-    <mesh geometry={data.asphalt} material={mats.asphalt} receiveShadow />
+    {/* kerbs first, then all asphalt over them regardless of depth: at junctions a street's kerb strip never
+        shows through the crossing street, and overlapping road pieces can't z-fight */}
+    <mesh geometry={data.kerb} material={mats.kerb} receiveShadow renderOrder={-2} />
+    <mesh geometry={data.asphalt} material={mats.asphalt} receiveShadow renderOrder={-1} />
     <Instances geometry={unitBox} material={mats.paint} matrices={data.dashes} castShadow={false} />
     <Instances geometry={unitBox} material={mats.paint} matrices={data.zebra} castShadow={false} />
   </group>;
