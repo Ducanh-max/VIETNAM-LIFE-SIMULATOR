@@ -17,7 +17,9 @@ function roundedRing(hu: number, hv: number, r: number, seg = 5) {
   const raw = roundedRingRaw(hu, hv, r, seg);
   const pts: [number, number][] = [];
   for (let i = 0; i < raw.length; i++) {
-    const a = raw[i], b = raw[(i + 1) % raw.length]; const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 2));
+    // pieces of about 2 m at the tower's base size; the count depends only on the shape (not the taper), so every
+    // ring of the tapered shaft has the same number of vertices and the walls don't twist
+    const a = raw[i], b = raw[(i + 1) % raw.length]; const n = Math.max(1, Math.ceil((Math.hypot(b[0] - a[0], b[1] - a[1]) / hu) * TOWER.halfU / 2 - 1e-4));
     for (let k = 0; k < n; k++) pts.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]);
   }
   return pts;
