@@ -296,3 +296,40 @@
 .map-search li:hover { background: #eef3f6; }
 .map-search li b { font-size: 12px; } .map-search li small { font-size: 10px; color: #667; }
 .map-cancel { justify-self: start; padding: 5px 9px; border-radius: 10px; border: 0; background: #e5372a; color: #fff; font-size: 11px; font-weight: 700; cursor: pointer; }
+
+/* welcome / intro / start choice */
+.welcome { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; z-index: 40;
+  background: radial-gradient(1200px 600px at 20% 10%, rgba(230, 189, 131, .22), transparent 60%), radial-gradient(900px 600px at 90% 90%, rgba(22, 199, 132, .14), transparent 60%), linear-gradient(160deg, #0d241f 0%, #10261f 45%, #1b2a2a 100%); }
+.welcome-card { width: min(560px, 100%); padding: 34px 34px 26px; border-radius: 26px; background: rgba(9, 25, 21, .78); border: 1.5px solid rgba(230, 189, 131, .45); box-shadow: 0 30px 80px rgba(0, 0, 0, .45); color: #f3efe6; display: flex; flex-direction: column; gap: 12px; text-align: center; animation: welcomeIn .45s ease; }
+.welcome-card.hero h1 { font-size: 36px; }
+.welcome-card h1 { margin: 0; font: 800 30px/1.2 "Be Vietnam Pro", Arial, sans-serif; }
+.welcome-card h1 em { font-style: normal; color: #e6bd83; }
+.welcome-card h2 { margin: 0; font: 800 24px/1.25 "Be Vietnam Pro", Arial, sans-serif; }
+.welcome-card p { margin: 0; color: #cfd9d4; line-height: 1.55; }
+.welcome-kicker { font: 700 12px Arial, sans-serif; letter-spacing: .16em; color: #e6bd83; }
+.welcome-primary { margin-top: 8px; padding: 14px 18px; border-radius: 14px; border: 0; background: linear-gradient(135deg, #f0c98f, #d8a463); color: #10261f; font: 800 16px "Be Vietnam Pro", Arial, sans-serif; cursor: pointer; box-shadow: 0 8px 22px rgba(216, 164, 99, .3); transition: transform .12s; }
+.welcome-primary:hover { transform: translateY(-1px); }
+.welcome-primary.inline { margin-top: 0; padding: 10px 16px; font-size: 14px; }
+.welcome-link { background: none; border: 0; color: #e6bd83; font: 600 14px Arial, sans-serif; cursor: pointer; padding: 4px; }
+.welcome-link.small { font-size: 12px; color: #9fb0aa; }
+.welcome-slide { display: grid; gap: 10px; animation: welcomeIn .35s ease; min-height: 200px; align-content: start; }
+.welcome-icon { font-size: 56px; }
+.welcome-dots { display: flex; gap: 8px; justify-content: center; }
+.welcome-dots button { width: 9px; height: 9px; border-radius: 50%; border: 0; background: #3c524b; cursor: pointer; padding: 0; }
+.welcome-dots button.on { background: #e6bd83; width: 24px; border-radius: 6px; }
+.welcome-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+.welcome-ghost { padding: 10px 14px; border-radius: 12px; border: 1px solid #4f6660; background: transparent; color: #f3efe6; font: 700 14px Arial, sans-serif; cursor: pointer; }
+.welcome-ghost:disabled { opacity: .35; cursor: default; }
+.welcome-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+.welcome-choices button { display: grid; gap: 6px; justify-items: center; padding: 20px 14px; border-radius: 18px; border: 1.5px solid #4f6660; background: rgba(255, 255, 255, .04); color: #f3efe6; cursor: pointer; transition: border-color .15s, transform .12s; }
+.welcome-choices button:hover { border-color: #e6bd83; transform: translateY(-2px); }
+.welcome-choices span { font-size: 38px; } .welcome-choices b { font-size: 16px; } .welcome-choices small { color: #aebdb8; font-size: 12px; }
+.welcome-room { display: flex; justify-content: center; align-items: baseline; gap: 12px; }
+.welcome-room span { color: #aebdb8; } .welcome-room strong, .welcome-code { font: 800 30px Arial, sans-serif; letter-spacing: .2em; color: #fff; }
+.welcome-code { font-size: 18px; letter-spacing: .12em; }
+.welcome-linkbox { display: flex; gap: 8px; }
+.welcome-linkbox input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 11px; border: 1px solid #4f6660; background: #0b1c18; color: #dfe8e4; font-size: 13px; }
+.welcome-linkbox button { padding: 10px 14px; border-radius: 11px; border: 0; background: #16a34a; color: #fff; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.welcome-note { color: #8ea19b; font-size: 11px; }
+@keyframes welcomeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (max-width: 560px) { .welcome-choices { grid-template-columns: 1fr; } .welcome-card { padding: 24px 20px; } }

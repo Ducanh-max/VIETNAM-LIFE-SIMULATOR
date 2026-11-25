@@ -4,12 +4,13 @@ import * as THREE from 'three';
 import { mapAttribution, type Point } from './game/geo';
 import { qualityConfig, World, type Quality, type TimeOfDay } from './game/World';
 import { actions, game, useGame } from './game/state';
-import { NameEntry, VietnamMap } from './ui/Entry';
+import { NameEntry } from './ui/Entry';
 import { BossDialog, JobPanel, MenuPanel, NeedsHud, PromptAndToast, Speedometer } from './ui/Hud';
 import { LiftPanel } from './game/world/Lotte';
 import { MultiplayerPanel, roomFromUrl } from './ui/MultiplayerPanel';
 import { RentalPanel } from './ui/RentalPanel';
-import { joinGame, net, onNet } from './game/net';
+import { joinGame, leaveGame, net, onNet } from './game/net';
+import { Welcome } from './ui/Welcome';
 import { Minimap, Phone } from './ui/Phone';
 import { loadPlayerName, savePlayerName } from './ui/player';
 import { vietnamTimeOfDay } from './ui/vietnamTime';
@@ -125,7 +126,11 @@ function App() {
 
     {mode === 'home' ? (!playerName || renaming
       ? <NameEntry initialName={playerName} onSubmit={(name) => { savePlayerName(name); setPlayerName(name); setRenaming(false); }} />
-      : <VietnamMap playerName={playerName} onEnter={start} onRename={() => setRenaming(true)} onAbout={() => openPanel('about')} />
+      : <Welcome playerName={playerName} invite={roomFromUrl()} onRename={() => setRenaming(true)} onStart={(room) => {
+          if (room) { history.replaceState(null, '', `?room=${room}#play`); void joinGame(room); setMpOpen(true); }
+          else { history.replaceState(null, '', `${location.pathname}#play`); if (net.room) void leaveGame(); setMpOpen(false); }
+          start();
+        }} />
     ) : <>
       <header className="game-header">
         <div className="game-brand" onClick={returnHome} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') returnHome(); }}>ĐỜI VIỆT<span> / HÀ NỘI 3D</span></div>
@@ -146,7 +151,7 @@ function App() {
       {menuOpen && !paused && !panel && <MenuPanel />}
       {dialog === 'boss' && !paused && !panel && <BossDialog />}
       {!panel && !paused && !menuOpen && !dialog && !phone && <button className="capture-tip" onClick={lockPointer}>Nhấp vào cảnh để điều khiển camera</button>}
-      {paused && !panel && <div className="pause-scrim"><div className="pause-card"><span className="modal-kicker">TẠM DỪNG</span><h2>Dừng chân bên hồ.</h2><p>Thành phố vẫn ở đây khi bạn quay lại.</p><button className="primary-button" onClick={() => setPaused(false)}><Icon name="play" /> Tiếp tục</button><button className="text-button" onClick={returnHome}>Về bản đồ Việt Nam →</button></div></div>}
+      {paused && !panel && <div className="pause-scrim"><div className="pause-card"><span className="modal-kicker">TẠM DỪNG</span><h2>Dừng chân bên hồ.</h2><p>Thành phố vẫn ở đây khi bạn quay lại.</p><button className="primary-button" onClick={() => setPaused(false)}><Icon name="play" /> Tiếp tục</button><button className="text-button" onClick={returnHome}>Về màn hình chính →</button></div></div>}
     </>}
 
     {panel && <div className="modal-scrim" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPanel(null); }}><section className="modal-card" role="dialog" aria-modal="true" aria-label={panel === 'settings' ? 'Cài đặt' : panel === 'about' ? 'Giới thiệu dự án' : 'Hướng dẫn chơi'}>

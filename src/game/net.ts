@@ -58,9 +58,12 @@ export function setIdentity(name: string, outfit: Outfit) {
 
 /** Join (or create) a room by code. Resolves to the status after the full-room check. */
 export async function joinGame(code: string) {
-  await leaveGame();
   code = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
   if (!code) return;
+  // already in (or joining) this room: the welcome screen and the invite-link effect may both ask
+  if (net.code === code && (net.status === 'connecting' || net.status === 'online')) return;
+  net.code = code; net.status = 'connecting';
+  await leaveGame(true);
   net.code = code; net.status = 'connecting'; net.message = 'Đang tìm bạn bè trong phòng…'; notify();
   let room: Room;
   try { room = joinRoom({ appId: APP_ID }, code); } catch (e) { net.status = 'error'; net.message = `Không kết nối được: ${(e as Error).message}`; notify(); return; }
@@ -123,9 +126,10 @@ export async function joinGame(code: string) {
   net.message = others ? `Đã vào phòng ${code} · ${others + 1}/${MAX_PLAYERS} người` : `Phòng ${code} đã mở. Gửi mã hoặc link cho bạn bè (chưa có ai khác).`;
   notify();
 }
-export async function leaveGame() {
+export async function leaveGame(keepCode = false) {
   const r = net.room;
-  net.room = null; net.send = null; net.remotes.clear(); net.riding = null; net.seats = []; net.status = 'off'; net.message = ''; net.code = '';
+  net.room = null; net.send = null; net.remotes.clear(); net.riding = null; net.seats = [];
+  if (!keepCode) { net.status = 'off'; net.message = ''; net.code = ''; }
   notify();
   if (r) { try { await r.leave(); } catch { /* ignore */ } }
 }
