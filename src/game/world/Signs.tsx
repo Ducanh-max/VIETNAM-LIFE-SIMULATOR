@@ -3,6 +3,7 @@ import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { distanceToShore, GROUND_HEIGHT, type Point } from '../geo';
 import { insideBuilding, osmNodes, roadClearance, roads, type Road } from '../osm';
+import { TOWER, toTower } from '../lotte';
 import { Instances, trs, unitBox, unitCylinder } from './Instances';
 
 /*
@@ -83,12 +84,14 @@ function layout() {
   // a sign for traffic moving in direction d at point p: on the right-hand verge, facing the oncoming driver
   // Signs go on the pavement: at least 0.6 m outside every carriageway (including crossing streets) and not
   // inside a building. Try the right-hand verge, a little further out, then a few metres along the road.
+  // the driveway and drop-off in front of Lotte's entrance: no sign posts standing in it
+  const lotteForecourt = (q: Point) => { const [u, v] = toTower(q); return u > TOWER.halfU - 1 && u < TOWER.halfU + 30 && Math.abs(v) < 14; };
   const spot = (p: Point, d: Point, n: Point, o: number): Point | null => {
     audit.total++;
     if (roadClearance([p[0] + n[0] * o, p[1] + n[1] * o]) < 0.3) audit.oldInRoad++; // where the old rule put it
     for (const along of [0, -3, 3, -6, 6, -10]) for (const extra of [0, 0.6, 1.2, 2]) {
       const q: Point = [p[0] + d[0] * along + n[0] * (o + extra), p[1] + d[1] * along + n[1] * (o + extra)];
-      if (roadClearance(q) >= 0.6 && !insideBuilding(q, 0.2) && distanceToShore(q) > 1) return q;
+      if (roadClearance(q) >= 0.6 && !insideBuilding(q, 0.2) && distanceToShore(q) > 1 && !lotteForecourt(q)) return q;
     }
     audit.skipped++;
     return null;
