@@ -1,6 +1,6 @@
 import { distanceToShore, inWorld, type Point } from './geo';
 import { pickupPoint } from './job';
-import { insideBuilding, roadClearance } from './osm';
+import { inLake, insideBuilding, roadClearance } from './osm';
 import { taxi } from './ride';
 import { game, player } from './state';
 
@@ -9,8 +9,8 @@ import { game, player } from './state';
  * are cheap, pavements and squares cost more, buildings and the lake are blocked. A* over that grid
  * follows the real OSM streets, and the path is simplified into a polyline for the maps.
  */
-/** Raster over the whole map: the lake district and the corridor west to Lotte (x −4520…1320, z −1320…1320). */
-export const NAV = { minX: -4520, minZ: -1320, sizeX: 5840, sizeZ: 2640, cell: 4 };
+/** Raster over the whole map: the lake district, the corridor west to Lotte, Ba Đình and Thủ Lệ (x −5260…1320, z −1320…1320). */
+export const NAV = { minX: -5260, minZ: -1320, sizeX: 6580, sizeZ: 2640, cell: 4 };
 const N = NAV.sizeX / NAV.cell; // row length
 const NZ = NAV.sizeZ / NAV.cell;
 let costs: Uint8Array | null = null; // 0 = blocked, otherwise step cost
@@ -23,7 +23,7 @@ function buildCosts() {
     if (distanceToShore(p) < 0.5) continue; // lake
     const road = roadClearance(p);
     if (road < 0.5) { c[j * N + i] = 1; continue; }
-    if (insideBuilding(p, 0)) continue;
+    if (insideBuilding(p, 0) || inLake(p)) continue;
     c[j * N + i] = road < 4 ? 3 : 5; // pavement next to a street, or open ground
   }
   return c;

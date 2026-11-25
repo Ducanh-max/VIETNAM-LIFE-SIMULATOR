@@ -2,6 +2,7 @@ import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { Water } from 'three/examples/jsm/objects/Water.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {
   bridgeEnds, distanceToSegment, promenadeEdge, streetRing, GROUND_HEIGHT, offsetRing, roadInner, sampleRing, shore,
   templeIsland, turtleIsland, type Point,
@@ -115,8 +116,9 @@ function Ground() {
     };
   }, []);
   const corridorGround = useMemo(() => {
-    const g = new THREE.PlaneGeometry(3340, 1240, 1, 1);
-    g.rotateX(-Math.PI / 2); g.translate(-2950, 0, -190);
+    // the corridor to Lotte, then Ba Đình north of it (beyond the district's square) and Thủ Lệ west of it, without overlaps
+    const plane = (w: number, d: number, x: number, z: number) => { const g = new THREE.PlaneGeometry(w, d, 1, 1); g.rotateX(-Math.PI / 2); g.translate(x, 0, z); return g; };
+    const g = mergeGeometries([plane(3340, 1240, -2950, -190), plane(960, 510, -1880, -1065), plane(650, 930, -4945, -245)])!;
     const uv = g.getAttribute('uv'); const pos = g.getAttribute('position');
     for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i), pos.getZ(i));
     return g;

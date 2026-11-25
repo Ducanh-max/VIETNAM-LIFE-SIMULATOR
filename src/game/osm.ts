@@ -1,5 +1,5 @@
 import osm from '../data/hoanKiemOsm.json';
-import { bridgeEnds, distanceToSegment, distanceToShore, insidePolygon, shore, type Point } from './geo';
+import { bridgeEnds, distanceToSegment, distanceToShore, insidePolygon, inWorld, shore, type Point } from './geo';
 
 /**
  * Streets, building footprints and parks around Hồ Hoàn Kiếm from OpenStreetMap
@@ -9,12 +9,12 @@ import { bridgeEnds, distanceToSegment, distanceToShore, insidePolygon, shore, t
 type RawRoad = { n: string; h: string; l?: number; o?: number; w?: number; ms?: number; p: number[][] };
 type RawNode = { t: string; p: number[] };
 type RawBuilding = { p: number[][]; lv?: number; h?: number; n?: string; k?: string };
-type RawPark = { p: number[][]; n?: string };
+type RawPark = { p: number[][]; n?: string; h?: number[][][] };
 
 /** `points` run in the direction of travel for one-way streets. `maxspeed` (km/h) when OSM has it. */
 export type Road = { name: string; kind: string; width: number; oneway: boolean; lanes: number; points: Point[]; maxspeed?: number };
 export type Building = { ring: Point[]; floors: number; height: number; name?: string; kind?: string; area: number; center: Point; seed: number };
-export type Park = { ring: Point[]; name?: string };
+export type Park = { ring: Point[]; name?: string; holes?: Point[][] };
 
 const vehicleKinds = new Set(['primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link', 'residential', 'unclassified', 'living_street', 'service', 'pedestrian', 'trunk']);
 const baseWidth: Record<string, number> = {
@@ -216,11 +216,32 @@ function standBack(ring: Point[]): { ring: Point[]; moved: boolean } | null {
 /** How many footprints were pulled back from the street, and how many small unnamed ones were dropped. */
 export const roadTrim = { moved: 0, dropped: 0 };
 
+/** Landmarks modelled by hand in world/Landmarks.tsx (their OSM footprints are not drawn as plain blocks). */
+export const LANDMARK_NAMES = new Set(['Lăng Chủ tịch Hồ Chí Minh', 'Cột cờ Hà Nội', 'Chùa Một Cột', 'Khuê Văn Các', 'Văn Miếu Môn']);
+/** A hand-modelled landmark's OSM footprint (for placing it exactly where OSM has it). */
+export const landmarkFootprint = (name: string): Point[] | null => ((osm.buildings as RawBuilding[]).find((b) => b.n === name)?.p as Point[] | undefined) ?? null;
+
 /** Lotte Center Hà Nội's footprint (the tower and podium are modelled by hand in world/Lotte.tsx). */
 export const lotteFootprint: Point[] | null = ((osm.buildings as RawBuilding[]).find((b) => /^Lotte Center/i.test(b.n ?? ''))?.p as Point[] | undefined) ?? null;
 
+// At Lăng Bác OSM maps the two 65 m viewing stands and the flagpole's base on the square as plain building blocks;
+// world/Landmarks.tsx models them (the stands as seven grey steps, the flagpole on the base's spot).
+const langFp = landmarkFootprint('Lăng Chủ tịch Hồ Chí Minh');
+const langC = langFp ? centroid(langFp) : null;
+const langPart = (ring: Point[]): 'stand' | 'flag' | null => {
+  if (!langC) return null;
+  const c = centroid(ring); const d = Math.hypot(c[0] - langC[0], c[1] - langC[1]); if (d > 100) return null;
+  const xs = ring.map((p) => p[0]), zs = ring.map((p) => p[1]); const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...zs) - Math.min(...zs);
+  if (Math.max(w, h) > 50 && d < 75) return 'stand';
+  if (w < 12 && h < 12 && d > 60 && d < 90 && Math.abs(c[1] - langC[1]) < 20) return 'flag';
+  return null;
+};
+/** The OSM block that marks the base of the flagpole on Quảng trường Ba Đình (centre), if mapped. */
+export const baDinhFlagBase: Point | null = (() => { const b = (osm.buildings as RawBuilding[]).find((x) => !x.n && langPart(x.p as Point[]) === 'flag'); return b ? centroid(b.p as Point[]) : null; })();
+
 export const buildings: Building[] = (osm.buildings as RawBuilding[]).flatMap((b) => {
-  if (/^Lotte Center/i.test(b.n ?? '')) return [];
+  if (/^Lotte Center/i.test(b.n ?? '') || LANDMARK_NAMES.has(b.n ?? '')) return [];
+  if (!b.n && langPart(b.p as Point[])) return [];
   const trimmed = standBack(b.p as Point[]);
   if (!trimmed) { if (!b.n) { roadTrim.dropped++; return []; } }
   else if (trimmed.moved) roadTrim.moved++;
@@ -271,7 +292,37 @@ export function insideBuilding(p: Point, skin = 0.25) {
 
 export const parks: Park[] = (osm.parks as RawPark[])
   .map((p) => ({ ring: p.p as Point[], name: p.n }))
-  .filter((p) => !insidePolygon(centroid(p.ring), shore) && polygonArea(p.ring) > 80 && polygonArea(p.ring) < 40_000);
+  .filter((p) => !insidePolygon(centroid(p.ring), shore) && polygonArea(p.ring) > 80 && polygonArea(p.ring) < 400_000 && inWorld(centroid(p.ring)));
+
+/** Lakes and ponds other than Hồ Gươm (Hồ Thủ Lệ, Hồ Giảng Võ, Hồ Văn, Hồ Thiền Quang, Hồ Linh Chiểu…); rivers left out. */
+export const lakes: Park[] = ((osm as { water?: RawPark[] }).water ?? [])
+  .map((p) => ({ ring: p.p as Point[], name: p.n, holes: p.h as Point[][] | undefined }))
+  .filter((p) => { const a = polygonArea(p.ring); const c = centroid(p.ring); return a > 20 && a < 130_000 && inWorld(c) && !insidePolygon(c, shore); });
+/** Lawns (landuse=grass), e.g. the grass squares round Lăng Bác. */
+export const lawns: Park[] = ((osm as { grass?: RawPark[] }).grass ?? [])
+  .map((p) => ({ ring: p.p as Point[], name: p.n }))
+  .filter((p) => polygonArea(p.ring) > 6 && polygonArea(p.ring) < 60_000 && inWorld(centroid(p.ring)) && !insidePolygon(centroid(p.ring), shore));
+const lakeGrid = new Map<string, number[]>();
+lakes.forEach((l, index) => {
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const [x, z] of l.ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+  for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++) for (let j = Math.floor(z0 / CELL); j <= Math.floor(z1 / CELL); j++) {
+    const k = cellKey(i, j); const list = lakeGrid.get(k);
+    if (list) list.push(index); else lakeGrid.set(k, [index]);
+  }
+});
+/** True on the water of one of the lakes above (with `margin` metres of bank counted as water). */
+export function inLake(p: Point, margin = 0) {
+  const list = lakeGrid.get(cellKey(Math.floor(p[0] / CELL), Math.floor(p[1] / CELL)));
+  if (!list) return false;
+  for (const i of list) {
+    if (lakes[i].name === 'Hồ Linh Chiểu') continue; // the pond of Chùa Một Cột: its stair and shrine are walkable (world/Landmarks.tsx)
+    const ring = lakes[i].ring;
+    if (insidePolygon(p, ring) && !lakes[i].holes?.some((h) => insidePolygon(p, h))) return true; // islands are land
+    if (margin > 0) for (let k = 0; k < ring.length; k++) if (distanceToSegment(p, ring[k], ring[(k + 1) % ring.length]) < margin) return true;
+  }
+  return false;
+}
 
 export const osmAttribution = osm.source;
 

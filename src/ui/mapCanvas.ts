@@ -1,6 +1,6 @@
 import { shore, templeIsland, turtleIsland, type Point } from '../game/geo';
 import { nav } from '../game/navigation';
-import { buildings, parks, RESTAURANT, roads } from '../game/osm';
+import { buildings, lakes, lawns, parks, RESTAURANT, roads } from '../game/osm';
 import { player, view } from '../game/state';
 
 /*
@@ -8,8 +8,8 @@ import { player, view } from '../game/state';
  * then blitted with pan / zoom / rotation by the minimap and the phone's map app, with the live route,
  * the destination, the shop and the player arrow drawn on top.
  */
-const MINX = -4540, MINZ = -1340;
-const SPANX = 5880, SPANZ = 2680;
+const MINX = -5280, MINZ = -1340;
+const SPANX = 6620, SPANZ = 2680;
 const S = 0.85; // px per metre in the base image (the corridor to Lotte makes the map wide)
 let base: HTMLCanvasElement | null = null;
 
@@ -26,7 +26,8 @@ export function mapBase() {
   c.width = Math.round(SPANX * S); c.height = Math.round(SPANZ * S);
   const ctx = c.getContext('2d')!;
   ctx.fillStyle = '#ece6d8'; ctx.fillRect(0, 0, c.width, c.height);
-  ctx.fillStyle = '#b9d99a'; for (const p of parks) { drawPoly(ctx, p.ring); ctx.fill(); }
+  ctx.fillStyle = '#b9d99a'; for (const p of [...parks, ...lawns]) { drawPoly(ctx, p.ring); ctx.fill(); }
+  for (const l of lakes) { ctx.fillStyle = '#7fc1d6'; drawPoly(ctx, l.ring); ctx.fill(); ctx.fillStyle = '#b9d99a'; for (const h of l.holes ?? []) { drawPoly(ctx, h); ctx.fill(); } }
   // streets: casing then fill, minor first
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   const sorted = [...roads].sort((a, b) => a.width - b.width);

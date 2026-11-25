@@ -10,6 +10,7 @@ import { DenSM } from './world/DenSM';
 import { DriverJob } from './world/DriverJob';
 import { Signs } from './world/Signs';
 import { Lotte } from './world/Lotte';
+import { Landmarks } from './world/Landmarks';
 import { Multiplayer } from './world/Multiplayer';
 import { Rental } from './world/Rental';
 import { Pedestrians } from './world/Pedestrians';
@@ -107,6 +108,7 @@ export function World({ time, quality, paused, freeCamera, onFps, onPosition }: 
     <Job />
     <Signs />
     <Lotte />
+    <Landmarks />
     <Multiplayer />
     <Rental />
     <DriverJob />

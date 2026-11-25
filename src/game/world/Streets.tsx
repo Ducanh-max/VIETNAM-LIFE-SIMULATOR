@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { insideTowerPlan } from '../lotte';
 import * as THREE from 'three';
-import { distanceToShore, GROUND_HEIGHT, insidePolygon, type Point } from '../geo';
-import { insideBuilding, parks, roadClearance, roads, type Road } from '../osm';
+import { distanceToShore, GROUND_HEIGHT, insidePolygon, registerBlocker, type Point } from '../geo';
+import { inLake, insideBuilding, lakes, lawns, parks, roadClearance, roads, type Park, type Road } from '../osm';
 import { Instances, trs, unitBox, unitCylinder } from './Instances';
 import { materials } from './materials';
 import { asphaltTexture, grassTexture, rng } from './textures';
@@ -212,7 +212,18 @@ function Parks() {
     const positions: number[] = [];
     const trees: Tree[] = [];
     const r = rng(311);
+    const triangulate = (park: Park) => {
+      const contour = park.ring.map(([x, z]) => new THREE.Vector2(x, z));
+      for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(contour, [])) {
+        const p0 = park.ring[a], p1 = park.ring[b], p2 = park.ring[c];
+        const cross = (p1[0] - p0[0]) * (p2[1] - p0[1]) - (p1[1] - p0[1]) * (p2[0] - p0[0]);
+        for (const p of cross < 0 ? [p0, p1, p2] : [p0, p2, p1]) positions.push(p[0], GROUND_HEIGHT + 0.025, p[1]);
+      }
+    };
+    for (const lawn of lawns) triangulate(lawn);
     for (const park of parks) {
+      const big = Math.abs(THREE.ShapeUtils.area(park.ring.map(([x, z]) => new THREE.Vector2(x, z)))) > 40_000;
+      const step = big ? 12 : 9;
       const contour = park.ring.map(([x, z]) => new THREE.Vector2(x, z));
       for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(contour, [])) {
         const p0 = park.ring[a], p1 = park.ring[b], p2 = park.ring[c];
@@ -221,9 +232,9 @@ function Parks() {
       }
       let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
       for (const [x, z] of park.ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
-      for (let x = x0 + 4; x < x1; x += 9) for (let z = z0 + 4; z < z1; z += 9) {
+      for (let x = x0 + 4; x < x1; x += step) for (let z = z0 + 4; z < z1; z += step) {
         const p: Point = [x + (r() - 0.5) * 5, z + (r() - 0.5) * 5];
-        if (!insidePolygon(p, park.ring) || insideBuilding(p, 2) || roadClearance(p) < 2) continue;
+        if (!insidePolygon(p, park.ring) || insideBuilding(p, 2) || roadClearance(p) < 2 || inLake(p, 2.5)) continue;
         trees.push({ x: p[0], z: p[1], y: GROUND_HEIGHT, kind: r() < 0.15 ? 'blossom' : r() < 0.3 ? 'banyan' : 'shade', scale: 0.8 + r() * 0.4 });
       }
     }
@@ -233,6 +244,31 @@ function Parks() {
   return <group>
     <mesh geometry={data.geometry} material={material} receiveShadow />
     <Trees trees={data.trees} seed={21} low />
+  </group>;
+}
+
+/** Lakes and ponds from OSM (Hồ Thủ Lệ, Hồ Giảng Võ, Hồ Văn, Hồ Thiền Quang…) with a stone bank; you can't walk on them. */
+function Lakes() {
+  useEffect(() => registerBlocker((p) => inLake(p)), []);
+  const data = useMemo(() => {
+    const water: number[] = []; const bank: number[] = [];
+    for (const lake of lakes) {
+      const contour = lake.ring.map(([x, z]) => new THREE.Vector2(x, z));
+      const holes = (lake.holes ?? []).map((h) => h.map(([x, z]) => new THREE.Vector2(x, z)));
+      const all = [...lake.ring, ...(lake.holes ?? []).flat()];
+      for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(contour, holes)) {
+        const p0 = all[a], p1 = all[b], p2 = all[c];
+        const cross = (p1[0] - p0[0]) * (p2[1] - p0[1]) - (p1[1] - p0[1]) * (p2[0] - p0[0]);
+        for (const p of cross < 0 ? [p0, p1, p2] : [p0, p2, p1]) water.push(p[0], GROUND_HEIGHT + 0.04, p[1]);
+      }
+      for (const r of [lake.ring, ...(lake.holes ?? [])]) pushRibbon(bank, [...r, r[0]], 0.45, GROUND_HEIGHT + 0.07);
+    }
+    return { water: flatGeometry(water, 1 / 8), bank: flatGeometry(bank, 1 / 2) };
+  }, []);
+  const waterMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#3d6b68', roughness: 0.08, metalness: 0.35, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), []);
+  return <group>
+    <mesh geometry={data.water} material={waterMat} />
+    <mesh geometry={data.bank} material={materials().stone} receiveShadow />
   </group>;
 }
 
@@ -311,6 +347,7 @@ export function Streets() {
   return <group>
     <Roads />
     <Parks />
+    <Lakes />
     <StreetTrees />
     <StreetSigns />
     <ParkedScooters />

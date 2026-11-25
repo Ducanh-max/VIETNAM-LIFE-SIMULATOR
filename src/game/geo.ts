@@ -281,9 +281,14 @@ export function cameraBlocked(p: Point) { return hitsObstacle(p); }
 export const WORLD_LIMIT = { x: 1300, z: 1300 }; // the lake district: about ±1.3 km around the lake
 /** The corridor west along Tràng Thi, Nguyễn Thái Học, Kim Mã and Liễu Giai to Lotte Center Hà Nội. */
 export const CORRIDOR = { x0: -4500, x1: -1200, z0: -740, z1: 360 };
-/** Inside the mapped area (the district or the corridor). */
+/** Ba Đình (Quảng trường Ba Đình, Lăng Chủ tịch Hồ Chí Minh, Chùa Một Cột, Hoàng thành) north of the corridor. */
+export const BA_DINH = { x0: -2340, x1: -1200, z0: -1300, z1: -130 };
+/** Công viên Thủ Lệ, west of Lotte. */
+export const THU_LE = { x0: -5250, x1: -4480, z0: -690, z1: 200 };
+const inRect = (x: number, z: number, r: { x0: number; x1: number; z0: number; z1: number }) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1;
+/** Inside the mapped area (the district, the corridor to Lotte, Ba Đình or Thủ Lệ). */
 export function inWorld([x, z]: Point) {
-  return (Math.abs(x) <= WORLD_LIMIT.x && Math.abs(z) <= WORLD_LIMIT.z) || (x >= CORRIDOR.x0 && x <= CORRIDOR.x1 && z >= CORRIDOR.z0 && z <= CORRIDOR.z1);
+  return (Math.abs(x) <= WORLD_LIMIT.x && Math.abs(z) <= WORLD_LIMIT.z) || inRect(x, z, CORRIDOR) || inRect(x, z, BA_DINH) || inRect(x, z, THU_LE);
 }
 
 const templeWalk = offsetRing(templeIsland, -0.6);

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { bridgeEnds, canWalk, groundHeight, type Point } from './geo';
 import { findRoute, routeLength } from './navigation';
-import { buildings, deliverySpots, RESTAURANT, restaurantToWorld, roadAt, roads, type Road } from './osm';
+import { buildings, deliverySpots, landmarkFootprint, parks, RESTAURANT, restaurantToWorld, roadAt, roads, type Road } from './osm';
 import { LOTTE, lotteDoor } from './lotte';
 import { addMoney, bike, formatVnd, game, player, pushMessage } from './state';
 import { WHEEL_R } from './world/Scooter';
@@ -44,6 +44,17 @@ export function places(): Place[] {
   const al = Math.hypot(away[0], away[1]);
   list.push({ name: 'Cầu Thê Húc · Đền Ngọc Sơn', note: 'Lối vào đền, bờ đông Hồ Gươm', x: bridgeEnds[0][0] + (away[0] / al) * 9, z: bridgeEnds[0][1] + (away[1] / al) * 9 });
   if (LOTTE) { const [x, z] = lotteDoor(); list.push({ name: 'Lotte Center Hà Nội', note: '54 Liễu Giai · đài quan sát tầng 65', x, z }); }
+  // hand-modelled landmarks of Ba Đình and Văn Miếu (their OSM footprints are drawn by world/Landmarks.tsx)
+  const byFootprint = (name: string, note: string, label = name) => {
+    const fp = landmarkFootprint(name); if (!fp) return;
+    const [x, z] = curbNear(fp.reduce((s, p) => s + p[0], 0) / fp.length, fp.reduce((s, p) => s + p[1], 0) / fp.length); list.push({ name: label, note, x, z });
+  };
+  byFootprint('Lăng Chủ tịch Hồ Chí Minh', 'Quảng trường Ba Đình · Đường Hùng Vương', 'Lăng Chủ tịch Hồ Chí Minh (Lăng Bác)');
+  byFootprint('Chùa Một Cột', 'Phố Chùa Một Cột, Ba Đình');
+  byFootprint('Cột cờ Hà Nội', 'Đường Điện Biên Phủ');
+  byFootprint('Khuê Văn Các', 'Phố Quốc Tử Giám', 'Văn Miếu – Quốc Tử Giám');
+  const thuLe = parks.find((p) => p.name === 'Công viên Thủ Lệ');
+  if (thuLe) { const c = thuLe.ring.reduce((s, p) => [s[0] + p[0] / thuLe.ring.length, s[1] + p[1] / thuLe.ring.length], [0, 0]); const [x, z] = curbNear(c[0], c[1] + 120); list.push({ name: 'Công viên Thủ Lệ', note: 'Vườn thú Hà Nội · Kim Mã, Đào Tấn', x, z }); }
   byName('Nhà hát Lớn', 'Quảng trường Cách mạng Tháng Tám');
   byName('Nhà thờ Lớn', 'Phố Nhà Chung');
   byName('Tràng Tiền Plaza', 'Phố Tràng Tiền');
