@@ -18,7 +18,7 @@ export function DenSM({ paused }: { paused: boolean }) {
     const dt = Math.min(delta, 0.05);
     const car = r.vehicle === 'car';
     if (r.stage === 'arriving') {
-      if (stepTaxi(dt, car ? 9 : 7.5)) { game.set({ ride: { ...r, stage: 'waiting' } }); game.toast(`${r.driver} đã tới! Ra ${car ? 'ô tô' : 'xe'} Đen SM và bấm E để lên xe.`); }
+      if (stepTaxi(dt, VEHICLES[r.vehicle].speed)) { game.set({ ride: { ...r, stage: 'waiting' } }); game.toast(`${r.driver} đã tới! Ra ${car ? 'ô tô' : 'xe'} Đen SM và bấm E để lên xe.`); }
     } else if (r.stage === 'waiting') {
       const d = Math.hypot(player.position.x - taxi.position.x, player.position.z - taxi.position.z);
       if (d < (car ? 3.8 : 3.2)) game.offer({ id: 'board', text: `Lên ${VEHICLES[r.vehicle].name} của ${r.driver}`, key: 'E', priority: 8, run: () => rideActions.board() });

@@ -1,3 +1,4 @@
+import { isCar } from './net';
 import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -121,7 +122,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
     const k = sitBlend.current;
     const mealNow = s.phase === 'eating' ? mealAt(s.order, s.eatProgress) : null;
     const state = machine.update({
-      speed: speed.current, sitBlend: k, seated: !!player.seat, onScooter: bike.riding && !taxi.passenger && bike.kind !== 'dencar', driving: bike.riding && !taxi.passenger && bike.kind === 'dencar', pillion: taxi.passenger && taxi.vehicle !== 'car', inCar: taxi.passenger && taxi.vehicle === 'car',
+      speed: speed.current, sitBlend: k, seated: !!player.seat, onScooter: bike.riding && !taxi.passenger && !isCar(bike.kind), driving: bike.riding && !taxi.passenger && isCar(bike.kind), pillion: taxi.passenger && taxi.vehicle !== 'car', inCar: taxi.passenger && taxi.vehicle === 'car',
       meal: mealNow?.action?.kind ?? null, ordering: s.phase === 'menu', dialog: !!s.dialog, dialogAge: c.dialogAt < 0 ? 0 : c.t - c.dialogAt, phone: s.phone, interactAge: c.t - c.interactAt,
     }, dt);
     avatarAnim.state = state;

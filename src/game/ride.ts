@@ -15,8 +15,8 @@ export type Place = { name: string; note: string; x: number; z: number };
 export type Vehicle = 'bike' | 'car';
 export type Ride = { stage: 'arriving' | 'waiting' | 'riding'; vehicle: Vehicle; dest: Place; fare: number; distance: number; driver: string; plate: string };
 export const VEHICLES: Record<Vehicle, { name: string; note: string; speed: number; seats: number; perKm: number; per100: number }> = {
-  bike: { name: 'Đen Bike', note: 'Xe máy điện · 1 khách', speed: 9, seats: 1, perKm: 18_000, per100: 1_800 },
-  car: { name: 'Đen Car', note: 'Ô tô điện 4 chỗ · điều hoà', speed: 10.5, seats: 4, perKm: 34_000, per100: 3_400 },
+  bike: { name: 'Đen Bike', note: 'Xe máy điện · 1 khách', speed: 50 / 3.6, seats: 1, perKm: 18_000, per100: 1_800 },
+  car: { name: 'Đen Car', note: 'Ô tô điện 4 chỗ · điều hoà', speed: 70 / 3.6, seats: 4, perKm: 34_000, per100: 3_400 },
 };
 /** Shortest trip Đen SM takes (real street distance): shorter places can't be booked and no shorter requests come in. */
 export const MIN_TRIP = 1000;
@@ -76,6 +76,9 @@ export const taxi = {
   vehicle: 'bike' as Vehicle,
   route: [] as Point[],
   s: 0, // distance travelled along the route
+  speed: 0, // current speed (m/s)
+  /** Where the player sits in the car (car space), default the rear passenger seat. */
+  seatOffset: null as THREE.Vector3 | null,
 };
 
 function pointAt(route: Point[], s: number) {
@@ -105,7 +108,7 @@ export const rideActions = {
     const near = deliverySpots.filter((d) => { const dd = Math.hypot(d.p[0] - from[0], d.p[1] - from[1]); return dd > 90 && dd < 200; });
     const start = near[Math.floor(Math.random() * near.length)]?.p ?? [from[0] + 60, from[1]];
     const approach = findRoute(start, from) ?? [start, from];
-    taxi.route = approach; taxi.s = 0; taxi.passenger = false; taxi.vehicle = vehicle;
+    taxi.route = approach; taxi.s = 0; taxi.speed = 0; taxi.passenger = false; taxi.vehicle = vehicle; taxi.seatOffset = null;
     const first = pointAt(approach, 0);
     taxi.position.set(first.p[0], groundHeight(first.p), first.p[1]); taxi.heading = first.dir;
     const driver = DRIVERS[Math.floor(Math.random() * DRIVERS.length)];
@@ -125,7 +128,7 @@ export const rideActions = {
     if (!r || r.stage !== 'waiting') return;
     const trip = findRoute([taxi.position.x, taxi.position.z], [r.dest.x, r.dest.z]);
     if (!trip) { game.toast('Tài xế không tìm được đường, thử lại sau nhé.'); return; }
-    taxi.route = trip; taxi.s = 0; taxi.passenger = true;
+    taxi.route = trip; taxi.s = 0; taxi.speed = 0; taxi.passenger = true;
     game.set({ ride: { ...r, stage: 'riding' } });
     game.toast(`${r.driver}: "Mình đi ${r.dest.name} nhé, bám chắc vào!"`);
   },
@@ -147,8 +150,24 @@ export const rideActions = {
 };
 
 /** Advance the Đen Bike along its route. Returns true when the route end is reached. */
-export function stepTaxi(dt: number, speed: number) {
+/**
+ * Drive along the route like the player does: accelerate to the town cruising speed (Đen Bike 50 km/h,
+ * Đen Car 70 km/h), slow down for sharp turns ahead and brake to stop exactly at the end.
+ */
+export function stepTaxi(dt: number, cruise: number) {
   const total = routeLength(taxi.route);
+  const left = total - taxi.s;
+  // how sharply the road bends over the next stretch (chord directions, so the raster route's small zigzags don't count)
+  const look = Math.max(14, taxi.speed * 2);
+  const P0 = pointAt(taxi.route, taxi.s).p, P1 = pointAt(taxi.route, Math.min(total, taxi.s + look / 2)).p, P2 = pointAt(taxi.route, Math.min(total, taxi.s + look)).p;
+  const a1 = Math.atan2(P1[0] - P0[0], P1[1] - P0[1]), a2 = Math.atan2(P2[0] - P1[0], P2[1] - P1[1]);
+  let turn = Math.abs(a2 - a1); turn = Math.min(turn, Math.PI * 2 - turn);
+  const curveLimit = turn > 1.1 ? 5.5 : turn > 0.7 ? 8.5 : turn > 0.4 ? 13 : cruise;
+  const stopLimit = Math.sqrt(2 * 5 * Math.max(0, left - 0.3)); // brake at 5 m/s² to stop on the spot
+  const want = Math.min(cruise, curveLimit, stopLimit);
+  taxi.speed = want > taxi.speed ? Math.min(want, taxi.speed + 3.6 * dt) : Math.max(want, taxi.speed - 7 * dt);
+  taxi.speed = Math.max(taxi.speed, Math.min(1.5, left / Math.max(dt, 1e-3))); // creep the last metres
+  const speed = taxi.speed;
   taxi.s = Math.min(total, taxi.s + speed * dt);
   const { p, dir } = pointAt(taxi.route, taxi.s);
   const prev = taxi.heading;
@@ -160,8 +179,9 @@ export function stepTaxi(dt: number, speed: number) {
   taxi.position.x = p[0]; taxi.position.z = p[1];
   taxi.position.y = THREE.MathUtils.damp(taxi.position.y, groundHeight(p), 10, dt);
   taxi.wheel += (speed * dt) / WHEEL_R;
-  return taxi.s >= total - 0.05;
+  if (taxi.s >= total - 0.05) { taxi.speed = 0; return true; }
+  return false;
 }
 
 // Dev hook for test scripts.
-if (import.meta.env.DEV) (window as unknown as { __taxi?: unknown }).__taxi = { taxi, rideActions, places };
+if (import.meta.env.DEV) (window as unknown as { __taxi?: unknown }).__taxi = { taxi, rideActions, places, findRoute, routeLength, stepTaxi, VEHICLES };

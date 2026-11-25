@@ -1,3 +1,5 @@
+import { isCar } from '../game/net';
+import { taxi } from '../game/ride';
 import { useEffect, useRef, useState } from 'react';
 import { jobActions, pickupPoint } from '../game/job';
 import { actions, bike, formatVnd, game, MENU, orderCount, orderTotal, player, useGame, view, type MenuId, type Order } from '../game/state';
@@ -161,11 +163,12 @@ export function Speedometer() {
     const tick = () => {
       id = requestAnimationFrame(tick);
       const el = root.current; if (!el) return;
-      el.style.display = bike.riding ? 'flex' : 'none';
-      if (!bike.riding) return;
-      const car = bike.kind === 'dencar';
+      const pass = taxi.passenger;
+      el.style.display = bike.riding || pass ? 'flex' : 'none';
+      if (!bike.riding && !pass) return;
+      const car = pass ? taxi.vehicle === 'car' : isCar(bike.kind);
       const top = car ? 200 : 120;
-      const kmh = Math.abs(bike.speed) * 3.6;
+      const kmh = Math.abs(pass ? taxi.speed : bike.speed) * 3.6;
       if (num.current) num.current.textContent = String(Math.round(kmh));
       if (arc.current) arc.current.style.strokeDashoffset = String(C * (1 - Math.min(1, kmh / top)));
       if (tag.current) tag.current.textContent = `${bike.speed < -0.2 ? 'LÙI' : kmh > (car ? 72 : 52) ? 'BOOST' : 'PHỐ'} · tối đa ${top}`;

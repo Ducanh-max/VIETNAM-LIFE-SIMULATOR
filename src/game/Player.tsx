@@ -1,3 +1,4 @@
+import { isCar } from './net';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
@@ -139,8 +140,9 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
         if (inCar) {
           // sit in the rear passenger seat (the chibi fits the cabin at full size)
           const h = taxi.heading;
-          const sx = CAR_PASSENGER.x, sz = CAR_PASSENGER.z;
-          avatar.current.position.set(taxi.position.x + sx * Math.cos(h) + sz * Math.sin(h), taxi.position.y + CAR_PASSENGER.y, taxi.position.z - sx * Math.sin(h) + sz * Math.cos(h));
+          const seatP = taxi.seatOffset ?? CAR_PASSENGER;
+          const sx = seatP.x, sz = seatP.z;
+          avatar.current.position.set(taxi.position.x + sx * Math.cos(h) + sz * Math.sin(h), taxi.position.y + seatP.y, taxi.position.z - sx * Math.sin(h) + sz * Math.cos(h));
           avatar.current.rotation.set(0, h, 0, 'YXZ');
         } else {
           avatar.current.position.copy(taxi.position); avatar.current.rotation.set(0, taxi.heading, taxi.lean, 'YXZ');
@@ -164,7 +166,7 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
     // ---- Riding the delivery scooter: W/S throttle and brake, A/D steer, Shift for full throttle.
     if (bike.riding && !freeCamera) {
       sitting.current = false;
-      const car = bike.kind === 'dencar';
+      const car = isCar(bike.kind);
       const throttle = paused ? 0 : (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0);
       const steerIn = paused ? 0 : (k.has('KeyA') ? 1 : 0) - (k.has('KeyD') ? 1 : 0);
       // Speeds: town riding with W, Shift opens it up to the top speed (Đen Bike / Wave 120 km/h, Đen Car 200 km/h).

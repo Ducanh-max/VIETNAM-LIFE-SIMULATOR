@@ -1,3 +1,4 @@
+import type { VehicleKind } from './net';
 import { useSyncExternalStore } from 'react';
 import * as THREE from 'three';
 import type { Ride } from './ride';
@@ -191,7 +192,9 @@ export const bike = {
   wheel: 0,
   riding: false,
   /** Which vehicle this is: the shop's Wave, an Đen Bike or an Đen Car (the player drives it). */
-  kind: 'wave' as 'wave' | 'denbike' | 'dencar',
+  kind: 'wave' as VehicleKind,
+  /** Body colour of a rented vehicle. */
+  color: '#c8342b',
 };
 
 /** Camera heading, for the HUD compass arrow. */
