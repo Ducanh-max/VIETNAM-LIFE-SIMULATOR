@@ -8,7 +8,7 @@ import { isCar, leaveSeat, net, onNet, requestSeat, sample, seatCount, setIdenti
 import { taxi } from '../ride';
 import { bike, game, player } from '../state';
 import { loadPlayerName } from '../../ui/player';
-import { CAR_DRIVER, DenCarModel } from './DenCar';
+import { CABIN_SCALE, CAR_DRIVER, DenCarModel } from './DenCar';
 import { NameTag, Person, SIT_HIP, type PersonAnim } from './Person';
 import { PILLION, ScooterModel, SEAT } from './Scooter';
 
@@ -20,7 +20,7 @@ import { PILLION, ScooterModel, SEAT } from './Scooter';
 /** Hip point of each seat in vehicle space: scooter = driver + 1 pillion, car = driver, front passenger, 3 rear. */
 export function seatPos(kind: VehicleKind, i: number): THREE.Vector3 {
   if (!isCar(kind)) return i === 0 ? new THREE.Vector3(0, SEAT.y, SEAT.z + 0.2) : PILLION.clone();
-  return [CAR_DRIVER.clone(), new THREE.Vector3(-0.38, 0.56, 0.35), new THREE.Vector3(0.42, 0.56, -0.62), new THREE.Vector3(0, 0.56, -0.62), new THREE.Vector3(-0.42, 0.56, -0.62)][i] ?? CAR_DRIVER.clone();
+  return [CAR_DRIVER.clone(), new THREE.Vector3(-0.36, 0.5, 0.25), new THREE.Vector3(0.4, 0.5, -0.6), new THREE.Vector3(0, 0.5, -0.6), new THREE.Vector3(-0.4, 0.5, -0.6)][i] ?? CAR_DRIVER.clone();
 }
 const pose = (v: NetVehicle) => ({ position: new THREE.Vector3(v.x, v.y, v.z), heading: v.h, steer: v.steer, lean: v.lean, wheel: v.wheel, riding: true });
 
@@ -45,7 +45,8 @@ function RemoteVehicle({ v, driver }: { v: NetVehicle; driver: Remote }) {
     if (!r) return null;
     const sp = seatPos(v.kind, i);
     const anim: PersonAnim = { mode: i === 0 ? (isCar(v.kind) ? 'drive' : 'ride') : 'sit', speed: 0 };
-    return <group key={id ?? i} position={[sp.x, sp.y - SIT_HIP, sp.z]}>
+    const sc = isCar(v.kind) ? CABIN_SCALE : 1;
+    return <group key={id ?? i} position={[sp.x, sp.y - SIT_HIP * sc, sp.z]} scale={sc}>
       <Person anim={anim} outfit={r.outfit ?? npcOutfit('youngMan', 7)} seed={i} />
       <NameTag name={r.name} y={1.75} color="#7cc4ff" />
     </group>;
@@ -158,7 +159,8 @@ function MyPassengers({ seats }: { seats: string }) {
       if (i === 0 || !id) return null;
       const r = net.remotes.get(id); if (!r) return null;
       const sp = seatPos(bike.kind, i);
-      return <group key={id} position={[sp.x, sp.y - SIT_HIP, sp.z]}>
+      const sc = isCar(bike.kind) ? CABIN_SCALE : 1;
+      return <group key={id} position={[sp.x, sp.y - SIT_HIP * sc, sp.z]} scale={sc}>
         <Person anim={{ mode: 'sit', speed: 0 }} outfit={r.outfit ?? npcOutfit('youngMan', 7)} seed={i} />
         <NameTag name={r.name} y={1.75} color="#7cc4ff" />
       </group>;

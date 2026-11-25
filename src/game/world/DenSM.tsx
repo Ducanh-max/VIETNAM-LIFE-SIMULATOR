@@ -2,7 +2,7 @@ import { useFrame } from '@react-three/fiber';
 import { useRef } from 'react';
 import { rideActions, stepTaxi, taxi, VEHICLES } from '../ride';
 import { game, player, useGame } from '../state';
-import { CAR_DRIVER, DenCarModel } from './DenCar';
+import { CABIN_SCALE, CAR_DRIVER, DenCarModel } from './DenCar';
 import { NameTag, Person, SIT_HIP, type PersonAnim } from './Person';
 import { ScooterModel, SEAT } from './Scooter';
 
@@ -34,7 +34,7 @@ export function DenSM({ paused }: { paused: boolean }) {
   const tag = <NameTag name={ride.driver} role={`Tài xế ${VEHICLES[ride.vehicle].name}`} y={1.75} color="#16c784" />;
   if (ride.vehicle === 'car') {
     return <DenCarModel pose={taxi}>
-      <group position={[CAR_DRIVER.x, CAR_DRIVER.y - SIT_HIP, CAR_DRIVER.z]}>
+      <group position={[CAR_DRIVER.x, CAR_DRIVER.y - SIT_HIP * CABIN_SCALE, CAR_DRIVER.z]} scale={CABIN_SCALE}>
         <Person anim={carDriverAnim} shirt="#16c784" pants="#1b1b1d" hair="#111214" seed={11} />
       </group>
       <group position={[0, 0.25, 0]}>{tag}</group>

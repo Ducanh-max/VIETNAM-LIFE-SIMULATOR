@@ -155,7 +155,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
       const turn = -bike.steer * 1.6;
       for (const side of [R, L]) {
         const a = (side < 0 ? Math.PI * 0.85 : Math.PI * 0.15) + turn; // hands at ~10 and 2 o'clock on the wheel
-        arm(side, toTorso(V(Math.cos(a) * 0.14, HIP + 0.3 + Math.sin(a) * 0.13, 0.31), al), V(side, -0.6, -0.3));
+        arm(side, toTorso(V(Math.cos(a) * 0.16, HIP + 0.4 + Math.sin(a) * 0.15, 0.42), al), V(side, -0.6, -0.3)); // the wheel, in the avatar's (cabin-scaled) units
       }
       handPoseL = handPoseR = 'wheel';
       headPitch = -0.05;

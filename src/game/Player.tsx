@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { bridgeEnds, cameraBlocked, canWalk, groundHeight, type Point } from './geo';
 import { Avatar } from './Avatar';
 import { taxi } from './ride';
-import { CAR_DRIVER, CAR_PASSENGER } from './world/DenCar';
+import { CABIN_SCALE, CAR_DRIVER, CAR_PASSENGER } from './world/DenCar';
 import { bike, game, player, tickNeeds, view } from './state';
 import { WHEEL_R, WHEELBASE } from './world/Scooter';
 
@@ -138,13 +138,15 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
       const inCar = taxi.vehicle === 'car';
       if (avatar.current) {
         if (inCar) {
-          // sit in the rear passenger seat (the chibi fits the cabin at full size)
+          // sit in the passenger seat, drawn a little smaller so the chibi head clears the roof
           const h = taxi.heading;
           const seatP = taxi.seatOffset ?? CAR_PASSENGER;
           const sx = seatP.x, sz = seatP.z;
           avatar.current.position.set(taxi.position.x + sx * Math.cos(h) + sz * Math.sin(h), taxi.position.y + seatP.y, taxi.position.z - sx * Math.sin(h) + sz * Math.cos(h));
           avatar.current.rotation.set(0, h, 0, 'YXZ');
+          avatar.current.scale.setScalar(CABIN_SCALE);
         } else {
+          avatar.current.scale.setScalar(1);
           avatar.current.position.copy(taxi.position); avatar.current.rotation.set(0, taxi.heading, taxi.lean, 'YXZ');
         }
       }
@@ -210,7 +212,8 @@ export function Player({ paused, freeCamera, onFps, onPosition, focus }: PlayerP
           const h = bike.heading;
           avatar.current.position.set(bike.position.x + CAR_DRIVER.x * Math.cos(h) + CAR_DRIVER.z * Math.sin(h), bike.position.y + CAR_DRIVER.y, bike.position.z - CAR_DRIVER.x * Math.sin(h) + CAR_DRIVER.z * Math.cos(h));
           avatar.current.rotation.set(0, h, 0, 'YXZ');
-        } else { avatar.current.position.copy(bike.position); avatar.current.rotation.set(0, bike.heading, bike.lean, 'YXZ'); }
+          avatar.current.scale.setScalar(CABIN_SCALE);
+        } else { avatar.current.scale.setScalar(1); avatar.current.position.copy(bike.position); avatar.current.rotation.set(0, bike.heading, bike.lean, 'YXZ'); }
       }
       chaseCamera(bike.heading, Math.abs(bike.speed), dt);
       const camFwd = new THREE.Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));

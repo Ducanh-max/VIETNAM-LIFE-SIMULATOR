@@ -5,7 +5,7 @@ import { driverActions } from '../driver';
 import { GROUND_HEIGHT } from '../geo';
 import { jobActions } from '../job';
 import { bike, game, player, useGame } from '../state';
-import { CAR_PASSENGER, DenCarModel } from './DenCar';
+import { CABIN_SCALE, CAR_PASSENGER, DenCarModel } from './DenCar';
 import { Waypoint } from './Job';
 import { NameTag, Person, SIT_HIP, type PersonAnim } from './Person';
 import { PILLION, ScooterModel } from './Scooter';
@@ -56,7 +56,7 @@ export function DriverJob() {
     : null;
   return <group>
     {car
-      ? <DenCarModel pose={bike}>{passenger && <group position={[CAR_PASSENGER.x, CAR_PASSENGER.y - SIT_HIP, CAR_PASSENGER.z]}>{passenger}</group>}</DenCarModel>
+      ? <DenCarModel pose={bike}>{passenger && <group position={[CAR_PASSENGER.x, CAR_PASSENGER.y - SIT_HIP * CABIN_SCALE, CAR_PASSENGER.z]} scale={CABIN_SCALE}>{passenger}</group>}</DenCarModel>
       : <ScooterModel pose={bike} livery="den">{passenger && <group position={[0, PILLION.y - SIT_HIP, PILLION.z - 0.04]}>{passenger}</group>}</ScooterModel>}
     {f && driver.stage === 'pickup' && <group position={[f.pickup.x, GROUND_HEIGHT, f.pickup.z]}>
       <Waypoint />

@@ -15,7 +15,7 @@ export const RENT_PRICES: Record<RentKind, { name: string; seats: number; deposi
   car: { name: 'Ô tô 5 chỗ', seats: 5, deposit: 500_000, first: 50_000, step: 25_000, cap: 800_000 },
 };
 const BIKE_COLORS = ['#2f6fb3', '#1f9e6e', '#e0a21b', '#7a4bc2', '#e8e4dc', '#d2462f'];
-const CAR_COLORS = ['#f2f2ef', '#b9bec4', '#c3222a'];
+const CAR_COLORS = ['#f1f1ee', '#c3222a', '#5d6268', '#2f5fc0']; // white, red, grey, blue
 export type Rental = { kind: RentKind; startedAt: number; deposit: number; color: string; plate: string };
 
 /** Charge for a rental that lasted `ms`: the first 10 minutes, then each started 10 minutes, capped. */
