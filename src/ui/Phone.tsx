@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { net, onNet } from '../game/net';
+import { loadPlayerName } from './player';
 import { driverActions } from '../game/driver';
 import { jobActions } from '../game/job';
 import { nav, updateNav } from '../game/navigation';
@@ -146,11 +148,33 @@ function WalletApp() {
   </div>;
 }
 
+/** Chat with the players in the same room: the room's text chat, as a phone conversation. */
+const myName = () => loadPlayerName() || 'Người chơi';
+function RoomChat() {
+  const [, force] = useState(0);
+  useEffect(() => onNet(() => force((n) => n + 1)), []);
+  const [msg, setMsg] = useState('');
+  const list = useRef<HTMLDivElement>(null);
+  useEffect(() => { list.current?.scrollTo(0, 1e6); });
+  if (!net.room) return <div className="chat-off"><p>Bạn đang chơi một mình.</p><small>Mở nút 👥 (Chơi cùng bạn bè) để tạo hoặc vào phòng, rồi nhắn tin với mọi người ở đây.</small></div>;
+  const send = () => { const m = msg.trim(); if (!m) return; net.send?.chat(m); setMsg(''); };
+  return <div className="chat">
+    <div className="chat-head">Phòng {net.code} · {net.remotes.size + 1} người: {['Bạn', ...[...net.remotes.values()].map((r) => r.name)].join(', ')}</div>
+    <div className="chat-list" ref={list}>
+      {net.chat.length === 0 && <p className="app-empty">Chưa có tin nhắn. Gửi lời chào đi!</p>}
+      {net.chat.map((c, i) => { const me = c.from === myName(); return <div key={i} className={`chat-bubble ${me ? 'me' : ''}`}>{!me && <b>{c.from}</b>}<span>{c.text}</span><small>{hhmm.format(c.at)}</small></div>; })}
+    </div>
+    <div className="chat-input"><input value={msg} maxLength={160} placeholder="Nhắn cho cả phòng…" onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') send(); }} /><button onClick={send} aria-label="Gửi">➤</button></div>
+  </div>;
+}
+
 function MessagesApp() {
   const messages = useGame((s) => s.messages);
+  const [tab, setTab] = useState<'room' | 'inbox'>(() => (net.room ? 'room' : 'inbox'));
   return <div className="app-page">
     <h3>Tin nhắn</h3>
-    {messages.length === 0 ? <p className="app-empty">Chưa có tin nhắn nào.</p>
+    <div className="den-tabs"><button className={tab === 'room' ? 'on' : ''} onClick={() => setTab('room')}>Bạn cùng phòng</button><button className={tab === 'inbox' ? 'on' : ''} onClick={() => setTab('inbox')}>Hộp thư</button></div>
+    {tab === 'room' ? <RoomChat /> : messages.length === 0 ? <p className="app-empty">Chưa có tin nhắn nào.</p>
       : <ul className="msg-list">{messages.map((m, i) => <li key={i}><div className="msg-avatar">{m.from.replace(/^(Chú|Anh|Chị|Cô|Bác|Em|Bạn)\s+/, '')[0]}</div><div><b>{m.from}<small>{hhmm.format(m.at)}</small></b><p>{m.text}</p></div></li>)}</ul>}
   </div>;
 }
