@@ -95,13 +95,15 @@ export function Multiplayer() {
     if (net.riding) {
       const host = net.remotes.get(net.riding.host);
       const hv = host?.shown?.v;
-      if (!hv || !hv.seats.includes(net.selfId)) {
+      // just got on: the driver's updates take a moment to list us in the seat
+      const fresh = performance.now() - (net.riding.since ?? 0) < 2500;
+      if (!fresh && (!hv || !hv.seats.includes(net.selfId))) {
         // the driver got off or we lost them: step off beside the vehicle
         const at = hv ?? host?.shown;
         leaveSeat(); taxi.passenger = false; taxi.seatOffset = null;
         if (at) for (const side of [1, -1]) { const h = 'h' in at ? at.h : at.yaw; const p: Point = [at.x + Math.cos(h) * 1.6 * side, at.z - Math.sin(h) * 1.6 * side]; if (canWalk(p)) { player.teleport?.(p[0], p[1]); break; } }
         game.toast('Bạn đã xuống xe.');
-      } else {
+      } else if (hv) {
         taxi.passenger = true; taxi.vehicle = isCar(hv.kind) ? 'car' : 'bike';
         taxi.position.set(hv.x, hv.y, hv.z); taxi.heading = hv.h; taxi.lean = hv.lean; taxi.speed = Math.abs(host!.shown!.s);
         taxi.seatOffset = isCar(hv.kind) ? seatPos(hv.kind, net.riding.seat) : null;
@@ -118,7 +120,7 @@ export function Multiplayer() {
         const r = best as Remote; const v = r.shown!.v!;
         const free = v.seats.filter((s, i) => i > 0 && !s).length;
         game.offer(free ? { id: 'board-friend', text: `Lên xe của ${r.name} (${free} chỗ trống)`, key: 'F', priority: 9, run: () => {
-          void requestSeat(r.id).then((res) => { if (res.ok) { net.riding = { host: r.id, seat: res.seat }; game.toast(`Đã lên xe của ${r.name}.`); } else game.toast(res.reason ?? 'Không lên được xe.'); });
+          void requestSeat(r.id).then((res) => { if (res.ok) { net.riding = { host: r.id, seat: res.seat, since: performance.now() }; game.toast(`Đã lên xe của ${r.name}.`); } else game.toast(res.reason ?? 'Không lên được xe.'); });
         } } : { id: 'board-full', text: `Xe của ${r.name} đã đủ chỗ`, key: null, priority: 5 });
       }
     }
@@ -131,7 +133,7 @@ export function Multiplayer() {
     const mine: NetPose = {
       t: 0, x: wp.x, y: wp.y, z: wp.z, yaw: a.rotation.y, a: avatarAnim.state, s: bike.riding ? Math.abs(bike.speed) : player.position.distanceTo(prevPos.current) * 12, e: avatarAnim.expr,
       v: bike.riding && !taxi.passenger ? { kind: bike.kind, x: bike.position.x, y: bike.position.y, z: bike.position.z, h: bike.heading, steer: bike.steer, lean: bike.lean, wheel: bike.wheel, color: bike.color, seats: net.seats } : null,
-      ride: net.riding,
+      ride: net.riding ? { host: net.riding.host, seat: net.riding.seat } : null,
     };
     prevPos.current.copy(player.position);
     net.send.pose(mine);
@@ -141,7 +143,25 @@ export function Multiplayer() {
   const list = [...net.remotes.values()];
   return <group>
     {list.map((r) => <RemoteWalker key={r.id} r={r} />)}
+    {bike.riding && net.seats.some((s, i) => i > 0 && s) && <MyPassengers seats={net.seats.join(',')} />}
     {list.filter((r) => r.shown?.v).map((r) => <RemoteVehicle key={`v${r.id}:${r.shown!.v!.kind}`} v={r.shown!.v!} driver={r} />)}
   </group>;
 }
 
+
+/** Friends sitting in the vehicle I drive (their own avatars are drawn by them; this is how I see them). */
+function MyPassengers({ seats }: { seats: string }) {
+  const g = useRef<THREE.Group>(null);
+  useFrame(() => { if (g.current) { g.current.position.copy(bike.position); g.current.rotation.set(0, bike.heading, isCar(bike.kind) ? 0 : bike.lean, 'YXZ'); } });
+  return <group ref={g}>
+    {seats.split(',').map((id, i) => {
+      if (i === 0 || !id) return null;
+      const r = net.remotes.get(id); if (!r) return null;
+      const sp = seatPos(bike.kind, i);
+      return <group key={id} position={[sp.x, sp.y - SIT_HIP, sp.z]}>
+        <Person anim={{ mode: 'sit', speed: 0 }} outfit={r.outfit ?? npcOutfit('youngMan', 7)} seed={i} />
+        <NameTag name={r.name} y={1.75} color="#7cc4ff" />
+      </group>;
+    })}
+  </group>;
+}

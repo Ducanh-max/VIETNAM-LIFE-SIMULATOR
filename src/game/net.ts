@@ -29,7 +29,7 @@ export const net = {
   selfId: '',
   remotes: new Map<string, Remote>(),
   /** Seat this player holds in someone else's vehicle. */
-  riding: null as null | { host: string; seat: number },
+  riding: null as null | { host: string; seat: number; since?: number },
   /** Seats of the vehicle this player drives (index 0 = driver = me). */
   seats: [] as (string | null)[],
   listeners: new Set<() => void>(),
