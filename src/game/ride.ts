@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { bridgeEnds, canWalk, groundHeight, type Point } from './geo';
 import { findRoute, routeLength } from './navigation';
-import { buildings, deliverySpots, RESTAURANT, restaurantToWorld, roads } from './osm';
+import { buildings, deliverySpots, RESTAURANT, restaurantToWorld, roadAt, roads, type Road } from './osm';
 import { LOTTE, lotteDoor } from './lotte';
 import { addMoney, bike, formatVnd, game, player, pushMessage } from './state';
 import { WHEEL_R } from './world/Scooter';
@@ -15,7 +15,7 @@ export type Place = { name: string; note: string; x: number; z: number };
 export type Vehicle = 'bike' | 'car';
 export type Ride = { stage: 'arriving' | 'waiting' | 'riding'; vehicle: Vehicle; dest: Place; fare: number; distance: number; driver: string; plate: string };
 export const VEHICLES: Record<Vehicle, { name: string; note: string; speed: number; seats: number; perKm: number; per100: number }> = {
-  bike: { name: 'Đen Bike', note: 'Xe máy điện · 1 khách', speed: 50 / 3.6, seats: 1, perKm: 18_000, per100: 1_800 },
+  bike: { name: 'Đen Bike', note: 'Xe máy điện · 1 khách', speed: 70 / 3.6, seats: 1, perKm: 18_000, per100: 1_800 },
   car: { name: 'Đen Car', note: 'Ô tô điện 4 chỗ · điều hoà', speed: 70 / 3.6, seats: 4, perKm: 34_000, per100: 3_400 },
 };
 /** Shortest trip Đen SM takes (real street distance): shorter places can't be booked and no shorter requests come in. */
@@ -151,11 +151,26 @@ export const rideActions = {
 
 /** Advance the Đen Bike along its route. Returns true when the route end is reached. */
 /**
- * Drive along the route like the player does: accelerate to the town cruising speed (Đen Bike 50 km/h,
- * Đen Car 70 km/h), slow down for sharp turns ahead and brake to stop exactly at the end.
+ * Drive along the route like the player does: 70 km/h normally, up to 90 km/h on big straight roads (OSM
+ * trunk/primary, or wide multi-lane secondary) and slower on narrow streets (residential 50, alleys and
+ * service ways 30), slowing for sharp turns and junctions ahead and braking to stop exactly at the end.
  */
-export function stepTaxi(dt: number, cruise: number) {
+export function roadSpeed(r: Road | null, straight: boolean) {
+  if (!r) return 50 / 3.6;
+  const big = r.kind === 'trunk' || r.kind === 'primary' || (r.kind === 'secondary' && (r.width >= 11 || r.lanes >= 3));
+  if (big && straight) return 90 / 3.6;
+  if (['primary', 'secondary', 'tertiary', 'trunk', 'primary_link', 'secondary_link', 'tertiary_link'].includes(r.kind)) return 70 / 3.6;
+  if (r.width < 6 || ['service', 'living_street', 'pedestrian'].includes(r.kind)) return 30 / 3.6;
+  return 50 / 3.6;
+}
+export function stepTaxi(dt: number, maxCruise: number) {
   const total = routeLength(taxi.route);
+  const here0 = pointAt(taxi.route, taxi.s).p;
+  const far = pointAt(taxi.route, Math.min(total, taxi.s + 70));
+  const mid = pointAt(taxi.route, Math.min(total, taxi.s + 35));
+  const b1 = Math.atan2(mid.p[0] - here0[0], mid.p[1] - here0[1]), b2 = Math.atan2(far.p[0] - mid.p[0], far.p[1] - mid.p[1]);
+  let bend = Math.abs(b2 - b1); bend = Math.min(bend, Math.PI * 2 - bend);
+  const cruise = Math.min(Math.max(maxCruise, 90 / 3.6), roadSpeed(roadAt(here0), bend < 0.15 && total - taxi.s > 120));
   const left = total - taxi.s;
   // how sharply the road bends over the next stretch (chord directions, so the raster route's small zigzags don't count)
   const look = Math.max(14, taxi.speed * 2);

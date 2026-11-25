@@ -316,3 +316,12 @@ if (import.meta.env.DEV) (window as unknown as { __roadTrim?: unknown }).__roadT
 /** Traffic signals and pedestrian crossings mapped as OSM nodes. */
 export const osmNodes = ((osm as { nodes?: RawNode[] }).nodes ?? []).map((n) => ({ kind: n.t, p: n.p as Point }));
 if (import.meta.env.DEV) (window as unknown as { __osmData?: unknown }).__osmData = { deliverySpots, restaurantToWorld, RESTAURANT };
+
+/** The road under (or nearest within 6 m of) a point, for speed limits. */
+export function roadAt(p: Point): Road | null {
+  const list = segGrid.get(cellKey(Math.floor(p[0] / CELL), Math.floor(p[1] / CELL)));
+  if (!list) return null;
+  let best: Road | null = null; let bd = 6;
+  for (const s of list) { const d = distanceToSegment(p, s.a, s.b) - s.half; if (d < bd) { bd = d; best = s.road; } }
+  return best;
+}
