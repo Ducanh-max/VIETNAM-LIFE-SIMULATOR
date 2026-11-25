@@ -1,8 +1,8 @@
 import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { GROUND_HEIGHT, type Point } from '../geo';
-import { osmNodes, roads, type Road } from '../osm';
+import { distanceToShore, GROUND_HEIGHT, type Point } from '../geo';
+import { insideBuilding, osmNodes, roadClearance, roads, type Road } from '../osm';
 import { Instances, trs, unitBox, unitCylinder } from './Instances';
 
 /*
@@ -81,27 +81,39 @@ const speedIcon = (r: Road): Icon => { const v = r.maxspeed ?? (['trunk', 'prima
 function layout() {
   const signs: Placed[] = []; const blades: Placed[] = [];
   // a sign for traffic moving in direction d at point p: on the right-hand verge, facing the oncoming driver
-  const put = (r: Road, p: Point, d: Point, icon: Icon, h = 2.3) => { const n = right(d); const o = r.width / 2 + 0.7; signs.push({ p: [p[0] + n[0] * o, p[1] + n[1] * o], face: [-d[0], -d[1]], icon, h }); };
+  // Signs go on the pavement: at least 0.6 m outside every carriageway (including crossing streets) and not
+  // inside a building. Try the right-hand verge, a little further out, then a few metres along the road.
+  const spot = (p: Point, d: Point, n: Point, o: number): Point | null => {
+    audit.total++;
+    if (roadClearance([p[0] + n[0] * o, p[1] + n[1] * o]) < 0.3) audit.oldInRoad++; // where the old rule put it
+    for (const along of [0, -3, 3, -6, 6, -10]) for (const extra of [0, 0.6, 1.2, 2]) {
+      const q: Point = [p[0] + d[0] * along + n[0] * (o + extra), p[1] + d[1] * along + n[1] * (o + extra)];
+      if (roadClearance(q) >= 0.6 && !insideBuilding(q, 0.2) && distanceToShore(q) > 1) return q;
+    }
+    audit.skipped++;
+    return null;
+  };
+  const put = (r: Road, p: Point, d: Point, icon: Icon, h = 2.3) => { const n = right(d); const q = spot(p, d, n, r.width / 2 + 0.7); if (q) signs.push({ p: q, face: [-d[0], -d[1]], icon, h }); };
   for (const r of roads) {
     if (r.points.length < 2) continue;
     const L = len(r);
     if (r.kind === 'pedestrian') {
-      if (L > 20) { const a = along(r, 0), b = along(r, L); put(r, a.p, a.d, 'noCar'); put(r, b.p, [-b.d[0], -b.d[1]], 'noCar'); }
+      if (L > 20) { const a = along(r, 4), b = along(r, L - 4); put(r, a.p, a.d, 'noCar'); put(r, b.p, [-b.d[0], -b.d[1]], 'noCar'); }
       continue;
     }
     if (!TOWN.has(r.kind)) continue;
     if (r.oneway && L > 25) {
-      const a = along(r, 6); put(r, a.p, a.d, 'oneway');
-      const b = along(r, L - 2); put(r, b.p, [-b.d[0], -b.d[1]], 'noEntry'); // drivers coming the wrong way at the far end
+      const a = along(r, Math.min(L / 2, 10)); put(r, a.p, a.d, 'oneway');
+      const b = along(r, Math.max(L / 2, L - 9)); put(r, b.p, [-b.d[0], -b.d[1]], 'noEntry'); // drivers coming the wrong way at the far end (back from the junction)
     }
     if (L > 110) for (let s = 30; s < L - 20; s += 320) {
       const a = along(r, s); put(r, a.p, a.d, speedIcon(r), 2.2);
       if (!r.oneway) { const b = along(r, L - s); put(r, b.p, [-b.d[0], -b.d[1]], speedIcon(r), 2.2); }
     }
     if (MAIN.has(r.kind) && L > 150) for (let s = 110; s < L - 40; s += 260) { const a = along(r, s); put(r, a.p, a.d, 'noParking', 2.1); }
-    if (r.name && L > 45) for (const s of [3, L - 3]) {
-      const a = along(r, s); const n = right(a.d); const o = r.width / 2 + 1.0;
-      blades.push({ p: [a.p[0] + n[0] * o, a.p[1] + n[1] * o], face: n, name: r.name, h: 2.9 });
+    if (r.name && L > 45) for (const s of [6, L - 6]) {
+      const a = along(r, s); const n = right(a.d); const q = spot(a.p, a.d, n, r.width / 2 + 1.0);
+      if (q) blades.push({ p: q, face: n, name: r.name, h: 2.9 });
     }
   }
   // OSM crossings and signals: find the street through each node
@@ -132,14 +144,18 @@ function layout() {
       const axis = (Math.atan2(d[0], d[1]) + Math.PI) % Math.PI < Math.PI / 2 ? 0 : 0.5;
       const cluster = Math.sin(Math.round(n.p[0] / 40) * 12.9 + Math.round(n.p[1] / 40) * 78.2) * 0.5 + 0.5;
       for (const dir of r.oneway ? [d] : [d, [-d[0], -d[1]] as Point]) {
-        const nn = right(dir); const o = r.width / 2 + 0.6;
-        lights.push({ p: [n.p[0] - dir[0] * 3 + nn[0] * o, n.p[1] - dir[1] * 3 + nn[1] * o], face: [-dir[0], -dir[1]], phase: (cluster + axis) % 1 });
+        const nn = right(dir); const q = spot([n.p[0] - dir[0] * 3, n.p[1] - dir[1] * 3], [-dir[0], -dir[1]], nn, r.width / 2 + 0.6);
+        if (q) lights.push({ p: q, face: [-dir[0], -dir[1]], phase: (cluster + axis) % 1 });
       }
       if (k % 7 === 0) put(r, [n.p[0] - d[0] * 18, n.p[1] - d[1] * 18], d, k % 2 ? 'noLeft' : 'noRight', 2.2);
     }
   });
+  // automated check: posts inside any carriageway (must be 0)
+  for (const s of [...signs, ...blades]) if (roadClearance(s.p) < 0.3) audit.inRoad++;
+  for (const l of lights) if (roadClearance(l.p) < 0.3) audit.inRoad++;
   return { signs, blades, lights };
 }
+const audit = { skipped: 0, inRoad: 0, oldInRoad: 0, total: 0 };
 
 /** Merged quads facing `face` (double-sided for blades), with UVs into an atlas. */
 function quads(items: { p: Point; face: Point; h: number; w: number; hgt: number; uv: number[]; both?: boolean }[]) {
@@ -201,7 +217,7 @@ export function Signs() {
     const housings = lights.map((l) => trs(l.p[0] + l.face[0] * 0.12, GROUND_HEIGHT + 3.25, l.p[1] + l.face[1] * 0.12, Math.atan2(l.face[0], l.face[1]), 0.3, 0.86, 0.22));
     const counts: Record<string, number> = {};
     for (const s of signs) counts[s.icon!] = (counts[s.icon!] ?? 0) + 1;
-    counts.streetName = blades.length; counts.trafficLights = lights.length;
+    counts.streetName = blades.length; counts.trafficLights = lights.length; counts.postsInRoad = audit.inRoad; counts.skippedNoRoom = audit.skipped; counts.oldRuleInRoad = audit.oldInRoad; counts.placementsTried = audit.total;
     if (import.meta.env.DEV) (window as unknown as { __signs?: unknown }).__signs = { counts, lights, signs };
     return { faces, bladeGeo, nameTex: atlasN.texture, poles, housings, lights };
   }, []);
