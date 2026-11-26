@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Game admins: vlife_admins/{lowercase email}. Only that signed-in, verified user may read their own document;
+    // nobody may write from the game (documents are added by hand in the Firebase console).
+    match /vlife_admins/{email} {
+      allow read: if request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() == email;
+      allow write: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

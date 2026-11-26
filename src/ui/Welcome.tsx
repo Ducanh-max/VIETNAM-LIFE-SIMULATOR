@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { DevicePicker } from './MobileControls';
 import { AccountForm } from './AccountPanel';
-import { signOut, useAccount } from '../game/account';
+import { accountsReady, signOut, useAccount } from '../game/account';
 import { makeCode, MAX_PLAYERS } from '../game/net';
 
 /*
@@ -30,7 +30,7 @@ export function Welcome({ playerName, invite, onRename, onStart }: {
   const name = useAccount((s) => s.name);
   const guest = useAccount((s) => s.guest);
   // before choosing how to play: sign in / sign up, unless already signed in or playing as a guest
-  const setStage = (s: Stage) => setStageRaw(s === 'choose' && !user && !guest ? 'account' : s);
+  const setStage = (s: Stage) => setStageRaw(s === 'choose' && accountsReady && !user && !guest ? 'account' : s);
   const [slide, setSlide] = useState(0);
   const [code] = useState(() => makeCode());
   const [copied, setCopied] = useState(false);

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { playAsGuest, resetPassword, signIn, signInGoogle, signOut, signUp, useAccount } from '../game/account';
+import { accountsReady, playAsGuest, resetPassword, signIn, signInGoogle, signOut, signUp, useAccount } from '../game/account';
 
 type Tab = 'login' | 'signup' | 'forgot';
 
@@ -17,10 +17,11 @@ export function AccountForm({ onDone, onGuest }: { onDone: () => void; onGuest?:
     else if (tab === 'signup') {
       if (!name.trim()) throw new Error('Bạn nhập tên hiển thị trong game nhé.');
       const confirm = await signUp(email, password, name);
-      if (confirm) setMsg({ ok: true, text: 'Đã tạo tài khoản! Kiểm tra Gmail và bấm vào link xác nhận, rồi quay lại đăng nhập.' });
+      if (confirm) setMsg({ ok: true, text: 'Đã tạo tài khoản! Kiểm tra Gmail (cả mục Spam), bấm vào link xác nhận, rồi quay lại đăng nhập.' });
       else onDone();
     } else { await resetPassword(email); setMsg({ ok: true, text: 'Đã gửi email đặt lại mật khẩu. Kiểm tra hộp thư (cả mục Spam) nhé.' }); }
   });
+  if (!accountsReady) return <div className="account-form"><p className="account-msg err">Đăng nhập đang được cài đặt, sắp có. Bạn chơi không cần tài khoản trước nhé.</p>{onGuest && <button className="welcome-primary" onClick={() => { playAsGuest(); onGuest(); }}>Chơi không cần tài khoản</button>}</div>;
   return <div className="account-form">
     <div className="account-tabs">
       <button className={tab === 'login' ? 'on' : ''} onClick={() => { setTab('login'); setMsg(null); }}>Đăng nhập</button>
