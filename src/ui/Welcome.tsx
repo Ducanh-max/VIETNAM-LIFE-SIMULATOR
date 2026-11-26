@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { DevicePicker } from './MobileControls';
+import { AccountForm } from './AccountPanel';
+import { signOut, useAccount } from '../game/account';
 import { makeCode, MAX_PLAYERS } from '../game/net';
 
 /*
@@ -17,13 +19,18 @@ const SLIDES: { icon: string; title: string; text: string }[] = [
 ];
 const inviteLink = (code: string) => `${location.origin}${location.pathname}?room=${code}#play`;
 
-type Stage = 'welcome' | 'slides' | 'choose' | 'friends';
+type Stage = 'welcome' | 'slides' | 'account' | 'choose' | 'friends';
 export function Welcome({ playerName, invite, onRename, onStart }: {
   playerName: string; invite: string; onRename: () => void;
   /** Enter the game; `room` = join that private room, null = offline. */
   onStart: (room: string | null) => void;
 }) {
-  const [stage, setStage] = useState<Stage>('welcome');
+  const [stage, setStageRaw] = useState<Stage>('welcome');
+  const user = useAccount((s) => s.user);
+  const name = useAccount((s) => s.name);
+  const guest = useAccount((s) => s.guest);
+  // before choosing how to play: sign in / sign up, unless already signed in or playing as a guest
+  const setStage = (s: Stage) => setStageRaw(s === 'choose' && !user && !guest ? 'account' : s);
   const [slide, setSlide] = useState(0);
   const [code] = useState(() => makeCode());
   const [copied, setCopied] = useState(false);
@@ -66,7 +73,15 @@ export function Welcome({ playerName, invite, onRename, onStart }: {
       <button className="welcome-link" onClick={() => setStage('choose')}>Bỏ qua</button>
     </div>}
 
+    {stage === 'account' && <div className="welcome-card">
+      <span className="welcome-kicker">TÀI KHOẢN</span>
+      <h2>Đăng nhập / Đăng ký</h2>
+      <p>Có tài khoản thì tên của bạn hiện trong phòng chơi chung. Không muốn cũng được, chơi luôn không cần tài khoản.</p>
+      <AccountForm onDone={() => setStageRaw('choose')} onGuest={() => setStageRaw('choose')} />
+    </div>}
+
     {stage === 'choose' && <div className="welcome-card">
+      {user && <p className="welcome-account">Đã đăng nhập: <b>{name}</b> · <button className="welcome-link small inline" onClick={() => void signOut()}>Đăng xuất</button></p>}
       <span className="welcome-kicker">BẮT ĐẦU CHƠI</span>
       <h2>Bạn muốn chơi thế nào?</h2>
       <div className="welcome-choices">

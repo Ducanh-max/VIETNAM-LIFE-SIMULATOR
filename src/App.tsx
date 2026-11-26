@@ -9,6 +9,7 @@ import { BossDialog, JobPanel, MenuPanel, NeedsHud, PromptAndToast, Speedometer 
 import { ShopCounterPanel } from './ui/ShopPanel';
 import { Backpack } from './ui/Backpack';
 import { DevicePicker, MobileControls } from './ui/MobileControls';
+import { AccountCard } from './ui/AccountPanel';
 import { getDevice } from './ui/device';
 import { LiftPanel } from './game/world/Lotte';
 import { MultiplayerPanel, roomFromUrl } from './ui/MultiplayerPanel';
@@ -178,6 +179,7 @@ function App() {
       {panel === 'settings' ? <><span className="modal-kicker">TUỲ CHỈNH TRẢI NGHIỆM</span><h2>Cài đặt</h2><p>Chọn ánh sáng và chất lượng phù hợp với máy của bạn.</p>
         <div className="setting-group"><label>Thời điểm trong ngày</label><div className="segmented">{([['day', 'Ban ngày'], ['sunset', 'Hoàng hôn'], ['night', 'Ban đêm']] as const).map(([value, label]) => <button key={value} className={time === value ? 'selected' : ''} onClick={() => setTime(value)}>{label}</button>)}</div></div>
         <div className="setting-group"><label>Chất lượng đồ họa</label><div className="segmented quality">{(['low', 'medium', 'high', 'ultra'] as Quality[]).map((value) => <button key={value} className={quality === value ? 'selected' : ''} onClick={() => setQuality(value)}>{value.toUpperCase()}</button>)}</div></div>
+        <div className="setting-group"><label>Tài khoản</label><AccountCard /></div>
         <div className="setting-group"><label>Thiết bị chơi</label><DevicePicker compact /></div>
         <div className="setting-group toggle-row"><div><label>Chế độ drone</label><small>Nhấn V để bật/tắt. Space/Ctrl để lên/xuống, Shift để bay nhanh.</small></div><button className={`toggle ${freeCamera ? 'on' : ''}`} role="switch" aria-checked={freeCamera} onClick={() => setFreeCamera(!freeCamera)}><span /></button></div>
         <button className="primary-button modal-primary" onClick={() => setPanel(null)}>Áp dụng</button>
