@@ -446,3 +446,9 @@ body.rotate-landscape .phone-clock { display: none; }
 body.rotate-landscape .phone-home, body.rotate-landscape .phone-app { overflow-y: auto; }
 body.rotate-landscape .modal-card, body.rotate-landscape .bag-panel, body.rotate-landscape .reader { max-height: calc(100dvw - 24px); overflow: auto; }
 body.rotate-landscape .bag-panel, body.rotate-landscape .reader { top: 50px; left: auto; right: 8px; width: min(380px, 60vh); }
+/* the action prompt: small, bottom-left above the key bar, out of the way of the view */
+.action-prompt { left: 28px !important; bottom: 66px !important; transform: none !important; padding: 7px 12px !important; font-size: 12px !important; gap: 8px !important; max-width: 46vw; white-space: normal !important; background: rgba(16, 38, 34, .82) !important; }
+.action-prompt kbd { font-size: 11px !important; padding: 3px 7px !important; }
+.touch-prompt-row { left: 150px !important; bottom: 150px !important; transform: none !important; max-width: 40% !important; }
+.touch-prompt { font-size: 13px !important; padding: 9px 14px !important; }
+.touch-prompt.info { left: 150px !important; bottom: 150px !important; transform: none !important; max-width: 40% !important; font-size: 12px !important; }

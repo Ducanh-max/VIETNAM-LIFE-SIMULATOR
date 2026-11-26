@@ -8,6 +8,7 @@ import { bike, game, player } from '../state';
 import { Condiments, registerDineTables, type DineTable } from './Dine';
 import { Instances, trs, unitBox, unitCylinder } from './Instances';
 import { NameTag, Person, type PersonAnim } from './Person';
+import { Near } from './Near';
 
 /*
  * Street stalls on the pavements of other streets (see shops.ts STALLS): a phở gánh with low tables and plastic
@@ -114,5 +115,5 @@ export function StreetStalls() {
       if (d < 2.2) { game.offer({ id: `stall-${s.id}`, text: `Mua ở ${s.name} (${s.seller})`, key: 'E', priority: 5, run: () => { if (document.pointerLockElement) document.exitPointerLock(); shopStore.set({ counter: s.id, dine: false }); } }); break; }
     }
   });
-  return <>{list.map((s) => <Stall key={s.id} s={s} />)}</>;
+  return <>{list.map((s) => <Near key={s.id} at={s.at!.p} r={220}><Stall s={s} /></Near>)}</>;
 }

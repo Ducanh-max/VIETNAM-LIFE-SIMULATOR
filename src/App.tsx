@@ -1,5 +1,5 @@
 import { Canvas } from '@react-three/fiber';
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { mapAttribution, type Point } from './game/geo';
 import { qualityConfig, World, type Quality, type TimeOfDay } from './game/World';
@@ -9,6 +9,7 @@ import { BossDialog, JobPanel, MenuPanel, NeedsHud, PromptAndToast, Speedometer 
 import { ShopCounterPanel } from './ui/ShopPanel';
 import { Backpack } from './ui/Backpack';
 import { DevicePicker, MobileControls } from './ui/MobileControls';
+import { getDevice } from './ui/device';
 import { LiftPanel } from './game/world/Lotte';
 import { MultiplayerPanel, roomFromUrl } from './ui/MultiplayerPanel';
 import { RentalPanel } from './ui/RentalPanel';
@@ -47,10 +48,22 @@ function App() {
   // an invite link (?room=CODE) joins that room as soon as the game starts
   useEffect(() => { const c = roomFromUrl(); if (mode === 'game' && c && !net.room && net.status !== 'full') void joinGame(c); }, [mode]);
   const [renaming, setRenaming] = useState(false);
-  const [quality, setQuality] = useState<Quality>('medium');
+  // remembered between visits; the first time, phones start on Low
+  const [quality, setQualityState] = useState<Quality>(() => { const v = localStorage.getItem('doi-viet-quality'); return v === 'low' || v === 'medium' || v === 'high' || v === 'ultra' ? v : getDevice() === 'mobile' ? 'low' : 'medium'; });
+  const setQuality = (q: Quality) => { setQualityState(q); localStorage.setItem('doi-viet-quality', q); autoQuality.current.done = true; };
+  const autoQuality = useRef({ samples: [] as number[], done: localStorage.getItem('doi-viet-quality-auto') === 'off' });
   const [freeCamera, setFreeCamera] = useState(false);
   const [paused, setPaused] = useState(false);
-  const [fps, setFps] = useState(0);
+  const [fps, setFpsState] = useState(0);
+  // automatic quality: if the game runs under 26 FPS for ~10 s at the start, step the graphics down once
+  const setFps = (f: number) => {
+    setFpsState(f);
+    const a = autoQuality.current; if (a.done || !f) return;
+    a.samples.push(f); if (a.samples.length < 12) return;
+    const avg = a.samples.slice(2).reduce((s, x) => s + x, 0) / (a.samples.length - 2);
+    a.done = true;
+    if (avg < 26) { const next: Quality | null = quality === 'ultra' ? 'high' : quality === 'high' ? 'medium' : quality === 'medium' ? 'low' : null; if (next) { setQuality(next); game.toast(`Máy đang chạy ${Math.round(avg)} FPS nên game tự giảm đồ hoạ xuống ${next === 'low' ? 'Thấp' : next === 'medium' ? 'Trung bình' : 'Cao'} cho mượt hơn. Đổi lại trong Cài đặt.`); } }
+  };
   const [position, setPosition] = useState<Point>([0, 0]);
   const config = qualityConfig[quality];
   const phase = useGame((s) => s.phase);

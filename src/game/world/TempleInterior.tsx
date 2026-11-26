@@ -75,7 +75,7 @@ function make() {
     drumSkin: new THREE.MeshStandardMaterial({ color: '#d9c49a', roughness: 0.7 }),
     shell: new THREE.MeshStandardMaterial({ map: shellTex, roughness: 0.65 }),
     skin: new THREE.MeshStandardMaterial({ color: '#4f4c3a', roughness: 0.8 }),
-    glass: new THREE.MeshPhysicalMaterial({ color: '#e8f4f6', roughness: 0.05, transmission: 0.85, transparent: true, opacity: 0.25 }),
+    glass: new THREE.MeshStandardMaterial({ color: '#e8f4f6', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.22, depthWrite: false }), // no transmission: it re-renders the whole scene each frame
     wood: new THREE.MeshStandardMaterial({ color: '#5a321f', roughness: 0.6 }),
     orange: new THREE.MeshStandardMaterial({ color: '#f08a1c', roughness: 0.5 }),
     pomelo: new THREE.MeshStandardMaterial({ color: '#b9cc48', roughness: 0.5 }),

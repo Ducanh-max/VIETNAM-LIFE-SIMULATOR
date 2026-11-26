@@ -5,6 +5,7 @@ import { GROUND_HEIGHT, insidePolygon, registerBlocker, registerHeight, register
 import { baDinhFlagBase, lakes, landmarkFootprint, lawns } from '../osm';
 import { trs, unitBox, Instances } from './Instances';
 import { materials } from './materials';
+import { Near } from './Near';
 import { cornerCurlGeometry, curvedRoofGeometry } from './roofGeometry';
 import { latticeTexture, limeStoneTexture } from './textures';
 
@@ -392,12 +393,11 @@ export function Landmarks() {
   const khue = useMemo(() => footFrame('Khuê Văn Các'), []);
   const mon = useMemo(() => footFrame('Văn Miếu Môn'), []);
   return <group>
-    {lang && <Lang f={lang} />}
-    {lang && <BaDinhSquare f={lang} />}
-    {cotCo && <CotCo f={cotCo} />}
-    {motCot && <ChuaMotCot s={motCot} />}
-    {khue && <KhueVanCac f={khue} />}
-    {mon && <VanMieuMon f={mon} />}
+    {lang && <Near at={lang.o} r={700}><Lang f={lang} /><BaDinhSquare f={lang} /></Near>}
+    {cotCo && <Near at={cotCo.o} r={700}><CotCo f={cotCo} /></Near>}
+    {motCot && <Near at={motCot.f.o} r={350}><ChuaMotCot s={motCot} /></Near>}
+    {khue && <Near at={khue.o} r={350}><KhueVanCac f={khue} /></Near>}
+    {mon && <Near at={mon.o} r={350}><VanMieuMon f={mon} /></Near>}
   </group>;
 }
 

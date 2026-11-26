@@ -80,8 +80,10 @@ export const foodMaterials = () => once('food-mats', () => {
     shallot: new THREE.MeshStandardMaterial({ color: '#b5732e', roughness: 0.6 }),
     bamboo: new THREE.MeshStandardMaterial({ color: '#d8b675', roughness: 0.55 }),
     steel: new THREE.MeshStandardMaterial({ color: '#d5d8da', roughness: 0.22, metalness: 0.9 }),
-    glass: new THREE.MeshPhysicalMaterial({ color: '#ffffff', roughness: 0.04, transmission: 0.9, transparent: true, opacity: 0.32, thickness: 0.004, side: THREE.DoubleSide }),
-    ice: new THREE.MeshPhysicalMaterial({ color: '#f0f9ff', roughness: 0.12, transmission: 0.6, transparent: true, opacity: 0.75 }),
+    // plain see-through glass and ice: a transmission material makes three.js render the whole city a second time
+    // into a texture every frame (the biggest FPS cost in the game), for a barely visible difference
+    glass: new THREE.MeshStandardMaterial({ color: '#eef6fb', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false }),
+    ice: new THREE.MeshStandardMaterial({ color: '#f0f9ff', roughness: 0.1, transparent: true, opacity: 0.7 }),
     tray: new THREE.MeshStandardMaterial({ color: '#c7cbcd', roughness: 0.3, metalness: 0.8 }),
   };
 });

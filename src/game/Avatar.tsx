@@ -16,7 +16,7 @@ import { GRIP, PILLION, SEAT } from './world/Scooter';
 import { bagStore, useBag } from './bag';
 import { shopKind } from './shops';
 import { HeldModel } from './world/HeldItems';
-import { DINE_SECONDS, dineForAvatar, LimeWedge, Spoon } from './world/Dine';
+import { dineForAvatar, LIME, LimeWedge, Spoon } from './world/Dine';
 
 /*
  * The player's chibi avatar, driven by an animation state machine (IDLE, WALK, RUN, SPRINT, SIT_DOWN,
@@ -94,6 +94,8 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
   const heldRef = useRef<THREE.Group>(null);
   const spoonRef = useRef<THREE.Group>(null);
   const limeRef = useRef<THREE.Group>(null);
+  const quayRef = useRef<THREE.Group>(null);
+  const teaRef = useRef<THREE.Group>(null);
   const held = useBag((s) => s.held);
   const seatedNow = useRef(false);
   const [readingOpen, setReadingOpen] = useState(false);
@@ -141,7 +143,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
     let showSticks = false, showMorsel = false, showBottle = false, showGlass = false, showStream = false, showBag = false, showPhone = false;
     // something from the balo in the hands: eaten in bites / sips, or a book held open to read
     const H = s.phase === 'none' ? bagStore.get().held : null;
-    let showHeld = false, showSpoon = false, showLime = false;
+    let showHeld = false, showSpoon = false, showLime = false, showQuay = false, showTea = false;
     const bite = (period: number) => { const u = (c.t % period) / period; return u < 0.3 ? 0 : u < 0.45 ? (u - 0.3) / 0.15 : u < 0.7 ? 1 : u < 0.85 ? 1 - (u - 0.7) / 0.15 : 0; };
     let headPitch = 0;
     const R = -1, L = 1; // right arm at −x, left arm at +x
@@ -298,31 +300,68 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
       // phở at a table: lime squeezed over the bowl first, then chopsticks (right) and spoon (left) in turn
       const D = s.phase === 'none' && !H ? dineForAvatar() : null;
       const ez = (x: number) => x * x * (3 - 2 * x);
-      const bite01 = (x: number) => (x < 0.4 ? ez(x / 0.4) : x < 0.6 ? 1 : ez(1 - (x - 0.6) / 0.4));
       if (D && !eating) {
         const lift = D.seatHeight - 0.25; // the seat raises the avatar this much above the low stool it was posed for
-        const bowlB = V(0, D.tableTop - lift + 0.05, 0.36);
+        const top = D.tableTop - lift; // the table top in the seated body frame
+        const bowlB = V(0, top + 0.05, 0.36);
+        const at = (p: [number, number, number], dy = 0) => V(p[0], top + dy, 0.36 + p[2]);
         const mouthB = toBody(MOUTH, t.rotation.x);
-        handR = V(-0.12, bowlB.y + 0.08, 0.27); handL = V(0.12, bowlB.y + 0.07, 0.27);
-        if (D.stage === 'eating' || D.stage === 'served' || D.stage === 'done') { showSticks = true; handPoseR = 'chopsticks'; showSpoon = true; handPoseL = 'grip'; }
+        // resting: chopsticks in the right hand over the bowl, spoon in the left
+        handR = V(-0.12, top + 0.12, 0.27); handL = V(0.12, top + 0.1, 0.27);
+        if (D.stage === 'served' || D.stage === 'eating' || D.stage === 'done') { showSticks = true; handPoseR = 'chopsticks'; showSpoon = true; handPoseL = 'grip'; }
+        const seg = (u: number, a0: number, a1: number) => ez(Math.max(0, Math.min(1, (u - a0) / (a1 - a0))));
         if (D.stage === 'eating') {
           const u = D.progress;
-          if (u < 0.12) {
-            // squeezing the lime wedge over the bowl (the chopsticks wait on the table edge)
-            showSticks = false; showLime = true; handPoseR = 'fist';
-            handR = bowlB.clone().add(V(-0.03, 0.11 + Math.sin((u / 0.12) * Math.PI * 8) * 0.008, -0.03));
-            headPitch = 0.3;
-          } else {
-            const secs = (u - 0.12) * DINE_SECONDS; const cyc = (secs % 3.4) / 3.4;
-            const a = cyc < 0.55 ? bite01(cyc / 0.55) : 0; const b = cyc >= 0.55 ? bite01((cyc - 0.55) / 0.45) : 0;
-            const down = V(-0.05, -0.62, 0.78).normalize(); const up = V(0.2, 0.62, -0.75).normalize();
-            tipDir = down.clone().lerp(up, a * 0.7).normalize();
-            const tip = bowlB.clone().add(V(-0.01, 0.02, -0.02)).lerp(mouthB.clone().add(V(0, -0.02, 0.05)), a);
-            handR = tip.clone().addScaledVector(tipDir, -STICK);
-            handL = bowlB.clone().add(V(0.05, 0.05, -0.03)).lerp(mouthB.clone().add(V(0.04, -0.05, 0.07)), b);
-            headPitch = 0.28 * (1 - Math.max(a, b));
-            if (a > 0.8) mouthState = 'eating';
-            if (a > 0.05 && a < 0.97) { showMorsel = true; if (morselKind !== 'noodle') setMorselKind('noodle'); } // noodles hanging from the chopsticks
+          if (D.lime && u < LIME) {
+            // reach to the saucer, pick up a lime wedge, bring it over the bowl and squeeze it, put the hand back
+            const v = u / LIME;
+            const saucer = at(D.limeAt, 0.03), over = bowlB.clone().add(V(-0.02, 0.12, -0.03));
+            showSticks = false; handPoseR = v > 0.3 ? 'fist' : 'open';
+            const p = v < 0.3 ? handR.clone().lerp(saucer, seg(v, 0, 0.3)) : v < 0.45 ? saucer.clone().add(V(0, 0.02 * seg(v, 0.3, 0.45), 0)) : v < 0.6 ? saucer.clone().add(V(0, 0.02, 0)).lerp(over, seg(v, 0.45, 0.6)) : v < 0.88 ? over.clone().add(V(0, Math.sin((v - 0.6) * 60) * 0.006, 0)) : over.clone().lerp(V(-0.12, top + 0.12, 0.27), seg(v, 0.88, 1));
+            handR = p; showLime = v > 0.3 && v < 0.9;
+            headPitch = 0.35; leanTarget = 0.16;
+          } else if (D.kind === 'bowl') {
+            // a mouthful: chopsticks into the bowl, lift the noodles high, lay them on the spoon, lean over the bowl
+            // and bring both up to the mouth; every third mouthful is a spoon of broth
+            const secs = (u - (D.lime ? LIME : 0)) * 14; const k = Math.floor(secs / 3.2); const c = (secs % 3.2) / 3.2;
+            const tipIn = bowlB.clone().add(V(-0.01, 0.0, -0.01));
+            const high = bowlB.clone().add(V(-0.02, 0.2, -0.04));
+            const spoonOver = bowlB.clone().add(V(0.02, 0.07, -0.05));
+            const mouthTip = mouthB.clone().add(V(0, -0.03, 0.06));
+            leanTarget = 0.2 + 0.1 * Math.sin(Math.min(1, c * 1.4) * Math.PI);
+            if (k % 3 === 2) {
+              // broth: the spoon dips into the bowl and comes up to the lips; the chopsticks wait over the bowl
+              const sp = c < 0.3 ? handL.clone().lerp(bowlB.clone().add(V(0.02, 0.0, -0.01)), seg(c, 0, 0.3)) : c < 0.7 ? bowlB.clone().add(V(0.02, 0.0, -0.01)).lerp(mouthB.clone().add(V(0.02, -0.05, 0.07)), seg(c, 0.3, 0.7)) : mouthB.clone().add(V(0.02, -0.05, 0.07)).lerp(V(0.12, top + 0.1, 0.27), seg(c, 0.7, 1));
+              handL = sp; headPitch = c > 0.4 && c < 0.75 ? 0.1 : 0.32; if (c > 0.5 && c < 0.7) mouthState = 'eating';
+            } else {
+              let tip: THREE.Vector3; let tipUp = 0;
+              if (c < 0.18) tip = high.clone().lerp(tipIn, seg(c, 0, 0.18));
+              else if (c < 0.38) { tip = tipIn.clone().lerp(high, seg(c, 0.18, 0.38)); tipUp = 0.3; }
+              else if (c < 0.5) { tip = high.clone().lerp(spoonOver.clone().add(V(0, 0.03, 0)), seg(c, 0.38, 0.5)); tipUp = 0.3; }
+              else if (c < 0.75) { tip = spoonOver.clone().add(V(0, 0.03, 0)).lerp(mouthTip, seg(c, 0.5, 0.75)); tipUp = 0.55; }
+              else { tip = mouthTip.clone().lerp(high, seg(c, 0.75, 1)); tipUp = 0.3 * (1 - seg(c, 0.75, 1)); }
+              const down = V(-0.05, -0.62, 0.78).normalize(); const up = V(0.2, 0.62, -0.75).normalize();
+              tipDir = down.clone().lerp(up, tipUp).normalize();
+              handR = tip.clone().addScaledVector(tipDir, -STICK);
+              // the spoon waits over the bowl, then rises under the noodles to the mouth
+              handL = c < 0.45 ? spoonOver.clone() : c < 0.75 ? spoonOver.clone().lerp(mouthB.clone().add(V(0.03, -0.08, 0.07)), seg(c, 0.45, 0.75)) : mouthB.clone().add(V(0.03, -0.08, 0.07)).lerp(spoonOver, seg(c, 0.75, 1));
+              headPitch = c < 0.45 ? 0.38 : 0.38 - 0.25 * seg(c, 0.45, 0.72);
+              if (c > 0.68 && c < 0.8) mouthState = 'eating';
+              if (c > 0.2 && c < 0.8) { showMorsel = true; if (morselKind !== 'noodle') setMorselKind('noodle'); } // noodles hanging from the chopsticks
+            }
+          } else if (D.kind === 'quay') {
+            // a quẩy dipped into the broth then eaten (the chopsticks are put down)
+            showSticks = false; showQuay = true; handPoseR = 'grip';
+            const plate = at(D.quayAt, 0.03), dip = bowlB.clone().add(V(-0.02, 0.02, -0.02)), mouth = mouthB.clone().add(V(-0.02, -0.05, 0.08));
+            const c = (u * 2) % 1;
+            handR = c < 0.2 ? V(-0.12, top + 0.12, 0.27).lerp(plate, seg(c, 0, 0.2)) : c < 0.4 ? plate.clone().lerp(dip, seg(c, 0.2, 0.4)) : c < 0.75 ? dip.clone().lerp(mouth, seg(c, 0.4, 0.75)) : mouth.clone().lerp(V(-0.12, top + 0.12, 0.27), seg(c, 0.75, 1));
+            headPitch = c > 0.45 && c < 0.8 ? 0.12 : 0.3; if (c > 0.6 && c < 0.78) mouthState = 'eating';
+          } else if (D.kind === 'tea') {
+            // the glass of trà đá in the left hand, up to the lips and down again
+            showSpoon = false; showTea = true; handPoseL = 'grip';
+            const glass = at(D.teaAt, 0.05), lips = mouthB.clone().add(V(0.02, -0.07, 0.07));
+            handL = u < 0.2 ? V(0.12, top + 0.1, 0.27).lerp(glass, seg(u, 0, 0.2)) : u < 0.4 ? glass.clone().lerp(lips, seg(u, 0.2, 0.4)) : u < 0.75 ? lips.clone() : lips.clone().lerp(glass, seg(u, 0.75, 1));
+            headPitch = u > 0.35 && u < 0.8 ? -0.15 : 0.2;
           }
         }
       }
@@ -342,6 +381,8 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
       const hl = arm(L, toTorso(handL, al));
       if (spoonRef.current && showSpoon) { spoonRef.current.position.copy(hl).add(V(0.0, -0.005, 0.01)); spoonRef.current.rotation.set(0.35 - al, -0.4, 0); }
       if (limeRef.current && showLime) { limeRef.current.position.copy(hr).add(V(0.01, -0.03, 0.02)); limeRef.current.rotation.set(-al, 0, 0); }
+      if (quayRef.current && showQuay) { quayRef.current.position.copy(hr).add(V(0.0, -0.01, 0.05)); quayRef.current.rotation.set(0.6 - al, 0, Math.PI / 2); }
+      if (teaRef.current && showTea) { teaRef.current.position.copy(hl).add(V(-0.01, -0.04, 0.02)); teaRef.current.rotation.set(-al, 0, 0); }
       if (heldAt && heldRef.current) {
         showHeld = true;
         if (heldAt === 'mid') { heldRef.current.position.copy(hr).add(hl).multiplyScalar(0.5).add(V(0, 0.02, 0.03)); heldRef.current.rotation.set(0.75 - al, 0, 0); }
@@ -471,6 +512,8 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
     if (heldRef.current) heldRef.current.visible = showHeld;
     if (spoonRef.current) spoonRef.current.visible = showSpoon;
     if (limeRef.current) limeRef.current.visible = showLime;
+    if (quayRef.current) quayRef.current.visible = showQuay;
+    if (teaRef.current) teaRef.current.visible = showTea;
     const reading = !!H && H.kind === 'book' && !!player.seat;
     if (reading !== readingOpen) setReadingOpen(reading);
     seatedNow.current = !!player.seat;
@@ -494,6 +537,8 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
         <group ref={phone3d} visible={false}><Phone3D /></group>
         <group ref={spoonRef} visible={false}><Spoon /></group>
         <group ref={limeRef} visible={false}><LimeWedge /></group>
+        <group ref={quayRef} visible={false}><mesh><capsuleGeometry args={[0.009, 0.1, 3, 6]} /><meshStandardMaterial color="#d99a3a" roughness={0.7} /></mesh></group>
+        <group ref={teaRef} visible={false}><mesh position={[0, 0.05, 0]}><cylinderGeometry args={[0.032, 0.027, 0.11, 12]} /><meshStandardMaterial color="#c07a28" roughness={0.1} transparent opacity={0.8} /></mesh></group>
         <group ref={heldRef} visible={false}>{held && <HeldModel shop={held.shop} item={held.item} open={readingOpen} />}</group>
       </group>
     </group>

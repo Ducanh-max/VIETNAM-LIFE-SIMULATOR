@@ -14,6 +14,10 @@ import { Landmarks } from './world/Landmarks';
 import { FoodShipper } from './world/FoodShipper';
 import { Seats } from './world/Seats';
 import { DineWorld } from './world/Dine';
+import { PerfProbe } from './world/PerfProbe';
+import { Near } from './world/Near';
+import { RESTAURANT } from './osm';
+import { templeCenter } from './geo';
 import { StreetStalls } from './world/StreetStalls';
 import { Multiplayer } from './world/Multiplayer';
 import { Rental } from './world/Rental';
@@ -108,7 +112,7 @@ export function World({ time, quality, paused, freeCamera, onFps, onPosition }: 
     <Streets />
     <OsmBuildings />
     <Interaction paused={paused} />
-    <Restaurant paused={paused} />
+    <Near at={RESTAURANT.center} r={240}><Restaurant paused={paused} /></Near>
     <Job />
     <Signs />
     <Lotte />
@@ -116,6 +120,7 @@ export function World({ time, quality, paused, freeCamera, onFps, onPosition }: 
     <FoodShipper paused={paused} />
     <Seats paused={paused} />
     <DineWorld paused={paused} />
+    <PerfProbe />
     <StreetStalls />
     <Multiplayer />
     <Rental />
@@ -124,8 +129,7 @@ export function World({ time, quality, paused, freeCamera, onFps, onPosition }: 
     <Pedestrians />
     <TheHucBridge />
     <TurtleIsland />
-    <NgocSonIsland />
-    <NgocSonApproach />
+    <Near at={templeCenter} r={460}><NgocSonIsland /><NgocSonApproach /></Near>
     <Player paused={paused} freeCamera={freeCamera} onFps={onFps} onPosition={onPosition} focus={focus} />
   </>;
 }
