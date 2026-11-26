@@ -22,7 +22,7 @@ const frame = (s: Shop) => {
 };
 /** Low tables (local x, z) of each kind of stall; stools sit either side along z. */
 const TABLES: Record<string, [number, number][]> = { pho: [[1.35, 0.15], [-1.35, 0.15]], coffee: [[1.2, 0.15], [-1.2, 0.15]], banhmi: [[1.5, 0.2]], books: [], buncha: [] };
-const TABLE_TOP = 0.45, TABLE_HALF = 0.3, STOOL = 0.25, SEAT_OFF = 0.56;
+const TABLE_TOP = 0.45, TABLE_HALF = 0.4, STOOL = 0.25, SEAT_OFF = 0.66;
 
 let mats: ReturnType<typeof make> | null = null;
 function make() {
@@ -56,7 +56,7 @@ function Stall({ s }: { s: Shop }) {
     tables.forEach(([x, z]) => {
       const pair: Seat[] = [-1, 1].map((side) => ({ p: fr.w(x, z + side * SEAT_OFF), facing: fr.f + (side < 0 ? 0 : Math.PI), height: STOOL, kind: 'stool' }));
       seats.push(...pair);
-      if (s.kind === 'pho') dine.push({ shop: s.id, center: fr.w(x, z), top: TABLE_TOP, seats: pair, waiterHome: fr.w(0.6, -0.9), waiter: 'Hằng' });
+      if (s.kind === 'pho') dine.push({ shop: s.id, center: fr.w(x, z), top: TABLE_TOP, half: TABLE_HALF, seats: pair, waiterHome: fr.w(0.6, -0.9), waiter: 'Hằng' });
     });
     const [cx, cz] = fr.w(0, -0.45);
     const obs: Obstacle[] = [{ x: cx, z: cz, hx: 0.8, hz: 0.35, angle: fr.f }];
@@ -92,7 +92,7 @@ function Stall({ s }: { s: Shop }) {
     {/* low tables and plastic stools; condiments on the phở tables */}
     <Instances geometry={unitBox} material={m.steel} matrices={tableTops} />
     <Instances geometry={unitCylinder} material={m.blue} matrices={stools} />
-    {s.kind === 'pho' && tables.map(([x, z]) => <group key={`${x}`} position={[x, TABLE_TOP, z]}><Condiments /></group>)}
+    {s.kind === 'pho' && tables.map(([x, z]) => <group key={`${x}`} position={[x + Math.sign(x) * (TABLE_HALF - 0.07), TABLE_TOP, z]}><Condiments /></group>)}
     {/* the A-board with the stall's name, and the seller */}
     <group position={[-1.0, 0, -0.95]} rotation={[0, 0.25, 0]}>
       <mesh position={[0, 0.6, 0]} rotation={[-0.15, 0, 0]} material={signMat} castShadow><boxGeometry args={[0.7, 0.55, 0.03]} /></mesh>

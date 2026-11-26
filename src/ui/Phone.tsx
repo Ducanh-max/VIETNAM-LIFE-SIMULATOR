@@ -12,6 +12,7 @@ import { RENTAL } from '../game/rental';
 import { RentalApp } from './RentalPanel';
 import { FoodApp } from './ShopPanel';
 import { useShops } from '../game/shops';
+import { teleportTo, useAdmin } from '../game/admin';
 import { useVietnamClock, VIETNAM_TZ } from './vietnamTime';
 
 const fmtDist = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`);
@@ -77,6 +78,16 @@ function MapApp() {
   const [q, setQ] = useState('');
   const hits = q.trim() ? searchPlaces(q, 6) : [];
   const [, force] = useState(0);
+  const admin = useAdmin();
+  const down = useRef<{ x: number; y: number } | null>(null);
+  /** Admin: a tap (not a drag) on the map picks that point as the destination. */
+  const pick = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const d0 = down.current; down.current = null;
+    if (!admin || !d0 || Math.hypot(e.clientX - d0.x, e.clientY - d0.y) > 6) return;
+    const r = (e.target as HTMLCanvasElement).getBoundingClientRect(); const s = state.current;
+    const x = s.cx + (e.clientX - (r.left + r.width / 2)) / s.scale, z = s.cz + (e.clientY - (r.top + r.height / 2)) / s.scale;
+    nav.custom = { x, z, label: 'Điểm đã chọn' }; updateNav(); force((n) => n + 1);
+  };
   return <div className="app-map">
     <div className="map-search">
       <input value={q} placeholder="🔎 Nhập nơi muốn đến (có dấu hoặc không)" onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && hits[0]) { nav.custom = { x: hits[0].x, z: hits[0].z, label: hits[0].name }; setQ(''); updateNav(); state.current.follow = true; } }} />
@@ -85,9 +96,11 @@ function MapApp() {
     </div>
     <canvas ref={canvas}
       onWheel={(e) => zoom(e.deltaY < 0 ? 1.15 : 1 / 1.15)}
-      onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture(e.pointerId); const s = state.current; s.drag = { x: e.clientX, y: e.clientY, cx: s.cx, cz: s.cz }; s.follow = false; }}
+      onPointerDown={(e) => { down.current = { x: e.clientX, y: e.clientY }; (e.target as HTMLElement).setPointerCapture(e.pointerId); const s = state.current; s.drag = { x: e.clientX, y: e.clientY, cx: s.cx, cz: s.cz }; s.follow = false; }}
       onPointerMove={(e) => { const s = state.current; if (!s.drag) return; s.cx = s.drag.cx - (e.clientX - s.drag.x) / s.scale; s.cz = s.drag.cz - (e.clientY - s.drag.y) / s.scale; }}
-      onPointerUp={() => { state.current.drag = null; }} />
+      onPointerUp={(e) => { state.current.drag = null; pick(e); }} />
+    {admin && nav.custom && <button className="map-teleport" onClick={() => { const c = nav.custom!; if (teleportTo(c.x, c.z, c.label)) { nav.custom = null; updateNav(); force((n) => n + 1); } }}>🛰️ Dịch chuyển tới {nav.custom.label}</button>}
+    {admin && !nav.custom && <div className="map-teleport hint">Admin: chạm vào bản đồ hoặc tìm địa điểm để dịch chuyển</div>}
     <div className="map-controls">
       <button onClick={() => zoom(1.3)} aria-label="Phóng to">+</button>
       <button onClick={() => zoom(1 / 1.3)} aria-label="Thu nhỏ">−</button>

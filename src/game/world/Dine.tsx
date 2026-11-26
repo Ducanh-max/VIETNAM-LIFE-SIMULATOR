@@ -16,7 +16,8 @@ import { Tray } from './food';
  * noodles and broth (see Avatar.tsx). Every phở table has its condiments: tương ớt, tương đen, sa tế, lime,
  * a chopstick holder, spoons and tissues.
  */
-export type DineTable = { shop: ShopId; center: Point; top: number; seats: Seat[]; waiterHome: Point; waiter: string };
+/** `half`: half the side of the (square) table top. */
+export type DineTable = { shop: ShopId; center: Point; top: number; half: number; seats: Seat[]; waiterHome: Point; waiter: string };
 const tables: DineTable[] = [];
 export function registerDineTables(list: DineTable[]) { tables.push(...list); return () => { for (const t of list) { const i = tables.indexOf(t); if (i >= 0) tables.splice(i, 1); } }; }
 export const tableOfSeat = (s: Seat | null) => (s ? tables.find((t) => t.seats.includes(s)) ?? null : null);
@@ -51,9 +52,30 @@ export const dineStore = {
 const useDine = () => useSyncExternalStore(dineStore.subscribe, () => dine);
 export const DINE_SECONDS = 14; // a bowl of phở, noodles and broth
 /** Where the bowl sits on the table in front of the seat (world), and its height. */
-export function bowlSpot(d: { table: DineTable; seat: Seat }): THREE.Vector3 {
-  const f: Point = [Math.sin(d.seat.facing), Math.cos(d.seat.facing)];
-  return new THREE.Vector3(d.seat.p[0] + f[0] * 0.36, GROUND_HEIGHT + d.table.top, d.seat.p[1] + f[1] * 0.36);
+/**
+ * The table layout for one diner, in a frame at the table centre turned to the diner (+z away from them, +x on
+ * their left): the bowl being eaten in front of them ~15 cm from the edge, waiting bowls just beyond, the herb plate
+ * with lime and the chilli on the left, the trà đá and the quẩy on the right, empty bowls stacked at the back right.
+ * The caddy and tissues stand at the table's side edge (Condiments). Nothing hangs over the edge.
+ */
+export function tableLayout(t: DineTable) {
+  const h = t.half, z0 = -(h - 0.17);
+  const slots: [number, number][] = [[0, z0 + 0.17], [0.13, z0 + 0.17], [-0.13, z0 + 0.17], [0, z0 + 0.33], [0.13, z0 + 0.33]].filter(([, z]) => z < h - 0.08) as [number, number][];
+  return {
+    bowl: [0, 0, z0] as [number, number, number],
+    waiting: (k: number): [number, number, number] => { const sl = slots[Math.min(k, slots.length - 1)]; return [sl[0], k >= slots.length ? 0.065 * (k - slots.length + 1) : 0, sl[1]]; },
+    empty: (k: number): [number, number, number] => [-(h - 0.1), 0.03 * k, h - 0.12],
+    herbs: [h - 0.1, 0, z0] as [number, number, number],
+    // tea and quẩy in the front row on the right, clear of the caddy standing at a side edge
+    tea: [-(h - 0.05), 0, z0 - 0.02] as [number, number, number],
+    quay: [-0.21, 0, z0] as [number, number, number],
+  };
+}
+/** The table centre and the diner's distance from it, along their facing. */
+function frameOf(d: { table: DineTable; seat: Seat }) {
+  const f = d.seat.facing; const fx = Math.sin(f), fz = Math.cos(f);
+  const dist = (d.table.center[0] - d.seat.p[0]) * fx + (d.table.center[1] - d.seat.p[1]) * fz;
+  return { origin: new THREE.Vector3(d.table.center[0], GROUND_HEIGHT + d.table.top, d.table.center[1]), dist };
 }
 
 /** Order from the table (called by the counter panel opened at a table). */
@@ -76,8 +98,7 @@ export function placeDine(id: ShopId, basket: Basket) {
  * a plate of fresh herbs (húng quế, ngò gai) with lime wedges and bean sprouts; a little dish of fresh red chilli.
  */
 let condMats: Record<string, THREE.Material> | null = null;
-export function Condiments() {
-  const m = (condMats ??= {
+const condMaterials = () => (condMats ??= {
     wood: new THREE.MeshStandardMaterial({ color: '#9a6a3e', roughness: 0.7 }),
     bamboo: new THREE.MeshStandardMaterial({ color: '#d9bf86', roughness: 0.6 }),
     steel: new THREE.MeshStandardMaterial({ color: '#cfd3d6', roughness: 0.25, metalness: 0.7 }),
@@ -92,10 +113,12 @@ export function Condiments() {
     limeIn: new THREE.MeshStandardMaterial({ color: '#e2f2a8', roughness: 0.5 }),
     sprout: new THREE.MeshStandardMaterial({ color: '#f4f0dc', roughness: 0.6 }),
     redChili: new THREE.MeshStandardMaterial({ color: '#e0261a', roughness: 0.4 }),
-  });
+});
+export function Condiments() {
+  const m = condMaterials();
   return <group>
-    {/* the wooden caddy: chopstick cup, pepper, chilli sauce, fish sauce */}
-    <group position={[-0.1, 0, -0.12]}>
+    {/* the wooden caddy (chopstick cup, pepper, chilli sauce, fish sauce) and the tissue box, in a row at the side */}
+    <group position={[0, 0, -0.05]} rotation={[0, Math.PI / 2, 0]}>
       <mesh position={[0, 0.012, 0]} material={m.wood} castShadow><boxGeometry args={[0.2, 0.024, 0.09]} /></mesh>
       <mesh position={[-0.065, 0.06, 0]} material={m.wood}><boxGeometry args={[0.055, 0.1, 0.055]} /></mesh>
       {Array.from({ length: 14 }, (_, i) => <mesh key={i} position={[-0.065 + ((i % 4) - 1.5) * 0.008, 0.15, ((Math.floor(i / 4)) - 1.5) * 0.008]} rotation={[((i % 3) - 1) * 0.04, 0, ((i % 4) - 1.5) * 0.03]} material={m.bamboo}><cylinderGeometry args={[0.003, 0.0022, 0.2, 5]} /></mesh>)}
@@ -106,20 +129,28 @@ export function Condiments() {
       <mesh position={[0.075, 0.07, 0]} material={m.soy} castShadow><cylinderGeometry args={[0.017, 0.019, 0.1, 12]} /></mesh>
       <mesh position={[0.075, 0.135, 0]} material={m.soy}><cylinderGeometry args={[0.006, 0.012, 0.035, 10]} /></mesh>
     </group>
-    {/* wooden tissue box */}
-    <group position={[0.12, 0, -0.12]}>
+    <group position={[0, 0, 0.12]}>
       <mesh position={[0, 0.035, 0]} material={m.wood} castShadow><boxGeometry args={[0.09, 0.07, 0.07]} /></mesh>
       <mesh position={[0, 0.08, 0]} material={m.tissue} rotation={[0, 0.3, 0.2]}><boxGeometry args={[0.035, 0.03, 0.025]} /></mesh>
     </group>
-    {/* the herb plate: húng, ngò gai, lime wedges, bean sprouts */}
-    <group position={[-0.06, 0, 0.06]}>
+  </group>;
+}
+
+/** The plate of herbs (húng, ngò gai), lime wedges and bean sprouts, and the little dish of fresh chilli, brought with
+ * the phở and set to the left of the bowl. `limeTaken` hides the wedge picked up for the squeeze. */
+export function HerbPlate({ limeTaken }: { limeTaken: () => boolean }) {
+  const m = condMaterials();
+  const lime = useRef<THREE.Group>(null);
+  useFrame(() => { if (lime.current) lime.current.visible = !limeTaken(); });
+  return <group>
+    <group>
       <mesh position={[0, 0.006, 0]} material={m.plate}><cylinderGeometry args={[0.075, 0.065, 0.012, 20]} /></mesh>
       {Array.from({ length: 9 }, (_, i) => <mesh key={i} position={[Math.cos(i * 0.9) * 0.03, 0.022 + (i % 3) * 0.006, Math.sin(i * 0.9) * 0.025 - 0.012]} rotation={[-0.6 + (i % 2) * 0.3, i * 0.8, 0.2]} material={i % 2 ? m.herb : m.herb2}><circleGeometry args={[0.018, 6]} /></mesh>)}
-      {[0, 1, 2].map((i) => <group key={`l${i}`} position={[0.035 - i * 0.022, 0.022, 0.035]} rotation={[0, i * 0.7, Math.PI / 2]}><mesh material={m.lime}><sphereGeometry args={[0.014, 8, 6, 0, Math.PI]} /></mesh><mesh material={m.limeIn}><circleGeometry args={[0.0135, 8, 0, Math.PI]} /></mesh></group>)}
+      {[0, 1, 2].map((i) => <group key={`l${i}`} ref={i === 0 ? lime : undefined} position={[0.035 - i * 0.022, 0.022, 0.035]} rotation={[0, i * 0.7, Math.PI / 2]}><mesh material={m.lime}><sphereGeometry args={[0.014, 8, 6, 0, Math.PI]} /></mesh><mesh material={m.limeIn}><circleGeometry args={[0.0135, 8, 0, Math.PI]} /></mesh></group>)}
       {Array.from({ length: 8 }, (_, i) => <mesh key={`s${i}`} position={[0.03 + Math.cos(i) * 0.012, 0.018, -0.03 + Math.sin(i * 1.7) * 0.012]} rotation={[Math.PI / 2, 0, i * 0.8]} material={m.sprout}><cylinderGeometry args={[0.0018, 0.0018, 0.03, 4]} /></mesh>)}
     </group>
-    {/* fresh chilli in a little dish */}
-    <group position={[0.07, 0, 0.07]}>
+    {/* fresh chilli in a little dish, between the herbs and the bowl */}
+    <group position={[-0.15, 0, -0.03]}>
       <mesh position={[0, 0.008, 0]} material={m.plate}><cylinderGeometry args={[0.03, 0.022, 0.016, 14]} /></mesh>
       {Array.from({ length: 6 }, (_, i) => <mesh key={i} position={[Math.cos(i) * 0.012, 0.018, Math.sin(i) * 0.012]} rotation={[Math.PI / 2, 0, 0]} material={m.redChili}><cylinderGeometry args={[0.006, 0.006, 0.003, 8]} /></mesh>)}
     </group>
@@ -155,12 +186,6 @@ function leave(cur: Dine, what: string) {
 }
 
 /* Things on the table besides the bowls (bowl-local frame: +x is the eater's left, +z away from them). */
-const TEA_AT: [number, number, number] = [0.19, 0, -0.04];
-const QUAY_AT: [number, number, number] = [-0.21, 0, 0.1];
-export const LIME_AT: [number, number, number] = [-0.19, 0, -0.06];
-/** Where the k-th waiting bowl stands, and where empty bowls are pushed. */
-const waitingAt = (k: number): [number, number, number] => [-0.04 + (k % 2 ? 0.2 : 0), 0, 0.2 + Math.floor(k / 2) * 0.17];
-const emptyAt = (k: number): [number, number, number] => [0.24, 0.03 * k, 0.16];
 
 let tableMats: Record<string, THREE.Material> | null = null;
 const TM = () => (tableMats ??= {
@@ -191,17 +216,6 @@ function QuayPlate({ left }: { left: () => number }) {
     {Array.from({ length: 6 }, (_, i) => <mesh key={i} position={[(i % 3 - 1) * 0.03, 0.022 + Math.floor(i / 3) * 0.018, (i % 2) * 0.012 - 0.006]} rotation={[0, 0.3 + (i % 3) * 0.2, Math.PI / 2]} material={m.quay}><capsuleGeometry args={[0.009, 0.1, 3, 6]} /></mesh>)}
   </group>;
 }
-/** The saucer of lime wedges by the bowl; one wedge is taken for the squeeze. */
-function LimeSaucer({ taken }: { taken: () => boolean }) {
-  const m = TM(); const w = useRef<THREE.Group>(null);
-  useFrame(() => { if (w.current) w.current.visible = !taken(); });
-  return <group>
-    <mesh position={[0, 0.006, 0]} material={m.plate}><cylinderGeometry args={[0.045, 0.04, 0.012, 16]} /></mesh>
-    {[0, 1].map((i) => <group key={i} position={[-0.012 + i * 0.024, 0.02, 0.01]} rotation={[0, i, Math.PI / 2]}><mesh material={m.lime}><sphereGeometry args={[0.014, 8, 6, 0, Math.PI]} /></mesh><mesh material={m.limeIn}><circleGeometry args={[0.0135, 8, 0, Math.PI]} /></mesh></group>)}
-    <group ref={w} position={[0, 0.02, -0.014]} rotation={[0, 2, Math.PI / 2]}><mesh material={m.lime}><sphereGeometry args={[0.014, 8, 6, 0, Math.PI]} /></mesh><mesh material={m.limeIn}><circleGeometry args={[0.0135, 8, 0, Math.PI]} /></mesh></group>
-  </group>;
-}
-
 /** The waiter, everything ordered on the table and the flow (cooking → carried over → eaten course by course). */
 export function DineWorld({ paused }: { paused: boolean }) {
   const d = useDine();
@@ -272,7 +286,8 @@ export function DineWorld({ paused }: { paused: boolean }) {
     const onKey = (e: KeyboardEvent) => { const x = dineStore.get(); if (e.code !== 'KeyM' || e.repeat || !x || x.stage !== 'done') return; if (document.pointerLockElement) document.exitPointerLock(); const id = x.shop; dineStore.set(null); shopStore.set({ counter: id, dine: true }); };
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
   }, []);
-  const bowl = useMemo(() => (d ? bowlSpot(d) : null), [d?.seat, d?.table]);
+  const fr = useMemo(() => (d ? frameOf(d) : null), [d?.seat, d?.table]);
+  const L = useMemo(() => (d ? tableLayout(d.table) : null), [d?.table]);
   if (!d) return null;
   const bowls = d.courses.filter((c) => c.kind === 'bowl');
   const quays = d.courses.filter((c) => c.kind === 'quay');
@@ -293,21 +308,21 @@ export function DineWorld({ paused }: { paused: boolean }) {
         {teas.length > 0 && <group position={[0.13, 0, 0.08]} scale={0.85}><TeaGlass level={() => 1} /></group>}
       </Tray></group>}
     </group>
-    {onTable && bowl && <group position={bowl} rotation={[0, f, 0]}>
+    {onTable && fr && L && <group position={fr.origin} rotation={[0, f, 0]}>
       {/* the bowl being eaten in front, the others waiting behind, empty ones pushed aside */}
       {bowls.map((b, i) => {
         const front = b === bowlNow;
         const waitingIdx = bowls.filter((x, j) => j < i && x !== bowlNow && doneWith(x) < 1).length;
         const emptyIdx = bowls.filter((x, j) => j < i && doneWith(x) >= 1).length;
         const full = doneWith(b) >= 1 && !front;
-        const at = front ? [0, 0, 0] as [number, number, number] : full ? emptyAt(emptyIdx) : waitingAt(waitingIdx);
+        const at = front ? L.bowl : full ? L.empty(emptyIdx) : L.waiting(waitingIdx);
         return <group key={i} position={at}>
           <Bowl shop="pho" id={b.item} steam={!full} progress={() => { const p = doneWith(b); return b.n === 0 ? (p < LIME ? 0 : ease((p - LIME) / (1 - LIME))) : ease(p); }} />
         </group>;
       })}
-      <group position={LIME_AT}><LimeSaucer taken={() => { const x = dineStore.get(); return !!x && (x.stage === 'done' || x.course > 0 || (x.stage === 'eating' && x.progress > LIME * 0.4)); }} /></group>
-      {quays.length > 0 && <group position={QUAY_AT}><QuayPlate left={() => quays.reduce((s, q) => s + (1 - doneWith(q)), 0)} /></group>}
-      {teas.map((tc, i) => <group key={i} position={[TEA_AT[0] + i * 0.075, 0, TEA_AT[2]]}><TeaGlass level={() => 1 - doneWith(tc)} inHand={() => { const x = dineStore.get(); return !!x && x.stage === 'eating' && x.courses[x.course] === tc && x.progress > 0.2 && x.progress < 0.95; }} /></group>)}
+      <group position={L.herbs}><HerbPlate limeTaken={() => { const x = dineStore.get(); return !!x && (x.stage === 'done' || x.course > 0 || (x.stage === 'eating' && x.progress > LIME * 0.4)); }} /></group>
+      {quays.length > 0 && <group position={L.quay}><QuayPlate left={() => quays.reduce((s, q) => s + (1 - doneWith(q)), 0)} /></group>}
+      {teas.map((tc, i) => <group key={i} position={[L.tea[0] + Math.min(i, 2) * 0.075, 0, L.tea[2] + (i > 2 ? 0.08 : 0)]}><TeaGlass level={() => 1 - doneWith(tc)} inHand={() => { const x = dineStore.get(); return !!x && x.stage === 'eating' && x.courses[x.course] === tc && x.progress > 0.2 && x.progress < 0.95; }} /></group>)}
     </group>}
   </group>;
 }
@@ -317,7 +332,10 @@ export function dineForAvatar() {
   const x = dineStore.get();
   if (!x || !player.seat || seatState.mine !== x.seat) return null;
   const c = x.stage === 'eating' ? x.courses[x.course] : null;
-  return { stage: x.stage, progress: x.progress, kind: c?.kind ?? null, lime: !!c && c.kind === 'bowl' && c.n === 0, tableTop: x.table.top, seatHeight: x.seat.height, teaAt: TEA_AT, quayAt: QUAY_AT, limeAt: LIME_AT };
+  // positions in the seated body frame: x the same, z = distance from the diner
+  const L = tableLayout(x.table); const { dist } = frameOf(x);
+  const body = (p: [number, number, number]): [number, number, number] => [p[0], 0, dist + p[2]];
+  return { stage: x.stage, progress: x.progress, kind: c?.kind ?? null, lime: !!c && c.kind === 'bowl' && c.n === 0, tableTop: x.table.top, seatHeight: x.seat.height, bowlAt: body(L.bowl), teaAt: body(L.tea), quayAt: body(L.quay), limeAt: body([L.herbs[0] + 0.035, 0, L.herbs[2] + 0.035]) };
 }
 
 if (import.meta.env.DEV) (window as unknown as { __dine?: unknown }).__dine = { dineStore, tables, placeDine, coursesOf };

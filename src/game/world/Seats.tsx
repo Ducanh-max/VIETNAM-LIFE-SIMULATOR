@@ -4,6 +4,7 @@ import { bagStore, nearestSeat, seatState, sitOn, standUp, stepHeld } from '../b
 import { bike, game, player } from '../state';
 import { shopStore } from '../shops';
 import { dineStore, tableOfSeat } from './Dine';
+import { topUpAdmin } from '../admin';
 
 /**
  * Sitting down on any bench or stool (E near it, E again to get up), and the clock for eating and drinking what
@@ -12,6 +13,7 @@ import { dineStore, tableOfSeat } from './Dine';
 const stuck = { t: 0 };
 export function Seats({ paused }: { paused: boolean }) {
   useFrame((_, delta) => {
+    topUpAdmin();
     if (paused) return;
     // safety net: standing somewhere nothing lets you walk out of (dropped inside a building or a landmark) → step out
     if (!player.seat && !bike.riding && !game.get().ride && !canWalk([player.position.x, player.position.z])) {

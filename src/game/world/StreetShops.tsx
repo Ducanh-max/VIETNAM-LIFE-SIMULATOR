@@ -267,7 +267,7 @@ function Goods({ s }: { s: Shop }) {
         <B p={[s.x - 1.0, PHO_TOP - 0.02, back + dz]} s={[0.84, 0.04, 0.84]} m={m.steel} />
         <B p={[s.x - 1.0, PHO_TOP - 0.08, back + dz]} s={[0.78, 0.08, 0.78]} m={m.steel} />
         {[-1, 1].flatMap((a) => [-1, 1].map((b) => <B key={`${a}${b}`} p={[s.x - 1.0 + a * 0.36, (PHO_TOP - 0.1) / 2, back + dz + b * 0.36]} s={[0.035, PHO_TOP - 0.1, 0.035]} m={m.steel} />))}
-        <group position={[s.x - 1.0, PHO_TOP, back + dz]} rotation={[0, Math.PI / 2, 0]}><Condiments /></group>
+        <group position={[s.x - 1.0 - 0.34, PHO_TOP, back + dz]}><Condiments /></group>
         <Stools red at={[[s.x - 1.0, back + dz - 0.7], [s.x - 1.0, back + dz + 0.7], [s.x - 0.2, back + dz]]} />
       </group>)}
     </group>;
@@ -350,7 +350,7 @@ export function StreetShops() {
     const dine: DineTable[] = [];
     if (pho) for (const dz of [2.4, 4.6]) {
       const c = restaurantToWorld(pho.x - 1.0, HD - SHOP_DEPTH + dz);
-      dine.push({ shop: 'pho', center: c, top: PHO_TOP, seats: seats.filter((st) => Math.hypot(st.p[0] - c[0], st.p[1] - c[1]) < 0.9), waiterHome: restaurantToWorld(pho.x + 0.2, HD - 3.2), waiter: 'Chị Mai' });
+      dine.push({ shop: 'pho', center: c, top: PHO_TOP, half: 0.42, seats: seats.filter((st) => Math.hypot(st.p[0] - c[0], st.p[1] - c[1]) < 0.9), waiterHome: restaurantToWorld(pho.x + 0.2, HD - 3.2), waiter: 'Chị Mai' });
     }
     const a = registerSeats(seats); const b = registerDineTables(dine);
     return () => { a(); b(); };

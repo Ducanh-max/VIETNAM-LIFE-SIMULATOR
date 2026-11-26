@@ -303,8 +303,8 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
       if (D && !eating) {
         const lift = D.seatHeight - 0.25; // the seat raises the avatar this much above the low stool it was posed for
         const top = D.tableTop - lift; // the table top in the seated body frame
-        const bowlB = V(0, top + 0.05, 0.36);
-        const at = (p: [number, number, number], dy = 0) => V(p[0], top + dy, 0.36 + p[2]);
+        const bowlB = V(D.bowlAt[0], top + 0.05, D.bowlAt[2]);
+        const at = (p: [number, number, number], dy = 0) => V(p[0], top + dy, p[2]);
         const mouthB = toBody(MOUTH, t.rotation.x);
         // resting: chopsticks in the right hand over the bowl, spoon in the left
         handR = V(-0.12, top + 0.12, 0.27); handL = V(0.12, top + 0.1, 0.27);
