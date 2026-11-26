@@ -2,6 +2,8 @@ import { useFrame } from '@react-three/fiber';
 import { groundHeight } from '../geo';
 import { bagStore, nearestSeat, seatState, sitOn, standUp, stepHeld } from '../bag';
 import { bike, game, player } from '../state';
+import { shopStore } from '../shops';
+import { dineStore, tableOfSeat } from './Dine';
 
 /**
  * Sitting down on any bench or stool (E near it, E again to get up), and the clock for eating and drinking what
@@ -23,7 +25,11 @@ export function Seats({ paused }: { paused: boolean }) {
     const seat = nearestSeat([player.position.x, player.position.z], 1.1);
     if (!seat) return;
     const book = bagStore.get().held?.kind === 'book';
-    game.offer({ id: 'sit-seat', text: `${seat.kind === 'bench' ? 'Ngồi xuống ghế đá' : 'Ngồi xuống ghế'}${book ? ' đọc sách' : ''}`, key: 'E', priority: 4, run: () => sitOn(seat, groundHeight(seat.p)) });
+    const table = tableOfSeat(seat);
+    game.offer({ id: 'sit-seat', text: table ? 'Ngồi xuống & gọi phở' : `${seat.kind === 'bench' ? 'Ngồi xuống ghế đá' : 'Ngồi xuống ghế'}${book ? ' đọc sách' : ''}`, key: 'E', priority: table ? 7 : 4, run: () => {
+      sitOn(seat, groundHeight(seat.p));
+      if (table && !dineStore.get()) shopStore.set({ counter: table.shop, dine: true });
+    } });
   });
   return null;
 }

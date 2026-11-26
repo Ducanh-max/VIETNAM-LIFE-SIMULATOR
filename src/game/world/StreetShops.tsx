@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { registerSeats, type Seat } from '../bag';
+import { Condiments, registerDineTables, type DineTable } from './Dine';
 import * as THREE from 'three';
 import { RESTAURANT, restaurantToWorld } from '../osm';
 import { SHOPS, type Shop } from '../shops';
@@ -17,6 +18,7 @@ const D = RESTAURANT.depth;
 const HD = D / 2;
 export const SHOP_G = 3.4; // ground-floor height
 export const SHOP_DEPTH = 7.5; // depth of the open shop room
+const PHO_TOP = 0.62; // the phở tables
 const OPEN_H = 2.8; // height of the shop opening under the signboard
 const FLOORS: Record<string, { floors: number; variant: number }> = { coffee: { floors: 3, variant: 1 }, banhmi: { floors: 4, variant: 0 }, pho: { floors: 5, variant: 2 }, books: { floors: 3, variant: 1 } };
 export const walkInShops = SHOPS.filter((s) => s.walkIn);
@@ -145,8 +147,8 @@ function Goods({ s }: { s: Shop }) {
       <mesh position={[s.x + 1.3, 2.0, HD - 1.6]} material={m.steam}><cylinderGeometry args={[0.22, 0.32, 0.9, 12, 1, true]} /></mesh>
       {[0, 1, 2, 3].map((i) => <mesh key={i} position={[s.x + 0.6, 0.95 + i * 0.07, HD - 1.6]} material={m.bowl}><cylinderGeometry args={[0.13, 0.08, 0.07, 14]} /></mesh>)}
       {[2.4, 4.6].map((dz) => <group key={dz}>
-        <B p={[s.x - 1.0, 0.35, back + dz]} s={[0.8, 0.7, 0.8]} m={m.steel} />
-        <mesh position={[s.x - 1.0, 0.75, back + dz]} material={m.bowl}><cylinderGeometry args={[0.13, 0.08, 0.08, 14]} /></mesh>
+        <B p={[s.x - 1.0, PHO_TOP / 2, back + dz]} s={[0.8, PHO_TOP, 0.8]} m={m.steel} />
+        <group position={[s.x - 1.0, PHO_TOP, back + dz]} rotation={[0, Math.PI / 2, 0]}><Condiments /></group>
         <Stools at={[[s.x - 1.0, back + dz - 0.7], [s.x - 1.0, back + dz + 0.7], [s.x - 0.2, back + dz]]} />
       </group>)}
     </group>;
@@ -222,6 +224,17 @@ function shopStools(): [number, number, number, number][] {
 }
 
 export function StreetShops() {
-  useEffect(() => registerSeats(shopStools().map(([x, z, dx, dz]): Seat => ({ p: restaurantToWorld(x, z), facing: RESTAURANT.angle + Math.atan2(dx, dz), height: 0.4, kind: 'stool' }))), []);
+  useEffect(() => {
+    const seats = shopStools().map(([x, z, dx, dz]): Seat => ({ p: restaurantToWorld(x, z), facing: RESTAURANT.angle + Math.atan2(dx, dz), height: 0.4, kind: 'stool' }));
+    // the phở shop's two tables: their three stools each, the waiter starting by the counter
+    const pho = walkInShops.find((s) => s.id === 'pho');
+    const dine: DineTable[] = [];
+    if (pho) for (const dz of [2.4, 4.6]) {
+      const c = restaurantToWorld(pho.x - 1.0, HD - SHOP_DEPTH + dz);
+      dine.push({ shop: 'pho', center: c, top: PHO_TOP, seats: seats.filter((st) => Math.hypot(st.p[0] - c[0], st.p[1] - c[1]) < 0.9), waiterHome: restaurantToWorld(pho.x + 0.2, HD - 3.2), waiter: 'Chị Mai' });
+    }
+    const a = registerSeats(seats); const b = registerDineTables(dine);
+    return () => { a(); b(); };
+  }, []);
   return <>{walkInShops.map((s) => <OpenShop key={s.id} s={s} />)}</>;
 }

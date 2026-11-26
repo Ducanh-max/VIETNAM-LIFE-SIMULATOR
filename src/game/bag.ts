@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import * as THREE from 'three';
 import { type Point } from './geo';
-import { shopById, type ShopId, type ShopItem } from './shops';
+import { shopById, shopKind, type ShopId, type ShopItem } from './shops';
 import { formatVnd, game, player } from './state';
 
 /*
@@ -56,7 +56,7 @@ export function putAway() {
   bagStore.set({ held: null, page: 0 });
 }
 /** Seconds to finish a dish or a drink. */
-export const eatSeconds = (h: Held) => (h.kind === 'drink' ? 6 : h.shop === 'pho' || h.shop === 'buncha' ? 12 : 9);
+export const eatSeconds = (h: Held) => (h.kind === 'drink' ? 6 : shopKind(h.shop) === 'pho' || h.shop === 'buncha' ? 12 : 9);
 /** Advance eating / drinking; applies the hunger and thirst when finished. */
 export function stepHeld(dt: number) {
   const h = st.held; if (!h || h.kind === 'book') return;

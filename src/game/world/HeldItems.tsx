@@ -2,7 +2,7 @@ import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { bagStore } from '../bag';
-import { shopById, type ShopId } from '../shops';
+import { shopById, type ShopId, type ShopKind } from '../shops';
 import type { MenuId } from '../state';
 import { Bottle } from './food';
 
@@ -68,9 +68,9 @@ function BanhMi({ id }: { id: string }) {
   </group>;
 }
 
-function Bowl({ shop, id }: { shop: ShopId; id: string }) {
+export function Bowl({ shop, id, progress }: { shop: ShopKind; id: string; progress?: () => number }) {
   const m = M(); const level = useRef<THREE.Group>(null);
-  useFrame(() => { const h = bagStore.get().held; if (level.current) { const p = h?.progress ?? 0; level.current.position.y = 0.045 - p * 0.03; level.current.scale.setScalar(1 - p * 0.25); } });
+  useFrame(() => { const h = bagStore.get().held; if (level.current) { const p = progress ? progress() : h?.progress ?? 0; level.current.position.y = 0.045 - p * 0.03; level.current.scale.setScalar(1 - p * 0.25); } });
   const r = 0.07;
   return <group>
     <mesh position={[0, 0.03, 0]} material={m.bowl} castShadow><cylinderGeometry args={[r, r * 0.55, 0.06, 20, 1, true]} /></mesh>
@@ -97,9 +97,10 @@ function Glass({ liquid, ice = true, level = 1 }: { liquid: THREE.Material; ice?
 }
 
 /** The model for a held item (from the shop data). */
-export function HeldModel({ shop, item, open = false }: { shop: ShopId; item: string; open?: boolean }) {
+export function HeldModel({ shop: id, item, open = false }: { shop: ShopId; item: string; open?: boolean }) {
   const m = M();
-  const it = shopById(shop).items.find((x) => x.id === item);
+  const shop: ShopKind = shopById(id).kind;
+  const it = shopById(id).items.find((x) => x.id === item);
   if (!it) return null;
   if (it.book) return <Book id={item} title={it.name} open={open} />;
   if (shop === 'banhmi') return item === 'suadau'

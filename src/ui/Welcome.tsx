@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DevicePicker } from './MobileControls';
 import { makeCode, MAX_PLAYERS } from '../game/net';
 
 /*
@@ -72,6 +73,7 @@ export function Welcome({ playerName, invite, onRename, onStart }: {
         <button onClick={() => setStage('friends')}><span>👥</span><b>Chơi với bạn bè</b><small>Tạo phòng riêng, gửi link mời, tối đa {MAX_PLAYERS} người</small></button>
         <button onClick={() => onStart(null)}><span>🎮</span><b>Chơi offline</b><small>Vào game ngay, chơi một mình</small></button>
       </div>
+      <DevicePicker />
       <button className="welcome-link" onClick={() => setStage('slides')}>← Xem lại giới thiệu</button>
     </div>}
 

@@ -13,6 +13,8 @@ import { Lotte } from './world/Lotte';
 import { Landmarks } from './world/Landmarks';
 import { FoodShipper } from './world/FoodShipper';
 import { Seats } from './world/Seats';
+import { DineWorld } from './world/Dine';
+import { StreetStalls } from './world/StreetStalls';
 import { Multiplayer } from './world/Multiplayer';
 import { Rental } from './world/Rental';
 import { Pedestrians } from './world/Pedestrians';
@@ -113,6 +115,8 @@ export function World({ time, quality, paused, freeCamera, onFps, onPosition }: 
     <Landmarks />
     <FoodShipper paused={paused} />
     <Seats paused={paused} />
+    <DineWorld paused={paused} />
+    <StreetStalls />
     <Multiplayer />
     <Rental />
     <DriverJob />

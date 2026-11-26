@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { formatVnd, useGame } from '../game/state';
+import { placeDine } from '../game/world/Dine';
 import { basketCount, basketTotal, buyAtCounter, cancelFood, cookSeconds, FOOD_SPEED, placeFoodOrder, quoteDelivery, SHOPS, shopById, shopStore, useShops, type Basket, type Shop, type ShopId } from '../game/shops';
 
 function ItemList({ shop, basket, setBasket }: { shop: Shop; basket: Basket; setBasket: (b: Basket) => void }) {
@@ -24,13 +25,14 @@ function ItemList({ shop, basket, setBasket }: { shop: Shop; basket: Basket; set
 /** Buying at the counter of one of the shops next to Bún chả Đức Anh. */
 export function ShopCounterPanel() {
   const id = useShops((s) => s.counter);
+  const dine = useShops((s) => s.dine);
   const money = useGame((s) => s.money);
   const [basket, setBasket] = useState<Basket>({});
   useEffect(() => { setBasket({}); }, [id]);
   if (!id) return null;
   const shop = shopById(id);
   const total = basketTotal(shop, basket);
-  const close = () => shopStore.set({ counter: null });
+  const close = () => shopStore.set({ counter: null, dine: false });
   return <div className="modal-scrim" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) close(); }}>
     <section className="modal-card menu-card" role="dialog" aria-modal="true" aria-label={shop.name}>
       <button className="modal-close" aria-label="Đóng" onClick={close}>✕</button>
@@ -39,14 +41,18 @@ export function ShopCounterPanel() {
       <p>{shop.seller} ({shop.role.toLowerCase()}) chào bạn. {shop.id === 'books' ? 'Sách mua xong cất vào balo; lấy ra rồi ngồi ghế đá bên hồ mà đọc.' : 'Ăn luôn tại quán, hoặc mang về cất vào balo để ăn lúc khác.'}</p>
       <ItemList shop={shop} basket={basket} setBasket={setBasket} />
       <div className="menu-total"><span>Tổng cộng <small>(Ví: {formatVnd(money)})</small></span><strong>{formatVnd(total)}</strong></div>
-      <div className="shop-buttons">
+      {dine ? <div className="shop-buttons">
+        <button className="primary-button modal-primary" disabled={!basketCount(basket) || total > money} onClick={() => placeDine(id, basket)}>
+          {total > money ? 'Không đủ tiền' : `Gọi ra bàn · ${formatVnd(total)}`}
+        </button>
+      </div> : <div className="shop-buttons">
         {shop.id !== 'books' && <button className="primary-button modal-primary" disabled={!basketCount(basket) || total > money} onClick={() => buyAtCounter(id, basket, true)}>
           {total > money ? 'Không đủ tiền' : `Ăn luôn · ${formatVnd(total)}`}
         </button>}
         <button className={`${shop.id === 'books' ? 'primary-button modal-primary' : 'text-button'}`} disabled={!basketCount(basket) || total > money} onClick={() => buyAtCounter(id, basket, false)}>
           {total > money && shop.id === 'books' ? 'Không đủ tiền' : shop.id === 'books' ? `Mua, cất vào balo · ${formatVnd(total)}` : 'Mang về (cất vào balo)'}
         </button>
-      </div>
+      </div>}
     </section>
   </div>;
 }

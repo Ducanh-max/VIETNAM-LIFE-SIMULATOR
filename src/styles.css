@@ -387,3 +387,40 @@
 .reader button { border: 1px solid #d8c8a4; border-radius: 10px; padding: 6px 12px; background: #fff; cursor: pointer; font: 600 12px "Be Vietnam Pro", Arial, sans-serif; }
 .reader button:disabled { opacity: .4; cursor: default; } .reader small { color: #9a8a6a; font: 11px "Be Vietnam Pro", Arial, sans-serif; }
 .shop-buttons { display: grid; gap: 6px; } .shop-buttons .text-button { color: #f2d9a6; }
+
+/* playing on a phone: touch controls and a compact HUD (body.mobile, see ui/device.ts) */
+.touch-ui { position: fixed; inset: 0; pointer-events: none; z-index: 14; }
+.touch-stick { pointer-events: auto; position: absolute; left: 22px; bottom: 26px; width: 130px; height: 130px; border-radius: 50%; background: rgba(16, 38, 34, .35); border: 2px solid rgba(230, 189, 131, .55); touch-action: none; display: grid; place-items: center; }
+.touch-knob { width: 56px; height: 56px; border-radius: 50%; background: rgba(230, 189, 131, .85); box-shadow: 0 4px 12px rgba(0,0,0,.35); transition: transform .04s linear; }
+.touch-buttons { pointer-events: auto; position: absolute; right: 14px; bottom: 210px; display: grid; grid-template-columns: repeat(2, 64px); gap: 10px; touch-action: none; }
+.touch-btn { width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(230, 189, 131, .6); background: rgba(16, 38, 34, .72); color: #fff; font: 800 20px/1 "Be Vietnam Pro", Arial, sans-serif; display: grid; place-items: center; align-content: center; gap: 2px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.touch-btn small { font: 600 9px "Be Vietnam Pro", Arial, sans-serif; color: #e6bd83; }
+.touch-btn.main { grid-column: span 2; width: 100%; border-radius: 32px; background: rgba(31, 107, 82, .85); }
+.touch-btn.on { background: rgba(232, 84, 47, .85); }
+.device-picker { display: grid; gap: 6px; margin: 14px 0 6px; text-align: left; }
+.device-picker > span { font: 700 11px "Be Vietnam Pro", Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #8ea19b; }
+.device-picker .segmented { display: flex; gap: 6px; } .device-picker .segmented button { flex: 1; padding: 10px; border-radius: 12px; border: 1px solid #cfc3a8; background: #fff; cursor: pointer; font: 700 13px "Be Vietnam Pro", Arial, sans-serif; color: #223; }
+.device-picker .segmented button.selected { background: #1f6b52; color: #fff; border-color: #1f6b52; }
+.device-picker small { color: #8ea19b; font-size: 11px; } .device-picker.compact { margin: 0; } .device-picker.compact > span { display: none; }
+body.mobile canvas { touch-action: none; }
+body.mobile .game-bottom, body.mobile .capture-tip { display: none !important; }
+body.mobile .minimap { transform: scale(.72); transform-origin: bottom right; }
+body.mobile .needs-hud { transform: scale(.78); transform-origin: top right; }
+body.mobile .area-tag { transform: scale(.75); transform-origin: top left; }
+body.mobile .bag-button { top: auto; bottom: 360px; right: 14px; width: 50px; height: 50px; }
+body.mobile .bag-panel { right: 8px; left: 8px; width: auto; top: 70px; max-height: 70vh; }
+body.mobile .reader { left: 8px; right: 8px; width: auto; top: 70px; font-size: 14px; }
+
+body.mobile .modal-card { max-height: 88vh; overflow: auto; }
+@media (max-width: 760px) { body.mobile .touch-buttons { bottom: 190px; } body.mobile .modal-card { width: 94vw; padding: 18px; } }
+body.mobile .touch-buttons { right: 12px; bottom: 170px; grid-template-columns: repeat(3, 56px); gap: 8px; }
+body.mobile .touch-btn { width: 56px; height: 56px; font-size: 18px; }
+body.mobile .touch-btn.main { grid-column: span 3; height: 52px; }
+body.mobile .bag-button { top: 132px; bottom: auto; left: 14px; right: auto; }
+@media (orientation: landscape) and (max-height: 560px) {
+  body.mobile .touch-buttons { right: 150px; bottom: 12px; }
+  body.mobile .touch-stick { width: 116px; height: 116px; bottom: 16px; }
+  body.mobile .bag-button { top: auto; bottom: 20px; left: 150px; }
+}
+@media (orientation: portrait) { body.mobile .area-tag { display: none; } body.mobile .needs-hud { top: 64px; bottom: auto; right: 8px; } body.mobile .bag-button { top: 64px; left: 12px; } }
+@media (orientation: landscape) and (max-height: 560px) { body.mobile .phone-clock { display: none; } body.mobile .phone-home, body.mobile .phone-app { overflow-y: auto; } }

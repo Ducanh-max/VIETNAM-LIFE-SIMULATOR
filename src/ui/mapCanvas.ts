@@ -1,5 +1,7 @@
 import { shore, templeIsland, turtleIsland, type Point } from '../game/geo';
 import { nav } from '../game/navigation';
+import { places } from '../game/ride';
+import { SHOPS, shopFront } from '../game/shops';
 import { buildings, lakes, lawns, parks, RESTAURANT, roads } from '../game/osm';
 import { player, view } from '../game/state';
 
@@ -69,6 +71,16 @@ export function mapBase() {
     ctx.fillStyle = '#4a4036'; ctx.fillText(label, 0, 0);
     ctx.restore();
   }
+  // landmarks and eateries: a pin and a label (drawn last so they sit over the streets)
+  const pin = (x: number, z: number, label: string, color: string) => {
+    const px = (x - MINX) * S, py = (z - MINZ) * S;
+    ctx.fillStyle = color; ctx.beginPath(); ctx.arc(px, py, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.font = '700 11px "Be Vietnam Pro", Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.strokeText(label, px + 7, py); ctx.fillStyle = '#3a1f12'; ctx.fillText(label, px + 7, py);
+  };
+  for (const p of places()) pin(p.x, p.z, p.name.replace(/ \(.*\)$/, ''), '#d0342c');
+  for (const sh of SHOPS) if (sh.at) { const [x, z] = shopFront(sh); pin(x, z, sh.name, '#e8862f'); }
   base = c;
   return c;
 }

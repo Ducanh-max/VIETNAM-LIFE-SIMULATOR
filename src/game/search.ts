@@ -1,6 +1,9 @@
 import { bridgeEnds, streetRing, turtleIsland, type Point } from './geo';
 import { LOTTE, lotteDoor } from './lotte';
-import { buildings, deliverySpots, RESTAURANT, restaurantToWorld, roads } from './osm';
+import osmData from '../data/hoanKiemOsm.json';
+import { baDinhFlagBase, buildings, deliverySpots, lakes, parks, RESTAURANT, restaurantToWorld, roads } from './osm';
+import { places } from './ride';
+import { SHOPS, shopFront } from './shops';
 import { RENTAL } from './rental';
 
 /*
@@ -32,7 +35,24 @@ function build() {
   const tc: Point = [turtleIsland.reduce((s, p) => s + p[0], 0) / turtleIsland.length, turtleIsland.reduce((s, p) => s + p[1], 0) / turtleIsland.length];
   const shoreView = streetRing(4).reduce((b, p) => (Math.hypot(p[0] - tc[0], p[1] - tc[1]) < Math.hypot(b[0] - tc[0], b[1] - tc[1]) ? p : b));
   list.push({ name: 'Tháp Rùa', note: 'Ngắm từ bờ hồ gần nhất', x: shoreView[0], z: shoreView[1] });
+  // landmarks of Ba Đình and Văn Miếu, Công viên Thủ Lệ, the eateries (the same places Đen SM drives to)
+  if (baDinhFlagBase) { const [x, z] = curbNear(baDinhFlagBase[0], baDinhFlagBase[1]); list.push({ name: 'Quảng trường Ba Đình', note: 'Trước Lăng Bác · Đường Hùng Vương', x, z }); }
+  for (const p of places()) list.push({ name: p.name, note: p.note, x: p.x, z: p.z });
+  for (const s of SHOPS) { if (s.id === 'buncha') continue; const [x, z] = shopFront(s); list.push({ name: s.name, note: `${s.tagline} · ${s.street}`, x, z }); }
   const seen = new Set(list.map((h) => fold(h.name)));
+  // named parks, lakes, temples, schools, museums… from OSM
+  const centre = (r: Point[]): Point => [r.reduce((a, p) => a + p[0], 0) / r.length, r.reduce((a, p) => a + p[1], 0) / r.length];
+  const areas: { n?: string; ring: Point[]; note: string }[] = [
+    ...parks.map((p) => ({ n: p.name, ring: p.ring, note: 'Công viên · vườn hoa' })),
+    ...lakes.map((l) => ({ n: l.name, ring: l.ring, note: 'Hồ nước' })),
+    ...(((osmData as { compounds?: { p: number[][]; n?: string; k?: string }[] }).compounds) ?? []).map((c) => ({ n: c.n, ring: c.p as Point[], note: c.k === 'religious' ? 'Đền, chùa, nhà thờ' : c.k === 'school' || c.k === 'education' ? 'Trường học' : c.k === 'hospital' ? 'Bệnh viện' : 'Địa điểm' })),
+  ];
+  for (const a of areas) {
+    if (!a.n || seen.has(fold(a.n))) continue;
+    seen.add(fold(a.n));
+    const c = centre(a.ring); const [x, z] = curbNear(c[0], c[1]);
+    list.push({ name: a.n, note: a.note, x, z });
+  }
   for (const b of buildings) {
     if (!b.name || seen.has(fold(b.name))) continue;
     seen.add(fold(b.name));
