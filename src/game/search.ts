@@ -2,7 +2,7 @@ import { bridgeEnds, streetRing, turtleIsland, type Point } from './geo';
 import { LOTTE, lotteDoor } from './lotte';
 import osmData from '../data/hoanKiemOsm.json';
 import { baDinhFlagBase, buildings, deliverySpots, lakes, parks, RESTAURANT, restaurantToWorld, roads } from './osm';
-import { places } from './ride';
+import { places, roadsideNear } from './ride';
 import { SHOPS, shopFront } from './shops';
 import { RENTAL } from './rental';
 
@@ -36,7 +36,7 @@ function build() {
   const shoreView = streetRing(4).reduce((b, p) => (Math.hypot(p[0] - tc[0], p[1] - tc[1]) < Math.hypot(b[0] - tc[0], b[1] - tc[1]) ? p : b));
   list.push({ name: 'Tháp Rùa', note: 'Ngắm từ bờ hồ gần nhất', x: shoreView[0], z: shoreView[1] });
   // landmarks of Ba Đình and Văn Miếu, Công viên Thủ Lệ, the eateries (the same places Đen SM drives to)
-  if (baDinhFlagBase) { const [x, z] = curbNear(baDinhFlagBase[0], baDinhFlagBase[1]); list.push({ name: 'Quảng trường Ba Đình', note: 'Trước Lăng Bác · Đường Hùng Vương', x, z }); }
+  if (baDinhFlagBase) { const [x, z] = roadsideNear(baDinhFlagBase[0], baDinhFlagBase[1]); list.push({ name: 'Quảng trường Ba Đình', note: 'Trước Lăng Bác · Đường Hùng Vương', x, z }); }
   for (const p of places()) list.push({ name: p.name, note: p.note, x: p.x, z: p.z });
   for (const s of SHOPS) { if (s.id === 'buncha') continue; const [x, z] = shopFront(s); list.push({ name: s.name, note: `${s.tagline} · ${s.street}`, x, z }); }
   const seen = new Set(list.map((h) => fold(h.name)));

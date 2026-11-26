@@ -294,6 +294,24 @@ export function inWorld([x, z]: Point) {
 const templeWalk = offsetRing(templeIsland, -0.6);
 const bridgeShore = offsetRing(shore, 1.5);
 
+/** Inside one of the hand-placed obstacles (landmarks, the restaurant, stalls…), ignoring the footprint blockers. */
+export function inRegisteredObstacle([px, pz]: Point) {
+  for (const o of obstacles) {
+    const dx = px - o.x, dz = pz - o.z, c = Math.cos(o.angle), s = Math.sin(o.angle);
+    if (Math.abs(dx * c - dz * s) < o.hx && Math.abs(dx * s + dz * c) < o.hz) return true;
+  }
+  return false;
+}
+/** The nearest point the player can stand on (rings of 0,5 m out to `max` metres), or null. */
+export function nearestWalkable(p: Point, max = 40): Point | null {
+  if (canWalk(p)) return p;
+  for (let r = 0.5; r <= max; r += 0.5) {
+    const n = Math.max(8, Math.round((2 * Math.PI * r) / 0.5));
+    for (let k = 0; k < n; k++) { const a = (k / n) * Math.PI * 2; const q: Point = [p[0] + Math.cos(a) * r, p[1] + Math.sin(a) * r]; if (canWalk(q)) return q; }
+  }
+  return null;
+}
+
 export function canWalk(point: Point): boolean {
   if (!inWorld(point)) return false;
   if (hitsObstacle(point)) return false;

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { bridgeEnds, canWalk, groundHeight, type Point } from './geo';
+import { bridgeEnds, canWalk, groundHeight, nearestWalkable, type Point } from './geo';
 import { findRoute, routeLength } from './navigation';
 import { buildings, deliverySpots, landmarkFootprint, parks, RESTAURANT, restaurantToWorld, roadAt, roads, type Road } from './osm';
 import { LOTTE, lotteDoor } from './lotte';
@@ -22,6 +22,32 @@ export const VEHICLES: Record<Vehicle, { name: string; note: string; speed: numb
 export const MIN_TRIP = 1000;
 
 const DRIVERS = ['Anh Minh', 'Anh Quân', 'Chị Hạnh', 'Anh Toàn', 'Anh Sơn', 'Chị Vy'];
+
+/**
+ * A stop for a landmark: the pavement beside the nearest proper street (not a service drive or a footway), on the
+ * landmark's side, where the player can stand. Lăng Bác, Chùa Một Cột, Văn Miếu… stand in their own grounds, so
+ * their stop is on Hùng Vương, Chùa Một Cột, Quốc Tử Giám… rather than inside.
+ */
+const STREETS = new Set(['primary', 'secondary', 'tertiary', 'residential', 'unclassified', 'trunk', 'living_street']);
+export function roadsideNear(x: number, z: number): Point {
+  let best: { q: Point; n: Point; half: number; d: number } | null = null;
+  for (const r of roads) {
+    if (!STREETS.has(r.kind)) continue;
+    for (let i = 0; i < r.points.length - 1; i++) {
+      const a = r.points[i], b = r.points[i + 1]; const dx = b[0] - a[0], dz = b[1] - a[1]; const l2 = dx * dx + dz * dz || 1;
+      const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / l2)); const q: Point = [a[0] + dx * t, a[1] + dz * t];
+      const d = Math.hypot(q[0] - x, q[1] - z);
+      if (!best || d < best.d) { const l = Math.sqrt(l2); best = { q, n: [-dz / l, dx / l], half: r.width / 2, d }; }
+    }
+  }
+  if (!best) return [x, z];
+  const toward = Math.sign((x - best.q[0]) * best.n[0] + (z - best.q[1]) * best.n[1]) || 1;
+  for (const side of [toward, -toward]) for (const off of [1.4, 2.2, 3.2]) {
+    const p: Point = [best.q[0] + best.n[0] * (best.half + off) * side, best.q[1] + best.n[1] * (best.half + off) * side];
+    if (canWalk(p)) return p;
+  }
+  return nearestWalkable(best.q, 12) ?? best.q;
+}
 
 /** Pickup/drop-off point near a spot: the nearest doorstep on a named street, else the spot itself. */
 function curbNear(x: number, z: number): Point {
@@ -47,7 +73,7 @@ export function places(): Place[] {
   // hand-modelled landmarks of Ba Đình and Văn Miếu (their OSM footprints are drawn by world/Landmarks.tsx)
   const byFootprint = (name: string, note: string, label = name) => {
     const fp = landmarkFootprint(name); if (!fp) return;
-    const [x, z] = curbNear(fp.reduce((s, p) => s + p[0], 0) / fp.length, fp.reduce((s, p) => s + p[1], 0) / fp.length); list.push({ name: label, note, x, z });
+    const [x, z] = roadsideNear(fp.reduce((s, p) => s + p[0], 0) / fp.length, fp.reduce((s, p) => s + p[1], 0) / fp.length); list.push({ name: label, note, x, z });
   };
   byFootprint('Lăng Chủ tịch Hồ Chí Minh', 'Quảng trường Ba Đình · Đường Hùng Vương', 'Lăng Chủ tịch Hồ Chí Minh (Lăng Bác)');
   byFootprint('Chùa Một Cột', 'Phố Chùa Một Cột, Ba Đình');
@@ -158,11 +184,14 @@ export const rideActions = {
     if (!r) return;
     taxi.passenger = false;
     const h = taxi.heading;
+    let out = false;
     for (const side of [1, -1]) {
       const off = taxi.vehicle === 'car' ? 1.5 : 0.9;
       const p: Point = [taxi.position.x + Math.cos(h) * off * side, taxi.position.z - Math.sin(h) * off * side];
-      if (canWalk(p)) { player.teleport?.(p[0], p[1]); break; }
+      if (canWalk(p)) { player.teleport?.(p[0], p[1]); out = true; break; }
     }
+    // never leave the player boxed in: step out to the nearest spot they can walk from
+    if (!out) { const p = nearestWalkable([taxi.position.x, taxi.position.z]); if (p) player.teleport?.(p[0], p[1]); }
     addMoney(-r.fare, `Đen SM · ${r.dest.name}`);
     game.set({ ride: null });
     game.toast(`Đã tới ${r.dest.name}. Thanh toán ${formatVnd(r.fare)} qua ví. Cảm ơn bạn đã đi Đen SM!`);

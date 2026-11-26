@@ -1,4 +1,4 @@
-import { distanceToShore, inWorld, type Point } from './geo';
+import { distanceToShore, inRegisteredObstacle, inWorld, type Point } from './geo';
 import { pickupPoint } from './job';
 import { inLake, insideBuilding, roadClearance } from './osm';
 import { taxi } from './ride';
@@ -21,6 +21,7 @@ function buildCosts() {
     const p: Point = [NAV.minX + (i + 0.5) * NAV.cell, NAV.minZ + (j + 0.5) * NAV.cell];
     if (!inWorld(p)) continue;
     if (distanceToShore(p) < 0.5) continue; // lake
+    if (inRegisteredObstacle(p)) continue; // landmarks, the restaurant, stalls: drivers and walkers go round
     const road = roadClearance(p);
     if (road < 0.5) { c[j * N + i] = 1; continue; }
     if (insideBuilding(p, 0) || inLake(p)) continue;

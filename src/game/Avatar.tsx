@@ -322,6 +322,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
             handL = bowlB.clone().add(V(0.05, 0.05, -0.03)).lerp(mouthB.clone().add(V(0.04, -0.05, 0.07)), b);
             headPitch = 0.28 * (1 - Math.max(a, b));
             if (a > 0.8) mouthState = 'eating';
+            if (a > 0.05 && a < 0.97) { showMorsel = true; if (morselKind !== 'noodle') setMorselKind('noodle'); } // noodles hanging from the chopsticks
           }
         }
       }

@@ -36,8 +36,9 @@ export const SHOPS: Shop[] = [
     { id: 'suadau', name: 'Sữa đậu nành', note: 'Chai 300ml, ướp lạnh', price: 10_000, hunger: 6, thirst: 25 },
   ] },
   { id: 'pho', kind: 'pho', street: 'Phố Đinh Tiên Hoàng', name: 'Phở bò Gia truyền', sign: 'PHỞ BÒ', tagline: 'Nước dùng ninh xương 12 tiếng', color: '#a3251c', seller: 'Bác Hùng', role: 'Nấu phở', x: HW + 2.1, w: 4.2, walkIn: true, items: [
-    { id: 'tai', name: 'Phở bò tái', note: 'Thịt bò tái, hành lá, nước dùng trong', price: 40_000, hunger: 62, thirst: 12 },
-    { id: 'chin', name: 'Phở bò chín', note: 'Thịt bò chín thái mỏng', price: 40_000, hunger: 62, thirst: 12 },
+    { id: 'chin', name: 'Phở bò', note: 'Thịt bò chín thái mỏng, hành lá, nước dùng trong', price: 40_000, hunger: 62, thirst: 12 },
+    { id: 'ga', name: 'Phở gà', note: 'Thịt gà ta xé, lá chanh thái chỉ', price: 40_000, hunger: 60, thirst: 12 },
+    { id: 'tai', name: 'Phở tái', note: 'Thịt bò tái chần nước dùng sôi', price: 45_000, hunger: 64, thirst: 12 },
     { id: 'dacbiet', name: 'Phở đặc biệt', note: 'Tái, chín, nạm, gầu, trứng chần', price: 55_000, hunger: 80, thirst: 14 },
     { id: 'quay', name: 'Quẩy', note: 'Hai chiếc, chấm nước phở', price: 5_000, hunger: 8, thirst: 0 },
     { id: 'tra', name: 'Trà đá', note: 'Cốc to', price: 5_000, hunger: 0, thirst: 28 },

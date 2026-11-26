@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber';
-import { groundHeight } from '../geo';
+import { canWalk, groundHeight, nearestWalkable } from '../geo';
 import { bagStore, nearestSeat, seatState, sitOn, standUp, stepHeld } from '../bag';
 import { bike, game, player } from '../state';
 import { shopStore } from '../shops';
@@ -9,9 +9,15 @@ import { dineStore, tableOfSeat } from './Dine';
  * Sitting down on any bench or stool (E near it, E again to get up), and the clock for eating and drinking what
  * you took out of the balo. Reading starts by itself when you sit with a book in your hands (ui/Backpack.tsx).
  */
+const stuck = { t: 0 };
 export function Seats({ paused }: { paused: boolean }) {
   useFrame((_, delta) => {
     if (paused) return;
+    // safety net: standing somewhere nothing lets you walk out of (dropped inside a building or a landmark) → step out
+    if (!player.seat && !bike.riding && !game.get().ride && !canWalk([player.position.x, player.position.z])) {
+      stuck.t += delta;
+      if (stuck.t > 1.2) { stuck.t = 0; const p = nearestWalkable([player.position.x, player.position.z]); if (p) { player.teleport?.(p[0], p[1]); game.toast('Bạn bị kẹt, đã được đưa ra chỗ đi lại được.'); } }
+    } else stuck.t = 0;
     stepHeld(Math.min(delta, 0.05));
     const s = game.get();
     if (seatState.mine && !player.seat) seatState.mine = null; // someone else stood the player up

@@ -1,8 +1,8 @@
 import { useFrame } from '@react-three/fiber';
-import { useMemo, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import * as THREE from 'three';
 import { GROUND_HEIGHT, type Point } from '../geo';
-import { seatState, type Seat } from '../bag';
+import { seatState, standUp, type Seat } from '../bag';
 import { basketCount, basketTotal, shopById, shopStore, type Basket, type ShopId } from '../shops';
 import { addMoney, formatVnd, game, player } from '../state';
 import { Bowl, HeldModel } from './HeldItems';
@@ -50,41 +50,59 @@ export function placeDine(id: ShopId, basket: Basket) {
   game.toast(`Đã gọi món · ${formatVnd(total)}. ${shop.seller} đang chần bánh phở, chan nước dùng…`);
 }
 
-/** Bottles, jars and the chopstick holder in the middle of a phở table (local frame: table top at y = 0). */
+/**
+ * The things on every phở table (local frame: table top at y = 0): a wooden caddy with a bundle of bamboo chopsticks,
+ * a pepper shaker, tương ớt in a red squeeze bottle and nước mắm / xì dầu in a dark bottle; a wooden tissue box;
+ * a plate of fresh herbs (húng quế, ngò gai) with lime wedges and bean sprouts; a little dish of fresh red chilli.
+ */
+let condMats: Record<string, THREE.Material> | null = null;
 export function Condiments() {
-  const m = useMemo(() => ({
-    chili: new THREE.MeshStandardMaterial({ color: '#c8231a', roughness: 0.35 }),
-    hoisin: new THREE.MeshStandardMaterial({ color: '#3a1d12', roughness: 0.35 }),
-    sate: new THREE.MeshStandardMaterial({ color: '#d8501c', roughness: 0.3, transparent: true, opacity: 0.9 }),
-    lid: new THREE.MeshStandardMaterial({ color: '#f2efe6', roughness: 0.4 }),
-    plate: new THREE.MeshStandardMaterial({ color: '#f4f1ea', roughness: 0.4 }),
-    lime: new THREE.MeshStandardMaterial({ color: '#5fae3a', roughness: 0.5 }),
-    limeIn: new THREE.MeshStandardMaterial({ color: '#d6ef9a', roughness: 0.5 }),
+  const m = (condMats ??= {
+    wood: new THREE.MeshStandardMaterial({ color: '#9a6a3e', roughness: 0.7 }),
     bamboo: new THREE.MeshStandardMaterial({ color: '#d9bf86', roughness: 0.6 }),
-    steel: new THREE.MeshStandardMaterial({ color: '#cfd3d6', roughness: 0.3, metalness: 0.6 }),
-    tissue: new THREE.MeshStandardMaterial({ color: '#f4f4f4', roughness: 0.9 }),
-    box: new THREE.MeshStandardMaterial({ color: '#e45b7a', roughness: 0.6 }),
-  }), []);
+    steel: new THREE.MeshStandardMaterial({ color: '#cfd3d6', roughness: 0.25, metalness: 0.7 }),
+    chili: new THREE.MeshStandardMaterial({ color: '#d42a1c', roughness: 0.3 }),
+    cap: new THREE.MeshStandardMaterial({ color: '#f29a1e', roughness: 0.4 }),
+    soy: new THREE.MeshStandardMaterial({ color: '#2a160c', roughness: 0.15, transparent: true, opacity: 0.92 }),
+    tissue: new THREE.MeshStandardMaterial({ color: '#f7f7f4', roughness: 0.9 }),
+    plate: new THREE.MeshStandardMaterial({ color: '#f4f2ec', roughness: 0.35 }),
+    herb: new THREE.MeshStandardMaterial({ color: '#3f9a3a', roughness: 0.6, side: THREE.DoubleSide }),
+    herb2: new THREE.MeshStandardMaterial({ color: '#5cb84a', roughness: 0.6, side: THREE.DoubleSide }),
+    lime: new THREE.MeshStandardMaterial({ color: '#7cc142', roughness: 0.5 }),
+    limeIn: new THREE.MeshStandardMaterial({ color: '#e2f2a8', roughness: 0.5 }),
+    sprout: new THREE.MeshStandardMaterial({ color: '#f4f0dc', roughness: 0.6 }),
+    redChili: new THREE.MeshStandardMaterial({ color: '#e0261a', roughness: 0.4 }),
+  });
   return <group>
-    {/* tương ớt and tương đen in squeeze bottles */}
-    <mesh position={[-0.12, 0.07, 0]} material={m.chili} castShadow><cylinderGeometry args={[0.022, 0.025, 0.13, 12]} /></mesh>
-    <mesh position={[-0.12, 0.145, 0]} material={m.chili}><coneGeometry args={[0.012, 0.03, 8]} /></mesh>
-    <mesh position={[-0.07, 0.07, 0.03]} material={m.hoisin} castShadow><cylinderGeometry args={[0.022, 0.025, 0.13, 12]} /></mesh>
-    <mesh position={[-0.07, 0.145, 0.03]} material={m.hoisin}><coneGeometry args={[0.012, 0.03, 8]} /></mesh>
-    {/* sa tế in a little glass jar */}
-    <mesh position={[-0.01, 0.03, 0.02]} material={m.sate}><cylinderGeometry args={[0.024, 0.024, 0.06, 12]} /></mesh>
-    <mesh position={[-0.01, 0.064, 0.02]} material={m.lid}><cylinderGeometry args={[0.026, 0.026, 0.01, 12]} /></mesh>
-    {/* a saucer of lime wedges and fresh chilli */}
-    <mesh position={[0.06, 0.006, 0.02]} material={m.plate}><cylinderGeometry args={[0.05, 0.045, 0.012, 16]} /></mesh>
-    {[0, 1, 2].map((i) => <mesh key={i} position={[0.05 + i * 0.016, 0.022, 0.01 + (i % 2) * 0.02]} rotation={[0, i, Math.PI / 2]} material={i === 1 ? m.limeIn : m.lime}><sphereGeometry args={[0.016, 8, 6, 0, Math.PI]} /></mesh>)}
-    {/* the chopstick holder and the spoon cup */}
-    <mesh position={[0.12, 0.05, -0.03]} material={m.steel}><cylinderGeometry args={[0.025, 0.025, 0.1, 12, 1, true]} /></mesh>
-    {Array.from({ length: 10 }, (_, i) => <mesh key={`c${i}`} position={[0.12 + Math.cos(i * 2.4) * 0.012, 0.1, -0.03 + Math.sin(i * 2.4) * 0.012]} rotation={[Math.cos(i) * 0.08, 0, Math.sin(i) * 0.08]} material={m.bamboo}><cylinderGeometry args={[0.003, 0.003, 0.2, 5]} /></mesh>)}
-    <mesh position={[0.17, 0.035, 0.02]} material={m.steel}><cylinderGeometry args={[0.022, 0.02, 0.07, 12, 1, true]} /></mesh>
-    {[0, 1, 2].map((i) => <mesh key={`s${i}`} position={[0.17 + (i - 1) * 0.008, 0.07, 0.02]} rotation={[0.2 * (i - 1), 0, 0.15]} material={m.lid}><boxGeometry args={[0.012, 0.08, 0.006]} /></mesh>)}
-    {/* tissues */}
-    <mesh position={[0.02, 0.03, -0.07]} material={m.box}><boxGeometry args={[0.1, 0.06, 0.05]} /></mesh>
-    <mesh position={[0.02, 0.07, -0.07]} material={m.tissue}><boxGeometry args={[0.03, 0.03, 0.02]} /></mesh>
+    {/* the wooden caddy: chopstick cup, pepper, chilli sauce, fish sauce */}
+    <group position={[-0.1, 0, -0.12]}>
+      <mesh position={[0, 0.012, 0]} material={m.wood} castShadow><boxGeometry args={[0.2, 0.024, 0.09]} /></mesh>
+      <mesh position={[-0.065, 0.06, 0]} material={m.wood}><boxGeometry args={[0.055, 0.1, 0.055]} /></mesh>
+      {Array.from({ length: 14 }, (_, i) => <mesh key={i} position={[-0.065 + ((i % 4) - 1.5) * 0.008, 0.15, ((Math.floor(i / 4)) - 1.5) * 0.008]} rotation={[((i % 3) - 1) * 0.04, 0, ((i % 4) - 1.5) * 0.03]} material={m.bamboo}><cylinderGeometry args={[0.003, 0.0022, 0.2, 5]} /></mesh>)}
+      <mesh position={[-0.01, 0.05, 0.012]} material={m.steel}><cylinderGeometry args={[0.014, 0.016, 0.055, 12]} /></mesh>
+      <mesh position={[-0.01, 0.08, 0.012]} material={m.steel}><sphereGeometry args={[0.014, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2]} /></mesh>
+      <mesh position={[0.035, 0.07, 0]} material={m.chili} castShadow><cylinderGeometry args={[0.018, 0.02, 0.1, 12]} /></mesh>
+      <mesh position={[0.035, 0.135, 0]} material={m.cap}><coneGeometry args={[0.012, 0.035, 10]} /></mesh>
+      <mesh position={[0.075, 0.07, 0]} material={m.soy} castShadow><cylinderGeometry args={[0.017, 0.019, 0.1, 12]} /></mesh>
+      <mesh position={[0.075, 0.135, 0]} material={m.soy}><cylinderGeometry args={[0.006, 0.012, 0.035, 10]} /></mesh>
+    </group>
+    {/* wooden tissue box */}
+    <group position={[0.12, 0, -0.12]}>
+      <mesh position={[0, 0.035, 0]} material={m.wood} castShadow><boxGeometry args={[0.09, 0.07, 0.07]} /></mesh>
+      <mesh position={[0, 0.08, 0]} material={m.tissue} rotation={[0, 0.3, 0.2]}><boxGeometry args={[0.035, 0.03, 0.025]} /></mesh>
+    </group>
+    {/* the herb plate: húng, ngò gai, lime wedges, bean sprouts */}
+    <group position={[-0.06, 0, 0.06]}>
+      <mesh position={[0, 0.006, 0]} material={m.plate}><cylinderGeometry args={[0.075, 0.065, 0.012, 20]} /></mesh>
+      {Array.from({ length: 9 }, (_, i) => <mesh key={i} position={[Math.cos(i * 0.9) * 0.03, 0.022 + (i % 3) * 0.006, Math.sin(i * 0.9) * 0.025 - 0.012]} rotation={[-0.6 + (i % 2) * 0.3, i * 0.8, 0.2]} material={i % 2 ? m.herb : m.herb2}><circleGeometry args={[0.018, 6]} /></mesh>)}
+      {[0, 1, 2].map((i) => <group key={`l${i}`} position={[0.035 - i * 0.022, 0.022, 0.035]} rotation={[0, i * 0.7, Math.PI / 2]}><mesh material={m.lime}><sphereGeometry args={[0.014, 8, 6, 0, Math.PI]} /></mesh><mesh material={m.limeIn}><circleGeometry args={[0.0135, 8, 0, Math.PI]} /></mesh></group>)}
+      {Array.from({ length: 8 }, (_, i) => <mesh key={`s${i}`} position={[0.03 + Math.cos(i) * 0.012, 0.018, -0.03 + Math.sin(i * 1.7) * 0.012]} rotation={[Math.PI / 2, 0, i * 0.8]} material={m.sprout}><cylinderGeometry args={[0.0018, 0.0018, 0.03, 4]} /></mesh>)}
+    </group>
+    {/* fresh chilli in a little dish */}
+    <group position={[0.07, 0, 0.07]}>
+      <mesh position={[0, 0.008, 0]} material={m.plate}><cylinderGeometry args={[0.03, 0.022, 0.016, 14]} /></mesh>
+      {Array.from({ length: 6 }, (_, i) => <mesh key={i} position={[Math.cos(i) * 0.012, 0.018, Math.sin(i) * 0.012]} rotation={[Math.PI / 2, 0, 0]} material={m.redChili}><cylinderGeometry args={[0.006, 0.006, 0.003, 8]} /></mesh>)}
+    </group>
   </group>;
 }
 
@@ -117,12 +135,16 @@ export function DineWorld({ paused }: { paused: boolean }) {
     const cur = dineStore.get(); const dt = Math.min(delta, 0.05);
     if (!cur) { walk.current = null; return; }
     // leaving the seat ends the meal
-    if (seatState.mine !== cur.seat) { if (cur.stage !== 'done') game.toast('Bạn đã rời bàn.'); dineStore.set(null); return; }
+    if (seatState.mine !== cur.seat) {
+      if (cur.stage === 'cooking' || cur.stage === 'serving') { const shop = shopById(cur.shop); addMoney(basketTotal(shop, cur.basket), `Hoàn tiền · ${shop.name} (rời bàn trước khi có món)`); game.toast('Bạn đã rời bàn, quán hoàn lại tiền.'); }
+      else if (cur.stage !== 'done') game.toast('Bạn đã rời bàn.');
+      dineStore.set(null); return;
+    }
     if (paused) return;
     const w = waiter.current;
     if (cur.stage === 'cooking') {
       cur.t -= dt;
-      game.offer({ id: 'dine-cook', text: `${shopById(cur.shop).seller} đang làm phở cho bạn…`, key: null, priority: 7 });
+      game.offer({ id: 'dine-cook', text: `Đứng dậy (${shopById(cur.shop).seller} đang làm phở cho bạn…)`, key: 'E', priority: 7, run: () => standUp() });
       if (cur.t <= 0) {
         const c = cur.table.center; const h = cur.table.waiterHome; const dx = c[0] - h[0], dz = c[1] - h[1]; const l = Math.hypot(dx, dz) || 1;
         walk.current = { from: h, to: [c[0] - (dx / l) * 0.65, c[1] - (dz / l) * 0.65], s: 0, back: false };
@@ -137,8 +159,12 @@ export function DineWorld({ paused }: { paused: boolean }) {
         for (const it of shop.items) { const n = cur.basket[it.id] ?? 0; hunger += it.hunger * n; thirst += it.thirst * n; }
         game.set({ hunger: Math.min(100, hunger), thirst: Math.min(100, thirst) });
         dineStore.set({ ...cur, stage: 'done' });
-        game.toast('Húp cạn nước dùng! Phở ngon, ấm bụng. Bấm E để đứng dậy.');
-      } else game.offer({ id: 'dine-eating', text: cur.progress < 0.12 ? 'Vắt chanh vào bát phở…' : 'Đang ăn phở…', key: null, priority: 7 });
+        game.toast('Húp cạn nước dùng! Phở ngon, ấm bụng. Bấm E để đứng dậy, M để gọi thêm.');
+      } else game.offer({ id: 'dine-eating', text: cur.progress < 0.12 ? 'Đứng dậy (đang vắt chanh vào bát phở…)' : 'Đứng dậy (đang ăn phở…)', key: 'E', priority: 7, run: () => standUp() });
+    } else if (cur.stage === 'done') {
+      game.offer({ id: 'dine-done', text: 'Đứng dậy · M: Gọi thêm', key: 'E', priority: 8, run: () => standUp() });
+    } else if (cur.stage === 'serving') {
+      game.offer({ id: 'dine-serving', text: `Đứng dậy (${cur.table.waiter} đang bưng phở ra…)`, key: 'E', priority: 7, run: () => standUp() });
     }
     // the waiter carries the tray over and walks back
     const wk = walk.current;
@@ -159,6 +185,11 @@ export function DineWorld({ paused }: { paused: boolean }) {
       }
     }
   });
+  // M after the bowl is empty: order again at the same table
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { const x = dineStore.get(); if (e.code !== 'KeyM' || e.repeat || !x || x.stage !== 'done') return; if (document.pointerLockElement) document.exitPointerLock(); const id = x.shop; dineStore.set(null); shopStore.set({ counter: id, dine: true }); };
+    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const bowl = useMemo(() => (d ? bowlSpot(d) : null), [d]);
   if (!d) return null;
   const main = shopById(d.shop).items.find((it) => (d.basket[it.id] ?? 0) > 0 && it.hunger >= 40)?.id ?? 'tai';
@@ -170,10 +201,10 @@ export function DineWorld({ paused }: { paused: boolean }) {
     <group ref={waiter} position={[d.table.waiterHome[0], GROUND_HEIGHT, d.table.waiterHome[1]]}>
       <Person anim={anim} shirt="#ffffff" pants="#1d1d1f" apron="#a3251c" seed={41} />
       <NameTag name={d.table.waiter} role="Phục vụ" />
-      {carrying && <group position={[0, 0.78, 0.36]}><Tray><Bowl shop="pho" id={main} progress={() => 0} /></Tray></group>}
+      {carrying && <group position={[0, 0.78, 0.36]}><Tray><Bowl shop="pho" id={main} progress={() => 0} steam /></Tray></group>}
     </group>
     {onTable && bowl && <group position={bowl} rotation={[0, f, 0]}>
-      <Bowl shop="pho" id={main} progress={() => { const x = dineStore.get(); return x ? (x.stage === 'done' ? 1 : x.progress < 0.12 ? 0 : ease((x.progress - 0.12) / 0.88)) : 0; }} />
+      <Bowl shop="pho" id={main} steam={d.stage !== 'done'} progress={() => { const x = dineStore.get(); return x ? (x.stage === 'done' ? 1 : x.progress < 0.12 ? 0 : ease((x.progress - 0.12) / 0.88)) : 0; }} />
       {extras.map((it, i) => <group key={it.id} position={[0.16 * (i ? -1 : 1), 0, 0.02]}><HeldModel shop={d.shop} item={it.id} /></group>)}
     </group>}
   </group>;

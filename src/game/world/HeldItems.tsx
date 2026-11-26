@@ -17,7 +17,7 @@ function make() {
   const m = (color: string, extra: Partial<THREE.MeshStandardMaterialParameters> = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.6, ...extra });
   return {
     crust: m('#c9893f', { roughness: 0.75 }), crumb: m('#f2dfb6'), pate: m('#9a5a3c'), herb: m('#3f8f3a'), pickle: m('#e98a3a'), meat: m('#d98c8c'), egg: m('#f7d24a'),
-    bowl: m('#f4f1ea', { roughness: 0.35 }), rim: m('#2f68c4'), broth: m('#c8893a', { roughness: 0.15 }), noodle: m('#f6f1e0'), beef: m('#b8574a'), onion: m('#9fd36b'),
+    bowl: m('#f4f1ea', { roughness: 0.35 }), rim: m('#2f68c4'), broth: new THREE.MeshStandardMaterial({ color: '#d9a54a', roughness: 0.08, transparent: true, opacity: 0.88 }), noodle: m('#f6f1e0'), beef: m('#a86a58'), rare: m('#c98a7c'), chicken: m('#ead7a8'), onion: m('#7cc35a'),
     glass: new THREE.MeshStandardMaterial({ color: '#e8f4ff', roughness: 0.05, transparent: true, opacity: 0.35 }), coffee: m('#2b170d', { roughness: 0.1 }), milkCoffee: m('#7a4a2a', { roughness: 0.1 }),
     tea: new THREE.MeshStandardMaterial({ color: '#b5701d', roughness: 0.1, transparent: true, opacity: 0.8 }), ice: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.05, transparent: true, opacity: 0.6 }),
     cup: m('#f6f3ec', { roughness: 0.3 }), foam: m('#f2d27a', { roughness: 0.4 }), soy: m('#f3ead2'), cap: m('#2f8a4a'), quay: m('#d99a3a', { roughness: 0.7 }),
@@ -68,18 +68,47 @@ function BanhMi({ id }: { id: string }) {
   </group>;
 }
 
-export function Bowl({ shop, id, progress }: { shop: ShopKind; id: string; progress?: () => number }) {
+let bowlMat: THREE.MeshStandardMaterial | null = null;
+/** White porcelain with a blue floral band (the classic Vietnamese phở bowl). */
+function floralBowl() {
+  if (bowlMat) return bowlMat;
+  const c = document.createElement('canvas'); c.width = 512; c.height = 96; const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#f7f6f1'; ctx.fillRect(0, 0, 512, 96);
+  ctx.fillStyle = '#2a56a8'; ctx.fillRect(0, 6, 512, 4); ctx.fillRect(0, 84, 512, 3);
+  for (let i = 0; i < 8; i++) {
+    const x = 32 + i * 64; ctx.fillStyle = '#2f5fb5';
+    for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2; ctx.beginPath(); ctx.ellipse(x + Math.cos(a) * 9, 46 + Math.sin(a) * 9, 7, 4, a, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = '#f7f6f1'; ctx.beginPath(); ctx.arc(x, 46, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#3b6cc0'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 18, 46); ctx.bezierCurveTo(x + 26, 30, x + 38, 62, x + 46, 46); ctx.stroke();
+    ctx.fillStyle = '#3b6cc0'; ctx.beginPath(); ctx.ellipse(x + 30, 38, 5, 2.5, -0.6, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.ellipse(x + 38, 56, 5, 2.5, 0.6, 0, Math.PI * 2); ctx.fill();
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping;
+  return (bowlMat = new THREE.MeshStandardMaterial({ map: t, roughness: 0.25, side: THREE.DoubleSide }));
+}
+let steamMat: THREE.MeshBasicMaterial | null = null;
+/** Wisps of steam rising from a hot bowl. */
+function Steam() {
+  const g = useRef<THREE.Group>(null);
+  const mat = (steamMat ??= new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.22, depthWrite: false }));
+  useFrame(({ clock }) => { const t = clock.elapsedTime; g.current?.children.forEach((c, i) => { const u = ((t * 0.35 + i / 3) % 1); c.position.y = 0.07 + u * 0.16; c.scale.setScalar(0.6 + u * 1.2); ((c as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.22; c.visible = u < 0.95; c.rotation.y = t + i; }); });
+  return <group ref={g}>{[0, 1, 2].map((i) => <mesh key={i} position={[Math.cos(i * 2.1) * 0.02, 0.08, Math.sin(i * 2.1) * 0.02]} material={mat}><sphereGeometry args={[0.025, 8, 6]} /></mesh>)}</group>;
+}
+
+export function Bowl({ shop, id, progress, steam = false }: { shop: ShopKind; id: string; progress?: () => number; steam?: boolean }) {
   const m = M(); const level = useRef<THREE.Group>(null);
   useFrame(() => { const h = bagStore.get().held; if (level.current) { const p = progress ? progress() : h?.progress ?? 0; level.current.position.y = 0.045 - p * 0.03; level.current.scale.setScalar(1 - p * 0.25); } });
   const r = 0.07;
+  const pho = shop === 'pho';
   return <group>
-    <mesh position={[0, 0.03, 0]} material={m.bowl} castShadow><cylinderGeometry args={[r, r * 0.55, 0.06, 20, 1, true]} /></mesh>
+    <mesh position={[0, 0.03, 0]} material={pho ? floralBowl() : m.bowl} castShadow><cylinderGeometry args={[r, r * 0.55, 0.06, 24, 1, true]} /></mesh>
+    {pho && steam && <Steam />}
     <mesh position={[0, 0.002, 0]} material={m.bowl}><cylinderGeometry args={[r * 0.55, r * 0.55, 0.004, 16]} /></mesh>
     <mesh position={[0, 0.058, 0]} material={m.rim} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[r, 0.003, 6, 24]} /></mesh>
     <group ref={level}>
       <mesh material={shop === 'buncha' ? m.pate : m.broth}><cylinderGeometry args={[r * 0.92, r * 0.92, 0.004, 20]} /></mesh>
       {shop !== 'buncha' && Array.from({ length: 6 }, (_, i) => <mesh key={i} position={[Math.cos(i) * 0.03, 0.004, Math.sin(i * 1.7) * 0.03]} rotation={[0, i, 0]} material={m.noodle}><boxGeometry args={[0.07, 0.004, 0.006]} /></mesh>)}
-      {[0, 1, 2].map((i) => <mesh key={`b${i}`} position={[-0.02 + i * 0.022, 0.006, 0.012 - i * 0.01]} rotation={[0, i * 0.7, 0]} material={shop === 'buncha' ? m.crust : m.beef}><boxGeometry args={[0.03, 0.005, 0.02]} /></mesh>)}
+      {[0, 1, 2, 3].map((i) => <mesh key={`b${i}`} position={[-0.026 + i * 0.018, 0.006, 0.014 - (i % 2) * 0.012]} rotation={[0.08, i * 0.7, 0]} material={shop === 'buncha' ? m.crust : id === 'ga' ? m.chicken : id === 'tai' ? m.rare : m.beef}><boxGeometry args={[0.032, 0.004, 0.02]} /></mesh>)}
+      {pho && [0, 1, 2].map((i) => <mesh key={`l${i}`} position={[0.03 - i * 0.012, 0.009, -0.026 + i * 0.006]} rotation={[0, i * 1.3, 0]} material={m.herb}><boxGeometry args={[0.018, 0.002, 0.008]} /></mesh>)}
       {[0, 1, 2, 3].map((i) => <mesh key={`h${i}`} position={[Math.cos(i * 1.6) * 0.035, 0.008, Math.sin(i * 1.6) * 0.035]} material={m.onion}><boxGeometry args={[0.012, 0.004, 0.012]} /></mesh>)}
       {id === 'dacbiet' && <mesh position={[0.025, 0.01, -0.02]} material={m.egg} scale={[0.016, 0.01, 0.016]}><sphereGeometry args={[1, 10, 6]} /></mesh>}
     </group>

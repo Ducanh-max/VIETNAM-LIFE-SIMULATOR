@@ -109,9 +109,124 @@ function B({ p, s, m }: { p: [number, number, number]; s: [number, number, numbe
   return <mesh position={p} scale={s} geometry={unitBox} material={m} castShadow receiveShadow />;
 }
 
-function Stools({ at }: { at: [number, number][] }) {
+function Stools({ at, red = false }: { at: [number, number][]; red?: boolean }) {
   const m = S();
-  return <>{at.map(([x, z], i) => <mesh key={i} position={[x, 0.2, z]} material={i % 2 ? m.blue : m.red} castShadow><cylinderGeometry args={[0.13, 0.15, 0.4, 10]} /></mesh>)}</>;
+  return <>{at.map(([x, z], i) => <group key={i} position={[x, 0, z]}>
+    <mesh position={[0, 0.38, 0]} material={red || i % 2 === 0 ? m.red : m.blue} castShadow><boxGeometry args={[0.3, 0.04, 0.3]} /></mesh>
+    <mesh position={[0, 0.18, 0]} material={red || i % 2 === 0 ? m.red : m.blue}><cylinderGeometry args={[0.12, 0.16, 0.36, 4, 1, true]} /></mesh>
+  </group>)}</>;
+}
+
+/*
+ * The phở shop's dining room, after the owner's reference picture: pink-beige plaster over a grey wainscot,
+ * patterned encaustic floor tiles, a dark pendant lamp with a warm bulb over the tables, a cream "Phở Hà Nội" sign
+ * with a red border and a steaming bowl, a framed painting of Tháp Rùa on Hồ Gươm, a hanging pothos in the corner
+ * and a chalkboard menu with the shop's prices.
+ */
+function tex(w: number, h: number, draw: (c: CanvasRenderingContext2D) => void, repeat?: [number, number]) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')!);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...repeat); }
+  return t;
+}
+let phoMats: Record<string, THREE.Material> | null = null;
+function phoMaterials(s: Shop) {
+  if (phoMats) return phoMats;
+  const tile = tex(128, 128, (c) => {
+    c.fillStyle = '#e9e6e0'; c.fillRect(0, 0, 128, 128);
+    for (const [ox, oy] of [[0, 0], [64, 0], [0, 64], [64, 64]]) {
+      c.fillStyle = '#7d8590'; c.beginPath(); c.moveTo(ox + 32, oy + 6); c.lineTo(ox + 58, oy + 32); c.lineTo(ox + 32, oy + 58); c.lineTo(ox + 6, oy + 32); c.closePath(); c.fill();
+      c.fillStyle = '#e9e6e0'; c.beginPath(); c.arc(ox + 32, oy + 32, 13, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#9aa1aa'; for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; c.beginPath(); c.ellipse(ox + 32 + Math.cos(a) * 7, oy + 32 + Math.sin(a) * 7, 6, 3, a, 0, Math.PI * 2); c.fill(); }
+      c.strokeStyle = 'rgba(80,80,80,.35)'; c.strokeRect(ox + 0.5, oy + 0.5, 63, 63);
+    }
+  }, [6, 11]);
+  const sign = tex(512, 176, (c) => {
+    c.fillStyle = '#fbf1dc'; c.fillRect(0, 0, 512, 176);
+    c.strokeStyle = '#c0281c'; c.lineWidth = 12; c.strokeRect(8, 8, 496, 160); c.lineWidth = 3; c.strokeRect(22, 22, 468, 132);
+    // the steaming bowl
+    c.fillStyle = '#c0281c'; c.beginPath(); c.ellipse(105, 96, 58, 12, 0, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.moveTo(47, 96); c.quadraticCurveTo(105, 165, 163, 96); c.closePath(); c.fill();
+    c.fillStyle = '#f2c46a'; c.beginPath(); c.ellipse(105, 96, 50, 8, 0, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = '#c0281c'; c.lineWidth = 5; for (const x of [88, 105, 122]) { c.beginPath(); c.moveTo(x, 78); c.bezierCurveTo(x - 10, 64, x + 10, 54, x, 38); c.stroke(); }
+    c.lineWidth = 4; c.beginPath(); c.moveTo(150, 80); c.lineTo(205, 52); c.stroke();
+    c.fillStyle = '#c0281c'; c.font = 'italic bold 74px "Playfair Display", Georgia, serif'; c.textBaseline = 'middle'; c.fillText('Phở Hà Nội', 196, 96, 296);
+  });
+  const painting = tex(256, 192, (c) => {
+    const g = c.createLinearGradient(0, 0, 0, 192); g.addColorStop(0, '#9cc8e8'); g.addColorStop(0.55, '#d8ecf2'); g.addColorStop(0.56, '#5f8f7a'); g.addColorStop(1, '#3f6e62'); c.fillStyle = g; c.fillRect(0, 0, 256, 192);
+    c.fillStyle = '#3f7a3a'; for (let i = 0; i < 9; i++) { c.beginPath(); c.arc(i * 32, 104, 22 + (i % 3) * 6, 0, Math.PI * 2); c.fill(); }
+    // Tháp Rùa on its island
+    c.fillStyle = '#5e7a3f'; c.beginPath(); c.ellipse(128, 132, 46, 8, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#efe8d8'; c.fillRect(104, 92, 48, 38); c.fillRect(112, 70, 32, 22); c.fillRect(118, 54, 20, 16);
+    c.fillStyle = '#6b5a4a'; for (const [x, y, w, h] of [[110, 104, 8, 14], [124, 104, 8, 14], [138, 104, 8, 14], [118, 76, 6, 10], [132, 76, 6, 10]]) { c.beginPath(); c.moveTo(x, y + h); c.lineTo(x, y + 3); c.arc(x + w / 2, y + 3, w / 2, Math.PI, 0); c.lineTo(x + w, y + h); c.closePath(); c.fill(); }
+    c.fillStyle = 'rgba(255,255,255,.35)'; for (let i = 0; i < 6; i++) c.fillRect(40 + i * 30, 150 + (i % 2) * 10, 22, 2);
+    c.fillStyle = 'rgba(239,232,216,.45)'; c.fillRect(110, 140, 36, 18);
+  });
+  const board = tex(320, 420, (c) => {
+    c.fillStyle = '#26282a'; c.fillRect(0, 0, 320, 420);
+    c.strokeStyle = '#e8b422'; c.lineWidth = 16; c.strokeRect(8, 8, 304, 404);
+    c.fillStyle = 'rgba(255,255,255,.06)'; for (let i = 0; i < 40; i++) c.fillRect((i * 53) % 300 + 10, (i * 97) % 400 + 10, 40, 2);
+    c.fillStyle = '#f4f1e8'; c.font = 'italic bold 66px "Be Vietnam Pro", Georgia, serif'; c.fillText('Phở', 38, 96);
+    c.strokeStyle = '#f2b636'; c.lineWidth = 4; c.beginPath(); c.moveTo(40, 112); c.quadraticCurveTo(110, 104, 170, 116); c.stroke();
+    c.strokeStyle = '#f4f1e8'; c.lineWidth = 3; c.beginPath(); c.ellipse(240, 92, 40, 9, 0, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.moveTo(200, 92); c.quadraticCurveTo(240, 145, 280, 92); c.stroke();
+    for (const x of [228, 242, 256]) { c.beginPath(); c.moveTo(x, 76); c.bezierCurveTo(x - 6, 64, x + 6, 56, x, 44); c.stroke(); }
+    c.font = 'italic 34px "Be Vietnam Pro", Georgia, serif';
+    s.items.filter((it) => it.hunger >= 40).slice(0, 4).forEach((it, i) => { c.fillStyle = '#f4f1e8'; c.fillText(it.name, 30, 178 + i * 58, 200); c.fillStyle = '#f2b636'; c.textAlign = 'right'; c.fillText(`${it.price / 1000}k`, 292, 178 + i * 58); c.textAlign = 'left'; });
+  });
+  return (phoMats = {
+    floor: new THREE.MeshStandardMaterial({ map: tile, roughness: 0.5 }),
+    plaster: new THREE.MeshStandardMaterial({ color: '#e7cfc4', roughness: 0.95 }),
+    wainscot: new THREE.MeshStandardMaterial({ color: '#9a9c9c', roughness: 0.8 }),
+    sign: new THREE.MeshStandardMaterial({ map: sign, roughness: 0.6 }),
+    frame: new THREE.MeshStandardMaterial({ color: '#5a3a24', roughness: 0.6 }),
+    painting: new THREE.MeshStandardMaterial({ map: painting, roughness: 0.7 }),
+    board: new THREE.MeshStandardMaterial({ map: board, roughness: 0.85 }),
+    lamp: new THREE.MeshStandardMaterial({ color: '#2b2e30', roughness: 0.45, metalness: 0.5, side: THREE.DoubleSide }),
+    bulb: new THREE.MeshStandardMaterial({ color: '#fff3d0', emissive: '#ffcc6a', emissiveIntensity: 2.4 }),
+    pot: new THREE.MeshStandardMaterial({ color: '#8a5a3a', roughness: 0.8 }),
+    leaf: new THREE.MeshStandardMaterial({ color: '#7fb33a', roughness: 0.6, side: THREE.DoubleSide }),
+    leaf2: new THREE.MeshStandardMaterial({ color: '#a8c84a', roughness: 0.6, side: THREE.DoubleSide }),
+  });
+}
+function PhoInterior({ s }: { s: Shop }) {
+  const m = phoMaterials(s);
+  const hw = s.w / 2; const back = HD - SHOP_DEPTH; const zc = HD - SHOP_DEPTH / 2; const x0 = s.x - hw + 0.13, x1 = s.x + hw - 0.13;
+  const leaves = useMemo(() => {
+    const out: { p: [number, number, number]; r: number; k: number }[] = [];
+    for (let strand = 0; strand < 5; strand++) for (let i = 0; i < 9; i++) out.push({ p: [Math.cos(strand * 1.3) * 0.12 + Math.sin(i) * 0.03, -0.1 - i * 0.12 - strand * 0.05, Math.sin(strand * 1.3) * 0.12], r: strand + i, k: (strand + i) % 2 });
+    return out;
+  }, []);
+  return <group>
+    {/* floor tiles and the walls: grey wainscot below, pink-beige plaster above */}
+    <mesh position={[s.x, 0.035, zc]} rotation={[-Math.PI / 2, 0, 0]} material={m.floor} receiveShadow><planeGeometry args={[s.w - 0.24, SHOP_DEPTH - 0.1]} /></mesh>
+    {[x0, x1].map((x) => <group key={x}>
+      <mesh position={[x, 0.5, zc]} material={m.wainscot}><boxGeometry args={[0.02, 1.0, SHOP_DEPTH - 0.1]} /></mesh>
+      <mesh position={[x, 1.0 + (OPEN_H + 0.3 - 1.0) / 2, zc]} material={m.plaster}><boxGeometry args={[0.02, OPEN_H + 0.3 - 1.0, SHOP_DEPTH - 0.1]} /></mesh>
+    </group>)}
+    <mesh position={[s.x, 0.5, back + 0.13]} material={m.wainscot}><boxGeometry args={[s.w - 0.26, 1.0, 0.02]} /></mesh>
+    <mesh position={[s.x, 1.0 + (OPEN_H + 0.3 - 1.0) / 2, back + 0.13]} material={m.plaster}><boxGeometry args={[s.w - 0.26, OPEN_H + 0.3 - 1.0, 0.02]} /></mesh>
+    {/* "Phở Hà Nội" over the back wall, Tháp Rùa on the right wall, the chalkboard on the left */}
+    <mesh position={[s.x, 2.25, back + 0.16]} material={m.sign}><boxGeometry args={[2.0, 0.69, 0.04]} /></mesh>
+    <group position={[x1 - 0.03, 1.95, back + 2.2]} rotation={[0, -Math.PI / 2, 0]}>
+      <mesh material={m.frame}><boxGeometry args={[1.0, 0.78, 0.04]} /></mesh>
+      <mesh position={[0, 0, 0.022]} material={m.painting}><planeGeometry args={[0.88, 0.66]} /></mesh>
+    </group>
+    <group position={[x0 + 0.03, 1.55, back + 3.6]} rotation={[0, Math.PI / 2, 0]}>
+      <mesh material={m.board}><boxGeometry args={[0.95, 1.25, 0.03]} /></mesh>
+    </group>
+    {/* the pendant lamps over the tables */}
+    {[2.4, 4.6].map((dz) => <group key={dz} position={[s.x - 1.0, OPEN_H + 0.3, back + dz]}>
+      <mesh position={[0, -0.25, 0]} material={m.lamp}><cylinderGeometry args={[0.006, 0.006, 0.5, 4]} /></mesh>
+      <mesh position={[0, -0.6, 0]} material={m.lamp}><coneGeometry args={[0.24, 0.22, 18, 1, true]} /></mesh>
+      <mesh position={[0, -0.7, 0]} material={m.bulb}><sphereGeometry args={[0.06, 12, 8]} /></mesh>
+      <pointLight position={[0, -0.8, 0]} color="#ffc978" intensity={3} distance={4} decay={1.6} />
+    </group>)}
+    {/* a pothos trailing from a pot hung in the front corner */}
+    <group position={[x0 + 0.3, OPEN_H + 0.05, HD - 1.0]}>
+      <mesh position={[0, 0, 0]} material={m.pot}><cylinderGeometry args={[0.13, 0.1, 0.16, 12]} /></mesh>
+      {leaves.map((l, i) => <mesh key={i} position={l.p} rotation={[l.r * 0.7, l.r * 1.1, 0.4]} material={l.k ? m.leaf : m.leaf2}><circleGeometry args={[0.05, 6]} /></mesh>)}
+    </group>
+  </group>;
 }
 
 function Goods({ s }: { s: Shop }) {
@@ -140,6 +255,7 @@ function Goods({ s }: { s: Shop }) {
       <Stools at={[[s.x + 1.2, HD - 2.4], [s.x + 0.6, HD - 3.4]]} />
     </group>;
     case 'pho': return <group>
+      <PhoInterior s={s} />
       {/* the phở counter at the front: a big pot of broth, bowls, herbs; two low tables inside */}
       <B p={[s.x + 1.0, 0.45, HD - 1.6]} s={[1.7, 0.9, 0.9]} m={m.steel} />
       <mesh position={[s.x + 1.3, 1.2, HD - 1.6]} material={m.steel} castShadow><cylinderGeometry args={[0.32, 0.3, 0.6, 18]} /></mesh>
@@ -147,9 +263,12 @@ function Goods({ s }: { s: Shop }) {
       <mesh position={[s.x + 1.3, 2.0, HD - 1.6]} material={m.steam}><cylinderGeometry args={[0.22, 0.32, 0.9, 12, 1, true]} /></mesh>
       {[0, 1, 2, 3].map((i) => <mesh key={i} position={[s.x + 0.6, 0.95 + i * 0.07, HD - 1.6]} material={m.bowl}><cylinderGeometry args={[0.13, 0.08, 0.07, 14]} /></mesh>)}
       {[2.4, 4.6].map((dz) => <group key={dz}>
-        <B p={[s.x - 1.0, PHO_TOP / 2, back + dz]} s={[0.8, PHO_TOP, 0.8]} m={m.steel} />
+        {/* brushed stainless table: a top with a rim and four legs */}
+        <B p={[s.x - 1.0, PHO_TOP - 0.02, back + dz]} s={[0.84, 0.04, 0.84]} m={m.steel} />
+        <B p={[s.x - 1.0, PHO_TOP - 0.08, back + dz]} s={[0.78, 0.08, 0.78]} m={m.steel} />
+        {[-1, 1].flatMap((a) => [-1, 1].map((b) => <B key={`${a}${b}`} p={[s.x - 1.0 + a * 0.36, (PHO_TOP - 0.1) / 2, back + dz + b * 0.36]} s={[0.035, PHO_TOP - 0.1, 0.035]} m={m.steel} />))}
         <group position={[s.x - 1.0, PHO_TOP, back + dz]} rotation={[0, Math.PI / 2, 0]}><Condiments /></group>
-        <Stools at={[[s.x - 1.0, back + dz - 0.7], [s.x - 1.0, back + dz + 0.7], [s.x - 0.2, back + dz]]} />
+        <Stools red at={[[s.x - 1.0, back + dz - 0.7], [s.x - 1.0, back + dz + 0.7], [s.x - 0.2, back + dz]]} />
       </group>)}
     </group>;
     case 'books': return <group>
@@ -202,7 +321,7 @@ function OpenShop({ s }: { s: Shop }) {
     {/* rolled-up shutter, signboard, price board */}
     <mesh position={[s.x, OPEN_H + 0.12, HD - 0.12]} rotation={[0, 0, Math.PI / 2]} material={m.shutter}><cylinderGeometry args={[0.16, 0.16, s.w - 0.3, 12]} /></mesh>
     <mesh position={[s.x, OPEN_H + 0.35, HD + 0.06]} material={mats.sign} castShadow><boxGeometry args={[s.w - 0.25, 0.85, 0.1]} /></mesh>
-    <mesh position={[s.x + (s.id === 'banhmi' || s.id === 'pho' ? -1 : 1) * (hw - 0.13), 1.8, back + 3.0]} rotation={[0, (s.id === 'banhmi' || s.id === 'pho' ? 1 : -1) * Math.PI / 2, 0]} material={mats.board}><planeGeometry args={[0.9, 1.12]} /></mesh>
+    {s.id !== 'pho' && <mesh position={[s.x + (s.id === 'banhmi' ? -1 : 1) * (hw - 0.13), 1.8, back + 3.0]} rotation={[0, (s.id === 'banhmi' ? 1 : -1) * Math.PI / 2, 0]} material={mats.board}><planeGeometry args={[0.9, 1.12]} /></mesh>}
     <Goods s={s} />
     <group position={[sx, 0, sz]} rotation={[0, sr, 0]}>
       <Person anim={anim} shirt={s.id === 'pho' ? '#f3efe6' : s.id === 'books' ? '#3c5e8a' : s.id === 'coffee' ? '#8a4f6e' : '#e2a33a'} pants="#2a2a2a" apron={s.id === 'pho' || s.id === 'banhmi' ? '#3a3a3a' : undefined} seed={20 + s.x * 3} />
