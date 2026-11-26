@@ -308,6 +308,11 @@ const NO_INFILL = import.meta.env.DEV && typeof location !== 'undefined' && loca
   const taken = (p: Point) => { const i = Math.floor((p[0] - MX) / MC), j = Math.floor((p[1] - MZ) / MC); return i < 0 || j < 0 || i >= MW || j >= MH || mask[j * MW + i] === 1; };
   type Raw = { p: number[][]; h?: number[][][] };
   const extra = osm as unknown as { water?: Raw[]; grass?: Raw[]; compounds?: Raw[] };
+  // the railway corridors (ground track and the brick viaduct): no filler houses on the tracks
+  for (const rl of ((osm as unknown as { rails?: { p: number[][] }[] }).rails ?? [])) for (let i = 0; i < rl.p.length - 1; i++) {
+    const [ax, az] = rl.p[i], [bx, bz] = rl.p[i + 1]; const l = Math.hypot(bx - ax, bz - az) || 1; const nx = -(bz - az) / l * 4, nz = (bx - ax) / l * 4;
+    addPoly([[ax + nx, az + nz], [bx + nx, bz + nz], [bx - nx, bz - nz], [ax - nx, az - nz]]);
+  }
   for (const list of [osm.parks as Raw[], (extra.water ?? []).filter((w) => polygonArea(w.p as Point[]) < 200_000), extra.grass ?? [], extra.compounds ?? []]) for (const a of list) addPoly(a.p as Point[]);
   for (const b of buildings) addPoly(b.ring);
   for (const b of osm.buildings as RawBuilding[]) if (/^Lotte Center/i.test(b.n ?? '') || LANDMARK_NAMES.has(b.n ?? '')) addPoly(b.p as Point[]);

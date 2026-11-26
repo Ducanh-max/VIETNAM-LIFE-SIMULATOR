@@ -138,3 +138,4 @@ await writeFile(new URL('../../src/data/hoanKiemOsm.json', import.meta.url), JSO
 console.log(`roads ${roads.length}, buildings ${buildings.length}, parks ${parks.length}, water ${water.length}, grass ${grass.length}, nodes ${nodes.length} (${[...new Set(nodes.map((n) => n.t))].map((k) => `${k} ${nodes.filter((n) => n.t === k).length}`).join(', ')})`);
 await import("./fix-roads.mjs");
 await import("./fetch-compounds.mjs");
+await import("./fetch-railways.mjs");

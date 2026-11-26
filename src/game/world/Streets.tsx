@@ -2,11 +2,14 @@ import { useEffect, useMemo } from 'react';
 import { insideTowerPlan } from '../lotte';
 import * as THREE from 'three';
 import { distanceToShore, GROUND_HEIGHT, insidePolygon, registerBlocker, type Point } from '../geo';
+import { osmNodes } from '../osm';
 import { inLake, insideBuilding, isAlley, lakes, lawns, parks, RESTAURANT, roadClearance, roads, worldToRestaurant, type Park, type Road } from '../osm';
 import { Instances, trs, unitBox, unitCylinder } from './Instances';
 import { materials } from './materials';
 import { asphaltTexture, concreteTexture, grassTexture, rng } from './textures';
 import { Trees, type Tree } from './Vegetation';
+import { StreetDressing } from './StreetDressing';
+import { Railways } from './Railways';
 
 const ROAD_Y = GROUND_HEIGHT + 0.03;
 
@@ -82,13 +85,20 @@ function along(points: Point[], spacing: number, offset: number, visit: (p: Poin
 }
 const roadLength = (r: Road) => r.points.reduce((s, p, i) => i ? s + Math.hypot(p[0] - r.points[i - 1][0], p[1] - r.points[i - 1][1]) : 0, 0);
 
+/** A flat straight-ahead arrow painted on the road (length along +x, 5 m long like the QCVN arrows). */
+const arrowGeometry = (() => {
+  const sh = new THREE.Shape(); sh.moveTo(-2.5, -0.15); sh.lineTo(1.2, -0.15); sh.lineTo(1.2, -0.5); sh.lineTo(2.5, 0); sh.lineTo(1.2, 0.5); sh.lineTo(1.2, 0.15); sh.lineTo(-2.5, 0.15); sh.closePath();
+  const g = new THREE.ShapeGeometry(sh); g.rotateX(-Math.PI / 2); return g;
+})();
+
 /** Asphalt carriageways with a kerb edge, centre dashes and zebra crossings. */
 function Roads() {
   const data = useMemo(() => {
     const asphalt: number[] = [];
     const concrete: number[] = [];
     const kerb: number[] = [];
-    const dashes: THREE.Matrix4[] = [];
+    const dashes: THREE.Matrix4[] = []; const yellow: THREE.Matrix4[] = []; const stops: THREE.Matrix4[] = []; const arrows: THREE.Matrix4[] = [];
+    const signals = osmNodes.filter((n) => n.kind === 'traffic_signals').map((n) => n.p);
     const zebra: THREE.Matrix4[] = [];
     for (const road of roads) {
       const half = road.width / 2;
@@ -98,15 +108,51 @@ function Roads() {
       if (isAlley(road.name, road.kind)) { pushRibbon(concrete, road.points, half, ROAD_Y); continue; }
       pushRibbon(kerb, road.points, half + 0.35, ROAD_Y - 0.02); // kerb strip: lower and never pulled forward, so a crossing street's asphalt always covers it at junctions
       pushRibbon(asphalt, road.points, half, ROAD_Y);
-      if (!road.oneway && road.width >= 8 && road.kind !== 'service') {
+      /*
+       * Markings after QCVN 41: the centre line between opposing traffic is yellow (vạch 1.1 dashed; vạch 1.3 double
+       * solid on primary / trunk roads), lane lines between lanes in the same direction are white dashed (vạch 2.1),
+       * edge lines white solid (vạch 3.1) on the bigger roads, stop lines (vạch 7.1) where a street meets traffic
+       * lights, with a straight-ahead arrow before it. Nothing is painted in the junction mouths.
+       */
+      const markable = road.kind !== 'service' && !isAlley(road.name, road.kind) && road.width >= 6;
+      if (markable) {
         const L = roadLength(road);
+        const big = road.kind === 'primary' || road.kind === 'trunk';
+        const lanes = Math.max(1, Math.min(6, road.lanes || (road.width >= 12 ? 4 : 2)));
+        const laneW = road.width / lanes;
         let walked = 0;
-        along(road.points, 7, 3, (p, d) => {
-          walked += 7;
-          if (walked < 10 || walked > L - 10) return; // no dashes in the junction mouths at either end
-          if (roadClearance(p, road) < 0.5) return; // nor where another street crosses or runs alongside
-          dashes.push(trs(p[0], ROAD_Y + 0.02, p[1], -Math.atan2(d[1], d[0]), 3.2, 0.02, 0.16));
+        along(road.points, 1.5, 0.75, (p, d) => {
+          walked += 1.5;
+          if (walked < 10 || walked > L - 10) return;
+          if (roadClearance(p, road) < 0.5) return; // where another street crosses or runs alongside
+          const yaw = -Math.atan2(d[1], d[0]); const nx = -d[1], nz = d[0];
+          const dash = Math.floor(walked / 1.5) % 4 < 2; // 3 m painted, 3 m gap
+          const at = (o: number) => [p[0] + nx * o, p[1] + nz * o] as const;
+          if (!road.oneway && road.width >= 7) {
+            if (big) { for (const o of [-0.12, 0.12]) { const [x, z] = at(o); yellow.push(trs(x, ROAD_Y + 0.02, z, yaw, 1.55, 0.02, 0.12)); } }
+            else if (dash) { const [x, z] = at(0); yellow.push(trs(x, ROAD_Y + 0.02, z, yaw, 1.55, 0.02, 0.13)); }
+          }
+          // lane lines inside each direction
+          if (lanes > 2 || (road.oneway && lanes > 1)) for (let k = 1; k < lanes; k++) {
+            const o = -road.width / 2 + k * laneW; if (!road.oneway && Math.abs(o) < 0.3) continue;
+            if (dash) { const [x, z] = at(o); dashes.push(trs(x, ROAD_Y + 0.02, z, yaw, 1.55, 0.02, 0.12)); }
+          }
+          if ((big || road.kind === 'secondary') && road.width >= 9) for (const sgn of [-1, 1]) { const [x, z] = at(sgn * (road.width / 2 - 0.35)); dashes.push(trs(x, ROAD_Y + 0.02, z, yaw, 1.55, 0.02, 0.15)); }
         });
+        // stop line + arrow on the approach side at a road end with traffic lights
+        for (const end of [0, 1]) {
+          const pts = end ? [...road.points].reverse() : road.points;
+          const a = pts[0], b = pts[1]; const len = Math.hypot(b[0] - a[0], b[1] - a[1]); if (len < 18) continue;
+          if (!signals.some((q) => Math.hypot(q[0] - a[0], q[1] - a[1]) < 16)) continue;
+          const d: [number, number] = [(b[0] - a[0]) / len, (b[1] - a[1]) / len]; const nx = -d[1], nz = d[0];
+          // traffic arriving at this end drives toward it: its half is on its right (+n when driving -d)
+          const half = road.oneway ? road.width : road.width / 2; const o0 = road.oneway ? 0 : -half / 2; // right-hand traffic: the arriving half is on -n
+          const yaw = -Math.atan2(d[1], d[0]);
+          const c = [a[0] + d[0] * 12 + nx * o0, a[1] + d[1] * 12 + nz * o0];
+          stops.push(trs(c[0], ROAD_Y + 0.022, c[1], yaw, 0.4, 0.02, half - 0.3));
+          const ac = [a[0] + d[0] * 18 + nx * o0, a[1] + d[1] * 18 + nz * o0];
+          arrows.push(trs(ac[0], ROAD_Y + 0.022, ac[1], -Math.atan2(-d[1], -d[0]) , 1, 1, 1));
+        }
       }
       // Zebra crossings at both ends of the bigger streets.
       if (road.width >= 6.5 && road.kind !== 'service' && roadLength(road) > 30) {
@@ -123,7 +169,7 @@ function Roads() {
         }
       }
     }
-    return { asphalt: flatGeometry(asphalt, 1 / 6), concrete: flatGeometry(concrete, 1 / 3), kerb: flatGeometry(kerb), dashes, zebra };
+    return { asphalt: flatGeometry(asphalt, 1 / 6), concrete: flatGeometry(concrete, 1 / 3), kerb: flatGeometry(kerb), dashes, zebra, yellow, stops, arrows };
   }, []);
   const mats = useMemo(() => ({
     asphalt: new THREE.MeshStandardMaterial({ map: repeated(asphaltTexture(), 1, 1), roughness: 0.92, side: THREE.DoubleSide, depthFunc: THREE.AlwaysDepth }),
@@ -131,6 +177,7 @@ function Roads() {
     concrete: new THREE.MeshStandardMaterial({ map: repeated(concreteTexture(), 1, 1), roughness: 0.95, side: THREE.DoubleSide, depthFunc: THREE.AlwaysDepth }),
     // paint sits above the asphalt's polygon offset so stripes are never partly swallowed by an overlapping street
     paint: new THREE.MeshStandardMaterial({ color: '#f1eee4', roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8 }),
+    yellow: new THREE.MeshStandardMaterial({ color: '#f2c230', roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8 }),
   }), []);
   return <group>
     {/* kerbs first, then all asphalt over them regardless of depth: at junctions a street's kerb strip never
@@ -140,6 +187,9 @@ function Roads() {
     <mesh geometry={data.asphalt} material={mats.asphalt} receiveShadow renderOrder={-1} />
     <Instances geometry={unitBox} material={mats.paint} matrices={data.dashes} castShadow={false} />
     <Instances geometry={unitBox} material={mats.paint} matrices={data.zebra} castShadow={false} />
+    <Instances geometry={unitBox} material={mats.yellow} matrices={data.yellow} castShadow={false} />
+    <Instances geometry={unitBox} material={mats.paint} matrices={data.stops} castShadow={false} />
+    <Instances geometry={arrowGeometry} material={mats.paint} matrices={data.arrows} castShadow={false} />
   </group>;
 }
 
@@ -300,7 +350,10 @@ function StreetTrees() {
           // keep the pavement in front of Bún chả Đức Anh and its neighbouring shops clear, so the shopfronts show
           const [rx, rz] = worldToRestaurant(q);
           if (Math.abs(rx) < RESTAURANT.width / 2 + 9.5 && rz > RESTAURANT.depth / 2 - 1 && rz < RESTAURANT.depth / 2 + 7) continue;
-          list.push({ x: q[0], z: q[1], y: GROUND_HEIGHT, kind: 'shade', scale: 0.75 + r() * 0.3 });
+          // each street keeps mostly one species, as Hà Nội streets do (sấu on Phan Đình Phùng, bàng, xà cừ, phượng…)
+          const pick = Math.floor(((road.name.length * 7 + road.points.length) % 4 + r() * 1.3)) % 4;
+          const kind = (['sau', 'bang', 'xacu', 'phuong'] as const)[pick];
+          list.push({ x: q[0], z: q[1], y: GROUND_HEIGHT, kind, scale: (kind === 'xacu' ? 0.65 : 0.75) + r() * 0.3, whitewash: true });
         }
       });
     }
@@ -364,6 +417,8 @@ export function Streets() {
     <Parks />
     <Lakes />
     <StreetTrees />
+    <StreetDressing />
+    <Railways />
     <StreetSigns />
     <ParkedScooters />
   </group>;

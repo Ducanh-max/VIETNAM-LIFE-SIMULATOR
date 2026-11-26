@@ -155,7 +155,7 @@ function StreetLife({ time }: { time: TimeOfDay }) {
     const list: Tree[] = [];
     const nearBridge = (p: Point) => distanceToSegment(p, bridgeEnds[0], [bridgeEnds[0][0] + (bridgeEnds[0][0] - bridgeEnds[1][0]) * 0.4, bridgeEnds[0][1] + (bridgeEnds[0][1] - bridgeEnds[1][1]) * 0.4]) < 7;
     for (const { point } of sampleRing(offsetRing(shore, 1.6), 17)) if (!nearBridge(point) && r() < 0.85) list.push({ x: point[0] + (r() - 0.5), z: point[1] + (r() - 0.5), y: GROUND_HEIGHT, kind: 'willow', scale: 0.9 + r() * 0.3 });
-    for (const { point } of sampleRing(streetRing(10.5), 11)) if (!nearBridge(point) && roadClearance(point) > 1.5) list.push({ x: point[0], z: point[1], y: GROUND_HEIGHT, kind: r() < 0.12 ? 'blossom' : r() < 0.2 ? 'banyan' : 'shade', scale: 0.9 + r() * 0.35 });
+    for (const { point } of sampleRing(streetRing(10.5), 11)) if (!nearBridge(point) && roadClearance(point) > 1.5) list.push({ x: point[0], z: point[1], y: GROUND_HEIGHT, kind: r() < 0.14 ? 'locvung' : r() < 0.22 ? 'banyan' : r() < 0.35 ? 'phuong' : r() < 0.5 ? 'xacu' : 'shade', scale: 0.9 + r() * 0.35, whitewash: r() < 0.6 });
     const pole: THREE.Matrix4[] = [];
     const lamp: THREE.Matrix4[] = [];
     for (const { point } of sampleRing(offsetRing(shore, 4.2), 22)) {
