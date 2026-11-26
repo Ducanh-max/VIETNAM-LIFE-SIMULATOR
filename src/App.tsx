@@ -117,7 +117,7 @@ function App() {
 
   return <main className="app-shell text-stone-100" data-mode={mode}>
     {mode === 'game' && <div className="scene-wrap" onClick={lockPointer} role="presentation">
-      <Canvas key={quality} camera={{ position: [70, 8, -205], fov: 55, near: 0.1, far: 2000 }} dpr={Math.min(window.devicePixelRatio || 1, config.dpr)} shadows={config.shadow > 0}
+      <Canvas key={quality} resize={{ offsetSize: true }} camera={{ position: [70, 8, -205], fov: 55, near: 0.1, far: 2000 }} dpr={Math.min(window.devicePixelRatio || 1, config.dpr)} shadows={config.shadow > 0}
         gl={{ antialias: config.antialias, powerPreference: 'high-performance' }} onCreated={({ gl }) => {
           gl.outputColorSpace = THREE.SRGBColorSpace;
           gl.toneMapping = THREE.ACESFilmicToneMapping;

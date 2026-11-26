@@ -424,3 +424,25 @@ body.mobile .bag-button { top: 132px; bottom: auto; left: 14px; right: auto; }
 }
 @media (orientation: portrait) { body.mobile .area-tag { display: none; } body.mobile .needs-hud { top: 64px; bottom: auto; right: 8px; } body.mobile .bag-button { top: 64px; left: 12px; } }
 @media (orientation: landscape) and (max-height: 560px) { body.mobile .phone-clock { display: none; } body.mobile .phone-home, body.mobile .phone-app { overflow-y: auto; } }
+/* phone held upright: the whole game turned to landscape (device.ts) */
+body.rotate-landscape .app-shell[data-mode="game"] { position: fixed; top: 0; left: 100vw; width: 100dvh; height: 100dvw; min-height: 0; transform-origin: top left; transform: rotate(90deg); }
+body.mobile .action-prompt, body.mobile .game-toast, body.mobile .bag-button small { display: none !important; }
+.touch-prompt-row { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; gap: 8px; pointer-events: auto; max-width: 70%; }
+.touch-prompt { pointer-events: auto; border: 0; border-radius: 26px; padding: 13px 20px; background: rgba(230, 189, 131, .95); color: #1e2824; font: 800 15px "Be Vietnam Pro", Arial, sans-serif; box-shadow: 0 8px 24px rgba(0,0,0,.35); touch-action: none; }
+.touch-prompt.small { background: rgba(31, 107, 82, .95); color: #fff; }
+.touch-prompt.info { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); background: rgba(16, 38, 34, .85); color: #f3ead6; font-weight: 600; font-size: 13px; max-width: 60%; text-align: center; pointer-events: none; }
+.touch-toast { position: absolute; left: 50%; top: 64px; transform: translateX(-50%); max-width: 70%; padding: 10px 16px; border-radius: 14px; background: rgba(16, 38, 34, .9); color: #fff; font: 600 13px/1.5 "Be Vietnam Pro", Arial, sans-serif; text-align: center; pointer-events: none; box-shadow: 0 6px 18px rgba(0,0,0,.3); }
+body.mobile .touch-buttons { grid-template-columns: repeat(3, 56px); }
+body.mobile .touch-btn { font-size: 22px; }
+/* the turned (landscape) frame: lay out like a landscape phone, sizes from the turned dimensions */
+body.rotate-landscape .needs-hud { top: 58px !important; bottom: auto !important; right: 10px !important; }
+body.rotate-landscape .minimap { bottom: 12px !important; right: 12px !important; }
+body.rotate-landscape .touch-buttons { right: 150px; bottom: 12px; }
+body.rotate-landscape .touch-stick { width: 116px; height: 116px; bottom: 16px; }
+body.rotate-landscape .bag-button { top: auto !important; bottom: 20px; left: 150px !important; }
+body.rotate-landscape .area-tag { display: none; }
+body.rotate-landscape .phone { height: calc(100dvw - 40px); }
+body.rotate-landscape .phone-clock { display: none; }
+body.rotate-landscape .phone-home, body.rotate-landscape .phone-app { overflow-y: auto; }
+body.rotate-landscape .modal-card, body.rotate-landscape .bag-panel, body.rotate-landscape .reader { max-height: calc(100dvw - 24px); overflow: auto; }
+body.rotate-landscape .bag-panel, body.rotate-landscape .reader { top: 50px; left: auto; right: 8px; width: min(380px, 60vh); }

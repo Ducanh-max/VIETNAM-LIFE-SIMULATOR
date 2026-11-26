@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import { setDevice, suggestedDevice, useDevice } from './device';
+import { goLandscape, isRotated, setDevice, suggestedDevice, useDevice } from './device';
+import { game, useGame } from '../game/state';
 
 /*
  * Touch controls for playing on a phone. They drive the game through the same inputs as a keyboard and mouse:
  * the joystick presses W/A/S/D (and Shift when pushed all the way), dragging the right half of the screen turns
- * the camera like a right-mouse drag, two fingers pinch to zoom like the wheel, and the buttons send E, F, V, P, B.
+ * the camera like a right-mouse drag, two fingers pinch to zoom like the wheel, and the buttons send E, F, V, P.
+ * No keyboard letters on screen: buttons carry icons, the action prompt is itself a big button ("Chạm để …"), and
+ * messages that mention keys are reworded for touch. When the game is turned by CSS (phone held upright, see
+ * device.ts) touch movement is turned back into the game's frame.
  */
+/** Screen-space touch movement → the game's frame (turned 90° clockwise when rotated). */
+const toGame = (dx: number, dy: number): [number, number] => (isRotated() ? [dy, -dx] : [dx, dy]);
+/** "Bấm E để …" → "Chạm để …", key names out of messages. */
+export const touchText = (t: string) => t
+  .replace(/[Bb]ấm E( và)? /g, (m) => (m[0] === 'B' ? 'Chạm nút ' : 'chạm nút ')).replace(/[Nn]hấn E /g, 'chạm ')
+  .replace(/ ?((E|F|B|P))/g, '').replace(/(B để mở)/g, '(nút 🎒)').replace(/phím B/g, 'nút 🎒').replace(/(phím B)/g, '').replace(/B để mở/g, 'nút 🎒 để mở')
+  .replace(/M: Gọi thêm/g, 'Gọi thêm').replace(/bấm F/gi, 'chạm nút xe');
 const key = (type: 'keydown' | 'keyup', code: string, k: string) => window.dispatchEvent(new KeyboardEvent(type, { code, key: k, bubbles: true }));
 const tap = (code: string, k: string) => { key('keydown', code, k); setTimeout(() => key('keyup', code, k), 60); };
 const canvas = () => document.querySelector('canvas');
@@ -30,7 +41,7 @@ export function MobileControls() {
   const onStick = (t: { clientX: number; clientY: number }) => {
     const el = stick.current; if (!el) return;
     const r = el.getBoundingClientRect(); const R = r.width / 2;
-    let x = (t.clientX - (r.left + R)) / R, y = (t.clientY - (r.top + R)) / R;
+    let [x, y] = toGame((t.clientX - (r.left + r.width / 2)) / R, (t.clientY - (r.top + r.height / 2)) / R);
     const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
     setKnob([x, y]);
     const want = new Set<string>();
@@ -58,7 +69,8 @@ export function MobileControls() {
       }
       const lt = lookTouch.current; if (!lt) return;
       for (const t of Array.from(e.changedTouches)) if (t.identifier === lt.id) {
-        document.dispatchEvent(new MouseEvent('mousemove', { movementX: (t.clientX - lt.x) * 1.6, movementY: (t.clientY - lt.y) * 1.2, bubbles: true } as MouseEventInit));
+        const [mx, my] = toGame(t.clientX - lt.x, t.clientY - lt.y);
+        document.dispatchEvent(new MouseEvent('mousemove', { movementX: mx * 1.6, movementY: my * 1.2, bubbles: true } as MouseEventInit));
         lt.x = t.clientX; lt.y = t.clientY; e.preventDefault();
       }
     };
@@ -74,8 +86,18 @@ export function MobileControls() {
   }, [device]);
   useEffect(() => { if (stickTouch.current === null) setKeys(run ? new Set(['ShiftLeft']) : new Set()); }, [run]);
 
+  // the first tap in the game asks for fullscreen + landscape (allowed only from a user gesture)
+  useEffect(() => {
+    if (device !== 'mobile') return;
+    const once = () => { void goLandscape(); window.removeEventListener('pointerdown', once); };
+    window.addEventListener('pointerdown', once);
+    return () => window.removeEventListener('pointerdown', once);
+  }, [device]);
+
   if (device !== 'mobile') return null;
   return <div className="touch-ui">
+    <TouchPrompt />
+    <TouchToast />
     <div ref={stick} className="touch-stick"
       onTouchStart={(e) => { const t = e.changedTouches[0]; stickTouch.current = t.identifier; onStick(t); }}
       onTouchMove={(e) => { for (const t of Array.from(e.changedTouches)) if (t.identifier === stickTouch.current) onStick(t); }}
@@ -83,14 +105,37 @@ export function MobileControls() {
       <span className="touch-knob" style={{ transform: `translate(${knob[0] * 38}px, ${knob[1] * 38}px)` }} />
     </div>
     <div className="touch-buttons">
-      <button className="touch-btn main" onPointerDown={(e) => { e.preventDefault(); tap('KeyE', 'e'); }}>E<small>Tương tác</small></button>
-      <button className="touch-btn" onPointerDown={(e) => { e.preventDefault(); tap('KeyF', 'f'); }}>F<small>Xe</small></button>
-      <button className={`touch-btn ${run ? 'on' : ''}`} onPointerDown={(e) => { e.preventDefault(); setRun((r) => !r); }}>⇧<small>Chạy</small></button>
-      <button className="touch-btn" onPointerDown={(e) => { e.preventDefault(); tap('KeyV', 'v'); }}>V<small>Drone</small></button>
-      <button className="touch-btn" onPointerDown={(e) => { e.preventDefault(); tap('KeyP', 'p'); }}>📱<small>Điện thoại</small></button>
+      <button className="touch-btn main" aria-label="Tương tác" onPointerDown={(e) => { e.preventDefault(); tap('KeyE', 'e'); }}>🤚<small>Tương tác</small></button>
+      <button className="touch-btn" aria-label="Lên / xuống xe" onPointerDown={(e) => { e.preventDefault(); tap('KeyF', 'f'); }}>🛵<small>Lên xe</small></button>
+      <button className={`touch-btn ${run ? 'on' : ''}`} aria-label="Chạy" onPointerDown={(e) => { e.preventDefault(); setRun((r) => !r); }}>🏃<small>Chạy</small></button>
+      <button className="touch-btn" aria-label="Drone" onPointerDown={(e) => { e.preventDefault(); tap('KeyV', 'v'); }}>🚁<small>Drone</small></button>
+      <button className="touch-btn" aria-label="Điện thoại" onPointerDown={(e) => { e.preventDefault(); tap('KeyP', 'p'); }}>📱<small>Điện thoại</small></button>
+      <button className="touch-btn" aria-label="Toàn màn hình, xoay ngang" onPointerDown={(e) => { e.preventDefault(); void goLandscape(); }}>⛶<small>Xoay ngang</small></button>
     </div>
   </div>;
 }
+
+/** The current action as a big button: tap it to do it (instead of "press E"). */
+function TouchPrompt() {
+  const prompt = useGame((s) => s.prompt);
+  const phase = useGame((s) => s.phase);
+  if (!prompt || phase === 'menu') return null;
+  const text = touchText(prompt.text);
+  if (!prompt.key) return <div className="touch-prompt info">{text}</div>;
+  const more = /M: Gọi thêm/.test(prompt.text);
+  return <div className="touch-prompt-row">
+    <button className="touch-prompt" onPointerDown={(e) => { e.preventDefault(); tap(prompt.key === 'F' ? 'KeyF' : 'KeyE', prompt.key === 'F' ? 'f' : 'e'); }}>👆 Chạm để {text.charAt(0).toLowerCase() + text.slice(1)}</button>
+    {more && <button className="touch-prompt small" onPointerDown={(e) => { e.preventDefault(); tap('KeyM', 'm'); }}>🍜 Gọi thêm</button>}
+  </div>;
+}
+/** Game messages, worded for touch. */
+function TouchToast() {
+  const toast = useGame((s) => s.toast);
+  const [text, setText] = useState<string | null>(null);
+  useEffect(() => { if (!toast) return; setText(touchText(toast.text)); const id = setTimeout(() => setText(null), 4200); return () => clearTimeout(id); }, [toast]);
+  return text ? <div className="touch-toast">{text}</div> : null;
+}
+void game;
 
 /** "Chơi bằng: Điện thoại / Laptop" for the start screen and the settings. */
 export function DevicePicker({ compact = false }: { compact?: boolean }) {
