@@ -75,3 +75,84 @@ Các góc khác sau khi sửa:
 4. Chưa có xe taxi hoặc NPC đón khách ở sảnh.
 
 Trạng thái duyệt hình: **chờ chủ dự án xem**.
+
+---
+
+# Giai đoạn 2: hầm gửi xe B2–B5, tính phí, thang máy
+
+## Đã làm
+
+- **Tầng và thang máy:**
+  - Tầng hầm B1–B5 (mã −1…−5): B1 ở −5 m, mỗi tầng tiếp sâu thêm 3,8 m.
+  - `FLOOR_REGISTRY` (floorId, displayName, category, sceneAsset, availableInGame, spawnAnchor) phân tầng theo đặc tả: 65 đài quan sát, 33–64 khách sạn/căn hộ, 32 chưa rõ, 8–31 văn phòng, 7 tiện ích, 1–6 TTTM, B1 LOTTE Mart, B2–B5 gửi xe.
+  - Bảng chọn tầng có B5…65. B1 bị khoá (chưa có cảnh) và báo rõ "chưa mở trong game".
+  - Thang máy có trạng thái IDLE / OPENING / OPEN / CLOSING / MOVING / ARRIVED và tiếng "ting" khi tới tầng.
+  - Không nhận chuyến chồng chuyến: gọi thang khi cabin đang bận thì được xếp hàng.
+- **Hầm (cách bố trí do game tự đặt, không phải sơ đồ thật):**
+  - Mặt bằng là toàn bộ đường bao OSM của toà nhà.
+  - Ô ô tô 2,5 × 5 m; ô xe máy 0,9 × 2 m (B2); có mã ô và khu A–D.
+  - Cột 0,8 m chân sơn vàng đen, vạch trắng, mũi tên, gờ giảm tốc, gương cầu lồi.
+  - Dải LED trắng; đèn xanh/đỏ trên từng ô (xanh là trống, đỏ là đã có xe).
+  - Biển B2…B5, KHU, EXIT, chỉ lên/xuống tầng, P · thang máy.
+  - Xe NPC đỗ khoảng một nửa số ô; xe NPC có va chạm.
+- **Dốc:**
+  - Ba dải dốc rộng 6 m nằm trong tường đông nam của khối đế.
+  - Dốc đường ↔ B2 vào qua một cổng ở góc nam khối đế, cạnh đường nội bộ.
+  - Phía tây bắc, OSM có một dãy nhà, nên không đặt cổng ở đó được.
+  - Dốc có tường hai bên; phía trên hầm có nắp tối, để camera sau xe không nhìn xuyên lên thành phố.
+- **Gửi xe** (`src/game/lotteParking.ts`):
+  - Đi xe vào cổng thì tự lấy vé (biển số giả lập, giờ vào).
+  - Dừng xe trong ô trống và xuống xe thì ô đó được ghi là của người chơi.
+  - Lái xe lên dốc thì barie chặn cho tới khi trả phí. Bảng thanh toán hiện biển số, giờ vào, giờ hiện tại, thời gian gửi, hội viên, ô đỗ, phí và số dư ví.
+  - Ví thiếu tiền thì báo rõ và không trừ tiền. Trả rồi thì không trừ lần hai.
+  - Vé và vị trí xe được lưu: tải lại game, xe vẫn nằm đúng ô.
+- **Biểu phí:** đúng như đặc tả, cấu hình trong `parkingConfig`.
+  - Xe đạp 3.000đ/lượt.
+  - Xe máy 5.000đ/lượt, qua đêm 20.000đ.
+  - Ô tô 40.000đ cho mỗi giờ bắt đầu.
+  - Hội viên Lime / Green / Orange miễn 120 / 180 / 360 phút mỗi ngày.
+
+## Kiểm tra trong game
+
+Mình chạy bằng script Playwright trên Edge. Ga xe được giữ bằng script vì phím W không vào được trình duyệt headless; phần lái, va chạm và độ cao vẫn là code xe của game.
+
+- Lái ô tô từ ngoài đường vào cổng thì lấy vé. Xe xuống dốc tới B2 ở độ cao −8,48 m, tầng −2.
+- Đỗ vào ô B2-A04 thì phiên ghi `parkingSlot = B2-A04` và lưu vị trí xe.
+- Lái lên dốc thì xe dừng trước barie và hiện "Trả phí gửi xe: 40.000đ".
+- Bấm Thanh toán: ví từ 300.000đ còn 260.000đ, trạng thái `paid`. Lái ra đường thì phiên đóng. Không lấy nhầm vé mới khi đi ra.
+- Ví chỉ còn 10.000đ: hiện "Không đủ tiền: cần 40.000đ, ví còn 10.000đ. Chưa trừ tiền", ví giữ nguyên.
+- Thử biểu phí:
+
+  | Trường hợp | Phí |
+  |---|---|
+  | Ô tô 150 phút | 120.000đ |
+  | Lime, còn đủ 120 phút miễn | 40.000đ |
+  | Lime, đã dùng 100 phút miễn | 120.000đ |
+  | Ô tô 60 phút | 40.000đ |
+  | Ô tô 61 phút | 80.000đ |
+  | Xe máy | 5.000đ |
+  | Xe máy qua đêm | 20.000đ |
+  | Xe đạp | 3.000đ |
+
+- Đỗ xe máy ở ô B2-A01 rồi tải lại trang: xe máy vẫn ở đúng ô (B2, y = −8,48).
+- Thang máy từ tầng 1 xuống B4: tới nơi ở y = −16,08 m, trạng thái OPENING.
+- FPS (Edge headless 1280×800, máy này): trong hầm 44–50, trên dốc và ngoài cổng 43–48.
+- `tsc --noEmit` và `vite build` sạch trên bản đã commit cộng 4 file của giai đoạn này.
+
+## Ảnh
+
+- [cổng hầm ở góc nam khối đế](ham-cong-vao.png)
+- [xe vừa xuống B2](ham-xe-xuong-b2.png)
+- [B2: ô đỗ, cột, LED, đèn trạng thái](ham-b2-o-do.png)
+- [quầy thu phí và nhân viên](ham-b2-quay-thu-phi.png)
+- [bảng thanh toán khi thiếu tiền](ham-thanh-toan-thieu-tien.png)
+
+## Chưa làm hoặc còn hạn chế (nói thật)
+
+- **Thời gian gửi tính theo giờ thật, không theo đồng hồ trong game:** game chưa có đồng hồ lưu bền. Vé có lưu giờ vào nên tải lại không bị mất.
+- **Hạng hội viên:** chưa có cách nào để lên hạng trong game, mặc định là Khách thường. Code ưu đãi đã sẵn sàng.
+- **Xe máy và xe đạp:** game hiện chỉ có xe máy và ô tô để lái, nên chưa có xe đạp thật để gửi.
+- **Xe thuê sau khi tải lại:** sau khi tải lại, xe nằm trong hầm nhưng hợp đồng thuê xe của tiệm thì mất (phần thuê xe vốn không được lưu). Mình cho phép "Lên xe của bạn" để lái ra.
+- **Mô hình xe:** xe NPC là khối hộp đơn giản.
+- **Camera lái xe:** camera đuổi theo xe (code của Player, mình không sửa) có thể nhô lên trên trần 3,4 m. Khi đó trần trong suốt nhìn từ trên xuống (kiểu cắt lớp), còn nắp tối chặn không cho thấy thành phố.
+- **Tầng không có cảnh:** chỉ có B1. Mình chưa làm trường hợp lỗi tải cảnh, vì các tầng dựng bằng React tại chỗ, không tải file.

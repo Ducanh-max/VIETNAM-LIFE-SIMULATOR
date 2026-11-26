@@ -14,7 +14,9 @@ import { GROUND_HEIGHT, insidePolygon, offsetRing, project, type Point } from '.
 export const FLOORS = 65;
 export const FLOOR_H = 4.05; // floor-to-floor: floor 67 ("PH", top floor) at 267 m
 export const TOWER_TOP = 272;
-export const floorY = (f: number) => (f - 1) * FLOOR_H;
+/** Floor level above the street: floors 1–65 at 4,05 m; basements B1 (−1) at −5 m, then 3,8 m per level down to B5. */
+export const floorY = (f: number) => (f >= 1 ? (f - 1) * FLOOR_H : -5 - (-f - 1) * 3.8);
+const CORE_HALF_V = 4.5;
 const SPEED = 6; // m/s
 const ACCEL = 1.1; // m/s²
 /*
@@ -112,43 +114,139 @@ export function fromTower(u: number, v: number): Point {
 /** Where you stand outside the lobby door. */
 export const lotteDoor = (): Point => fromTower(TOWER.halfU + 4, 0);
 
+// ---- floors: 1–65 above ground, B1–B5 below (floor ids −1…−5) ----
+export const BASEMENTS = 5;
+export const floorLabel = (f: number) => (f >= 1 ? String(f) : `B${-f}`);
+/** Every floor id from the bottom up: B5 … B1, 1 … 65. */
+export const FLOOR_IDS = [...Array.from({ length: BASEMENTS }, (_, i) => -(BASEMENTS - i)), ...Array.from({ length: FLOORS }, (_, i) => i + 1)];
+export type FloorCategory = 'parking' | 'supermarket' | 'lobby' | 'store' | 'amenity' | 'office' | 'unknown' | 'hotel' | 'deck';
+export type FloorInfo = { floorId: number; displayName: string; category: FloorCategory; sceneAsset: string; availableInGame: boolean; spawnAnchor: Point };
+/**
+ * FloorRegistry (spec section 5): what each floor is and whether the game has a scene for it. Only floors with a
+ * scene can be picked in the lift. B1 (LOTTE Mart) arrives with the next phase.
+ */
+export const FLOOR_REGISTRY: FloorInfo[] = FLOOR_IDS.map((f): FloorInfo => {
+  const at: Point = [0, CORE_HALF_V + 2.5];
+  if (f <= -2) return { floorId: f, displayName: `Hầm ${floorLabel(f)} · gửi xe`, category: 'parking', sceneAsset: 'LotteBasement', availableInGame: true, spawnAnchor: at };
+  if (f === -1) return { floorId: f, displayName: 'B1 · LOTTE Mart (đang chuẩn bị)', category: 'supermarket', sceneAsset: 'LotteMart', availableInGame: false, spawnAnchor: at };
+  if (f === 1) return { floorId: f, displayName: 'Sảnh · trung tâm thương mại', category: 'lobby', sceneAsset: 'Interior:lobby', availableInGame: true, spawnAnchor: at };
+  if (f <= 6) return { floorId: f, displayName: `Tầng ${f} · trung tâm thương mại`, category: 'store', sceneAsset: 'Interior:store', availableInGame: true, spawnAnchor: at };
+  if (f === 7) return { floorId: f, displayName: 'Tầng 7 · tiện ích khách sạn', category: 'amenity', sceneAsset: 'Interior:office', availableInGame: true, spawnAnchor: at };
+  if (f <= 31) return { floorId: f, displayName: `Tầng ${f} · văn phòng`, category: 'office', sceneAsset: 'Interior:office', availableInGame: true, spawnAnchor: at };
+  if (f === 32) return { floorId: f, displayName: 'Tầng 32', category: 'unknown', sceneAsset: 'Interior:office', availableInGame: true, spawnAnchor: at };
+  if (f <= 64) return { floorId: f, displayName: `Tầng ${f} · khách sạn / căn hộ`, category: 'hotel', sceneAsset: 'Interior:hotel', availableInGame: true, spawnAnchor: at };
+  return { floorId: f, displayName: 'Tầng 65 · Đài quan sát Hanoi Sky', category: 'deck', sceneAsset: 'Interior:deck', availableInGame: true, spawnAnchor: at };
+});
+export const floorInfo = (f: number) => FLOOR_REGISTRY.find((x) => x.floorId === f) ?? FLOOR_REGISTRY[BASEMENTS];
+
+// ---- the basement: the whole OSM outline (way 727570329, tower + podium + entrance), five levels ----
+const FOOT_LL: [number, number][] = [[21.0318738, 105.8123383], [21.0319716, 105.8119467], [21.0326727, 105.8121497], [21.0324512, 105.8130273], [21.0323902, 105.8132657], [21.032154, 105.8131962], [21.0321399, 105.8131252], [21.0320635, 105.8127269], [21.0320807, 105.8127208], [21.0320685, 105.8126824], [21.0320512, 105.8126912]];
+const footLocal = FOOT_LL.map(([lat, lon]) => toTower(project([lon, lat])));
+/** Basement outline (tower local), 0,6 m in from the outer wall. */
+export const BASEMENT_RING: Point[] = offsetRing(signedArea(footLocal) > 0 ? footLocal : [...footLocal].reverse(), -0.6);
+/**
+ * Ramps run in three 6 m strips inside the podium's south-east wall, in a frame s (along the wall, from the south
+ * corner towards the tower) / t (inward). Strip A: street ↔ B2, entered through a portal in the podium's south-west
+ * wall at the south corner, where the service road round the back of the podium bends (the north-west side is lined
+ * with houses in OSM, so the entrance cannot be there). Strip B: B2 ↔ B3 and, two floors lower, B4 ↔ B5. Strip C: B3 ↔ B4. Each ramp slopes
+ * between s = 3 and s = 63 (60 m, about 1 in 16 per 3,8 m storey, 1 in 7 for the 8,8 m street ramp).
+ */
+export const RAMP = (() => {
+  const pr = frame.podiumRing;
+  const A = pr.reduce((m, p) => (p[1] < m[1] ? p : m)); const B = pr.reduce((m, p) => (p[0] > m[0] ? p : m));
+  const len = Math.hypot(B[0] - A[0], B[1] - A[1]); const e: Point = [(B[0] - A[0]) / len, (B[1] - A[1]) / len];
+  let n: Point = [-e[1], e[0]];
+  const c = pr.reduce((s, p) => [s[0] + p[0] / pr.length, s[1] + p[1] / pr.length], [0, 0]);
+  if ((c[0] - A[0]) * n[0] + (c[1] - A[1]) * n[1] < 0) n = [-n[0], -n[1]];
+  return { A, e, n, len, S0: 3, S1: 63, strips: { A: [1, 7], B: [7.5, 13.5], C: [14, 20] } as Record<'A' | 'B' | 'C', [number, number]> };
+})();
+export const toRamp = (u: number, v: number): Point => { const du = u - RAMP.A[0], dv = v - RAMP.A[1]; return [du * RAMP.e[0] + dv * RAMP.e[1], du * RAMP.n[0] + dv * RAMP.n[1]]; };
+export const fromRamp = (s: number, t: number): Point => [RAMP.A[0] + RAMP.e[0] * s + RAMP.n[0] * t, RAMP.A[1] + RAMP.e[1] * s + RAMP.n[1] * t];
+type Strip = 'A' | 'B' | 'C';
+/** Ramps: strip, the floor at the s = S0 end, the floor at the s = S1 end. */
+export const RAMPS: { strip: Strip; l0: number; l1: number }[] = [
+  { strip: 'A', l0: 1, l1: -2 }, { strip: 'B', l0: -3, l1: -2 }, { strip: 'B', l0: -5, l1: -4 }, { strip: 'C', l0: -4, l1: -3 },
+];
+const stripOf = (t: number): Strip | null => { for (const k of ['A', 'B', 'C'] as Strip[]) { const [a, b] = RAMP.strips[k]; if (t > a && t < b) return k; } return null; };
+/** The ramp you are on (or about to enter) at level L, or null. */
+function rampHere(u: number, v: number, L: number) {
+  const [s, t] = toRamp(u, v); const k = stripOf(t); if (!k) return null;
+  if (s < -0.5 || s > RAMP.S1 + 6) return null;
+  const r = RAMPS.find((x) => x.strip === k && (x.l0 === L || x.l1 === L)); if (!r) return null;
+  if (r.l0 === 1 && s < 0) return null; // outside the portal: the street
+  const k01 = Math.min(1, Math.max(0, (s - RAMP.S0) / (RAMP.S1 - RAMP.S0)));
+  return { r, s, t, y: GROUND_HEIGHT + floorY(r.l0) + (floorY(r.l1) - floorY(r.l0)) * k01 };
+}
+/** Change level when you reach the far end of a ramp (called every frame with the player's or vehicle's position). */
+export function stepLevel(p: Point) {
+  const [u, v] = toTower(p); const L = lift.playerFloor; if (L > 1 || lift.riding) return;
+  const h = rampHere(u, v, L); if (!h) return;
+  if (h.r.l0 === L && h.s > RAMP.S1 - 0.5) lift.playerFloor = h.r.l1;
+  else if (h.r.l1 === L && h.s < RAMP.S0 + 0.5) lift.playerFloor = h.r.l0;
+}
+/** Extra blockers on the basement levels (columns, booth…), registered by world/LotteBasement. Arguments: u, v, floor. */
+export const basementBlockers: ((u: number, v: number, f: number) => boolean)[] = [];
+/** Exit barrier at the top of the street ramp: closed while the player's ticket is unpaid (set by the parking UI). */
+export const gates = { exitClosed: () => false };
+export const inBasementPlate = (u: number, v: number) => insidePolygon([u, v], BASEMENT_RING);
+
 // ---- plan layout (tower local) ----
 const inner = (u: number, v: number, f: number) => {
+  if (f < 0) return inBasementPlate(u, v);
   if (Math.abs(u) > TOWER.halfU + 2 || Math.abs(v) > TOWER.halfV + 2) return false;
   return insidePolygon([u, v], towerRingCached(floorY(f), 0.8));
 };
 /** Half width of the lobby entrance on the tower's east face (a 9 m glass front with sliding doors). */
 export const DOOR_HALF = 4.5;
-export const CORE = { halfU: 7, halfV: 4.5 };
+export const CORE = { halfU: 7, halfV: CORE_HALF_V };
 export const CABIN = { u0: -1.3, u1: 1.3, v0: 2.0, v1: 4.1 }; // the lift cabin, its door at v = 4.5 facing +v
 const inCore = (u: number, v: number) => Math.abs(u) < CORE.halfU && Math.abs(v) < CORE.halfV;
 export const inCabin = (u: number, v: number) => u > CABIN.u0 && u < CABIN.u1 && v > CABIN.v0 && v < CABIN.v1;
 const inDoorway = (u: number, v: number) => u > CABIN.u0 && u < CABIN.u1 && v >= CABIN.v1 && v < CORE.halfV + 0.1;
 
-// ---- the lift ----
+// ---- the lift: ElevatorController (spec 10.1) ----
+export type LiftState = 'IDLE' | 'OPENING' | 'OPEN' | 'CLOSING' | 'MOVING' | 'ARRIVED';
 export const lift = {
   playerFloor: 1, // floor the player is on (or left from while riding)
   cabinY: 0, cabinV: 0, cabinFloor: 1, target: 1,
   moving: false, riding: false, doors: 0, // 0 closed … 1 open
   doorWant: 0, doorTimer: 0,
+  arrive: 0, // seconds left in ARRIVED before the doors open
   panel: false,
-  inside: false, // player inside the tower
-  queue: [] as number[],
+  inside: false, // player inside the tower or basement
+  queue: [] as number[], // landing calls made while the cabin was busy, served in order
+  onArrive: null as ((f: number) => void) | null,
 };
-export const cabinAt = (f: number) => !lift.moving && lift.cabinFloor === f;
-
-/** Send the cabin to a floor (doors close first). `withPlayer` when the player is inside. */
-export function sendLift(f: number, withPlayer: boolean) {
-  f = Math.max(1, Math.min(FLOORS, Math.round(f)));
-  if (f === lift.cabinFloor && !lift.moving) { lift.doorWant = 1; lift.doorTimer = 6; return; }
+export const cabinAt = (f: number) => !lift.moving && lift.arrive <= 0 && lift.cabinFloor === f;
+export function liftState(): LiftState {
+  if (lift.moving) return 'MOVING';
+  if (lift.arrive > 0) return 'ARRIVED';
+  if (lift.doorWant && lift.doors < 1) return 'OPENING';
+  if (lift.doors >= 1) return 'OPEN';
+  if (lift.doors > 0) return 'CLOSING';
+  return 'IDLE';
+}
+/** Send the cabin to a floor (doors close first). `withPlayer` when the player is inside. False when refused or queued. */
+export function sendLift(f: number, withPlayer: boolean): boolean {
+  f = Math.round(f);
+  if (!FLOOR_IDS.includes(f) || !floorInfo(f).availableInGame) return false;
+  const busy = lift.moving || lift.arrive > 0 || lift.target !== lift.cabinFloor;
+  if (busy) { if (!withPlayer && !lift.queue.includes(f)) lift.queue.push(f); return false; } // no overlapping trips
+  if (f === lift.cabinFloor) { lift.doorWant = 1; lift.doorTimer = 6; return true; }
   lift.target = f; lift.riding = withPlayer; lift.doorWant = 0; lift.panel = false;
+  return true;
 }
 
 /** Advance the lift: doors, then travel with a trapezoidal speed profile. */
 export function stepLift(dt: number) {
+  if (lift.arrive > 0) { lift.arrive -= dt; if (lift.arrive <= 0) { lift.doorWant = 1; lift.doorTimer = 6; } return; }
   // doors
   lift.doors = Math.max(0, Math.min(1, lift.doors + (lift.doorWant ? 1 : -1) * dt / 1.1));
   if (lift.doorWant && lift.doors >= 1) { lift.doorTimer -= dt; if (lift.doorTimer <= 0 && !lift.panel) lift.doorWant = 0; }
+  // a queued landing call once the cabin is free and its doors have shut
+  if (!lift.moving && lift.target === lift.cabinFloor && lift.queue.length && lift.doors <= 0 && !lift.doorWant && !lift.panel) {
+    const next = lift.queue.shift()!; if (next === lift.cabinFloor) { lift.doorWant = 1; lift.doorTimer = 6; } else { lift.target = next; lift.riding = false; }
+  }
   const goal = floorY(lift.target);
   if (lift.target !== lift.cabinFloor || lift.moving) {
     if (lift.doors > 0) return; // wait for the doors to close
@@ -161,20 +259,33 @@ export function stepLift(dt: number) {
     if ((dir > 0 && lift.cabinY >= goal) || (dir < 0 && lift.cabinY <= goal) || dir === 0) {
       lift.cabinY = goal; lift.cabinV = 0; lift.moving = false; lift.cabinFloor = lift.target;
       if (lift.riding) lift.playerFloor = lift.target;
-      lift.riding = false; lift.doorWant = 1; lift.doorTimer = 6;
+      lift.riding = false; lift.arrive = 0.6; // ARRIVED: chime, then the doors open
+      lift.onArrive?.(lift.cabinFloor);
     }
   }
 }
-/** The floor number the cabin is passing (for the displays). */
-export const cabinFloorShown = () => Math.round(lift.cabinY / FLOOR_H) + 1;
+/** The floor the cabin is passing (for the displays), as its label. */
+export const cabinFloorShown = () => { let best = 1, bd = Infinity; for (const f of FLOOR_IDS) { const d = Math.abs(floorY(f) - lift.cabinY); if (d < bd) { bd = d; best = f; } } return floorLabel(best); };
 
 // ---- collision and floor height, registered with the world (see world/Lotte.tsx) ----
 export function lotteBlocks(p: Point): boolean {
   const [u, v] = toTower(p);
   if (Math.abs(u) > 160 || Math.abs(v) > 160) return false;
   const f = lift.playerFloor;
+  const ramp = f <= 1 ? rampHere(u, v, f) : null;
+  if (ramp) {
+    // inside a ramp strip: its side walls, and the exit barrier near the top of the street ramp
+    const [a, b] = RAMP.strips[ramp.r.strip];
+    if ((ramp.t < a + 0.35 || ramp.t > b - 0.35) && ramp.s > 0.5 && ramp.s < RAMP.S1) return true;
+    if (ramp.r.strip === 'A' && f === -2 && ramp.s > RAMP.S0 + 1 && ramp.s < RAMP.S0 + 1.6 && gates.exitClosed()) return true;
+    return false;
+  }
   const here = inner(u, v, f);
-  if (f > 1) {
+  if (f < 0) {
+    if (!here) return true; // basement walls
+    for (const test of basementBlockers) if (test(u, v, f)) return true;
+    // a ramp strip whose ramp does not serve this floor overhead is low: plain floor; strips serving it are handled above
+  } else if (f > 1) {
     if (!lift.inside) return false;
     if (!here) return true; // upper floors: only the tower's floor plate
   } else {
@@ -191,18 +302,20 @@ export function lotteBlocks(p: Point): boolean {
   return false;
 }
 export function lotteHeight(p: Point): number | null {
-  if (!frame) return null;
   const [u, v] = toTower(p);
-  if (!inner(u, v, lift.playerFloor)) return null;
-  if ((inCabin(u, v) || inDoorway(u, v)) && (lift.riding || cabinAt(lift.playerFloor))) return GROUND_HEIGHT + lift.cabinY;
-  return GROUND_HEIGHT + floorY(lift.playerFloor);
+  const f = lift.playerFloor;
+  if (f <= 1) { const r = rampHere(u, v, f); if (r) return r.y; }
+  if (!inner(u, v, f)) return null;
+  if ((inCabin(u, v) || inDoorway(u, v)) && (lift.riding || cabinAt(f))) return GROUND_HEIGHT + lift.cabinY;
+  return GROUND_HEIGHT + floorY(f);
 }
 /** Inside the tower's footprint (plan only, any floor). */
 export function insideTowerPlan(p: Point) { const [u, v] = toTower(p); return Math.abs(u) < TOWER.halfU + 1 && Math.abs(v) < TOWER.halfV + 1 && insidePolygon([u, v], towerRingCached(0, -1)); }
-/** Inside the tower's walkable plate (for camera limits and showing the interior). */
+/** Inside the tower's walkable plate on the player's floor, or anywhere in the basement / on a ramp below the street. */
 export function insideTower(p: Point) {
   const [u, v] = toTower(p);
+  if (lift.playerFloor < 0) return inBasementPlate(u, v) || !!rampHere(u, v, lift.playerFloor);
   return inner(u, v, lift.playerFloor);
 }
 
-if (import.meta.env.DEV) (window as unknown as { __lotte?: unknown }).__lotte = { lift, sendLift, lotteDoor, fromTower, toTower, LOTTE };
+if (import.meta.env.DEV) (window as unknown as { __lotte?: unknown }).__lotte = { lift, sendLift, lotteDoor, fromTower, toTower, LOTTE, RAMP, fromRamp, toRamp, liftState };

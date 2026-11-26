@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GROUND_HEIGHT, registerBlocker, registerHeight } from '../geo';
 import { insidePolygon } from '../geo';
-import { DOOR_HALF, CABIN, cabinAt, cabinFloorShown, CORE, floorY, FLOOR_H, FLOORS, GROOVE_LIPS, inCabin, insideTower, LOTTE, lift, lotteBlocks, lotteHeight, sendLift, stepLift, taper, toTower, TOWER, TOWER_TOP, towerRing } from '../lotte';
+import { DOOR_HALF, CABIN, cabinAt, cabinFloorShown, CORE, FLOOR_IDS, floorInfo, floorLabel, floorY, FLOOR_H, GROOVE_LIPS, inCabin, insideTower, LOTTE, lift, liftState, lotteBlocks, lotteHeight, sendLift, stepLevel, stepLift, taper, toTower, TOWER, TOWER_TOP, towerRing } from '../lotte';
+import { LotteBasement, LottePortal, ParkingPanel, useParkingFlow } from './LotteBasement';
 import { materials as worldMaterials } from './materials';
 import { game, player, useGame } from '../state';
 
@@ -173,7 +174,6 @@ const mats = () => (M ??= makeMats());
 
 /** A floor's purpose, after the article (hotel 33–64, store 1–6, deck 65; the rest offices). */
 const floorKind = (f: number) => (f === 65 ? 'deck' : f >= 33 ? 'hotel' : f >= 7 ? 'office' : f === 1 ? 'lobby' : 'store');
-const FLOOR_NAME: Record<string, string> = { lobby: 'Sảnh · Lotte Department Store', store: 'Lotte Department Store', office: 'Văn phòng', hotel: 'Lotte Hotel Hanoi', deck: 'Đài quan sát Hanoi Sky' };
 
 function Interior({ f, doorsRef, display }: { f: number; doorsRef: React.RefObject<THREE.Group[]>; display: THREE.Texture }) {
   const m = mats();
@@ -313,6 +313,19 @@ export function Lotte() {
   const display = useMemo(() => canvasTex(128, 48, () => {}), []);
   const lastShown = useRef('');
   useEffect(() => { const a = registerBlocker(lotteBlocks); const b = registerHeight(lotteHeight); return () => { a(); b(); }; }, []);
+  // arrival chime (two soft tones) when the cabin reaches the floor you are on or carries you
+  useEffect(() => {
+    let ctx: AudioContext | null = null;
+    lift.onArrive = () => {
+      if (!lift.inside) return;
+      try {
+        ctx ??= new AudioContext();
+        [880, 660].forEach((hz, i) => { const o = ctx!.createOscillator(), g = ctx!.createGain(); o.frequency.value = hz; o.type = 'sine'; const t0 = ctx!.currentTime + i * 0.28; g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.08, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.6); o.connect(g).connect(ctx!.destination); o.start(t0); o.stop(t0 + 0.65); });
+      } catch { /* audio not available */ }
+    };
+    return () => { lift.onArrive = null; };
+  }, []);
+  useParkingFlow();
   useFrame((_, delta) => {
     if (!LOTTE) return;
     const dt = Math.min(delta, 0.05);
@@ -324,6 +337,7 @@ export function Lotte() {
     const isNear = Math.abs(u) < 260 && Math.abs(v) < 260;
     if (isNear !== near) setNear(isNear);
     if (!isNear) return;
+    stepLevel(p); // up or down a basement ramp
     const inside = insideTower(p);
     lift.inside = inside;
     if (!inside && lift.playerFloor !== 1 && !lift.riding) lift.playerFloor = 1;
@@ -349,7 +363,7 @@ export function Lotte() {
     }
     // camera limits indoors
     const inCab = inCabin(u, v) && (lift.riding || cabinAt(lift.playerFloor));
-    if (inside) player.cameraMax = inCab ? 2.2 : 4; else if (player.cameraMax === 2.2 || player.cameraMax === 4) player.cameraMax = Infinity;
+    if (inside) player.cameraMax = inCab ? 2.2 : lift.playerFloor < 0 ? 3.2 : 4; else if (player.cameraMax === 2.2 || player.cameraMax === 4 || player.cameraMax === 3.2) player.cameraMax = Infinity;
     if (lift.panel && !inCab) lift.panel = false;
     // prompts
     const s = game.get();
@@ -361,15 +375,15 @@ export function Lotte() {
     const atLanding = inside && Math.abs(u) < 6 && v > CABIN.v1 - 0.2 && v < CORE.halfV + 6;
     if (atLanding && cabinAt(lift.playerFloor) && !lift.panel) { lift.doorWant = 1; lift.doorTimer = Math.max(lift.doorTimer, 2); }
     if (inCab && !lift.riding) {
-      game.offer({ id: 'lift-panel', text: `Thang máy Lotte · tầng ${lift.cabinFloor}: chọn tầng (1–${FLOORS})`, key: 'E', priority: 9, run: () => { lift.panel = true; lift.doorWant = 1; lift.doorTimer = 999; if (document.pointerLockElement) document.exitPointerLock(); game.set({}); } });
+      game.offer({ id: 'lift-panel', text: `Thang máy Lotte · tầng ${floorLabel(lift.cabinFloor)}: chọn tầng (B5–65)`, key: 'E', priority: 9, run: () => { lift.panel = true; lift.doorWant = 1; lift.doorTimer = 999; if (document.pointerLockElement) document.exitPointerLock(); game.set({}); } });
     } else if (lift.riding) {
-      game.offer({ id: 'lift-ride', text: `Đang lên/xuống… tầng ${cabinFloorShown()} → ${lift.target}`, key: null, priority: 9 });
+      game.offer({ id: 'lift-ride', text: `Đang lên/xuống… tầng ${cabinFloorShown()} → ${floorLabel(lift.target)}`, key: null, priority: 9 });
     } else if (atLanding) {
       game.offer(cabinAt(lift.playerFloor) && lift.doors > 0.5
         ? { id: 'lift-in', text: 'Cửa thang đã mở · bước vào thang máy', key: null, priority: 8 }
         : { id: 'lift-call', text: lift.moving ? `Thang đang tới · tầng ${cabinFloorShown()}` : 'Gọi thang máy', key: lift.moving ? null : 'E', priority: 8, run: () => sendLift(lift.playerFloor, false) });
     } else if (inside) {
-      game.offer({ id: 'lotte-floor', text: `Lotte Center · tầng ${lift.playerFloor} · ${FLOOR_NAME[floorKind(lift.playerFloor)]} · thang máy ở giữa sảnh`, key: null, priority: 1 });
+      game.offer({ id: 'lotte-floor', text: `Lotte Center · ${floorInfo(lift.playerFloor).displayName} · thang máy ở giữa${lift.playerFloor < 0 ? ' hầm' : ' sảnh'}`, key: null, priority: 1 });
     }
   });
   if (!LOTTE || !geo) return null;
@@ -403,8 +417,9 @@ export function Lotte() {
     <mesh material={m.frame} position={[TOWER.halfU, GROUND_HEIGHT + 3.05, 0]}><boxGeometry args={[0.5, 0.2, DOOR_HALF * 2]} /></mesh>
     <group ref={entry}>{[-1, 1].map((s) => <mesh key={`sd${s}`} material={m.window} position={[TOWER.halfU, GROUND_HEIGHT + 1.45, s * DOOR_HALF / 2]}><boxGeometry args={[0.06, 2.9, DOOR_HALF - 0.1]} /></mesh>)}</group>
     <mesh position={[TOWER.halfU + 2.2, GROUND_HEIGHT + 0.09, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}><planeGeometry args={[DOOR_HALF * 2 - 1, 3.5]} /><meshStandardMaterial color="#7a1f2a" roughness={0.9} /></mesh>
+    <LottePortal />
     {near && <>
-      <Interior key={floor} f={floor} doorsRef={landingDoors} display={display} />
+      {floor >= 1 ? <Interior key={floor} f={floor} doorsRef={landingDoors} display={display} /> : <LotteBasement key={floor} f={floor} />}
       <group position={[0, 0, 0]}><Cabin cabin={cabin} doors={cabinDoors} /></group>
     </>}
     {/* the ground-floor glass is part of Interior; seen from outside when far, a plain glass band */}
@@ -412,17 +427,20 @@ export function Lotte() {
   </group>;
 }
 
-/** The lift's floor panel: buttons 1–65, opened from inside the cabin. */
+const LIFT_STATE_VI = { IDLE: 'chờ', OPENING: 'đang mở cửa', OPEN: 'cửa mở', CLOSING: 'đang đóng cửa', MOVING: 'đang chạy', ARRIVED: 'đã tới' } as const;
+/** The lift's floor panel (B5–B1, 1–65; floors without a scene are greyed out), opened from inside the cabin; also hosts the parking payment panel. */
 export function LiftPanel() {
   useGame((s) => s.prompt?.id);
   const [, force] = useState(0);
+  const [note, setNote] = useState('');
   useEffect(() => { const id = setInterval(() => force((n) => n + 1), 200); return () => clearInterval(id); }, []);
-  if (!lift.panel) return null;
+  if (!lift.panel) return <ParkingPanel />;
   return <div className="lift-panel" role="dialog" aria-label="Bảng chọn tầng">
-    <div className="lift-head"><b>LOTTE CENTER</b><span>Thang máy · đang ở tầng {lift.cabinFloor}</span></div>
+    <div className="lift-head"><b>LOTTE CENTER</b><span>Thang máy · tầng {floorLabel(lift.cabinFloor)} · {LIFT_STATE_VI[liftState()]}</span></div>
     <div className="lift-grid">
-      {Array.from({ length: FLOORS }, (_, i) => FLOORS - i).map((f) => <button key={f} className={f === lift.cabinFloor ? 'here' : f === 65 ? 'deck' : ''} onClick={() => { sendLift(f, true); force((n) => n + 1); }}>{f}</button>)}
+      {[...FLOOR_IDS].reverse().map((f) => { const info = floorInfo(f); return <button key={f} title={info.displayName} disabled={!info.availableInGame} className={f === lift.cabinFloor ? 'here' : f === 65 ? 'deck' : f < 0 ? 'basement' : ''} onClick={() => { if (!sendLift(f, true)) setNote(info.availableInGame ? 'Thang đang bận, chờ một chút.' : `${info.displayName}: chưa mở trong game.`); force((n) => n + 1); }}>{floorLabel(f)}</button>; })}
     </div>
-    <div className="lift-foot"><span>65 · Đài quan sát Hanoi Sky · 33–64 Khách sạn · 7–32 Văn phòng · 1–6 Trung tâm thương mại</span><button onClick={() => { lift.panel = false; lift.doorTimer = 2; force((n) => n + 1); }}>Đóng</button></div>
+    {note && <p className="parking-msg">{note}</p>}
+    <div className="lift-foot"><span>65 · Hanoi Sky · 33–64 Khách sạn/căn hộ · 8–31 Văn phòng · 7 Tiện ích · 1–6 TTTM · B1 LOTTE Mart (sắp mở) · B2–B5 Gửi xe</span><button onClick={() => { lift.panel = false; lift.doorTimer = 2; force((n) => n + 1); }}>Đóng</button></div>
   </div>;
 }
