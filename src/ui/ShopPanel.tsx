@@ -36,12 +36,17 @@ export function ShopCounterPanel() {
       <button className="modal-close" aria-label="Đóng" onClick={close}>✕</button>
       <span className="modal-kicker">{shop.tagline.toUpperCase()} · PHỐ ĐINH TIÊN HOÀNG</span>
       <h2>{shop.name}</h2>
-      <p>{shop.seller} ({shop.role.toLowerCase()}) chào bạn. {shop.id === 'books' ? 'Sách mua xong cho vào túi.' : 'Mua xong ăn uống luôn tại quán.'}</p>
+      <p>{shop.seller} ({shop.role.toLowerCase()}) chào bạn. {shop.id === 'books' ? 'Sách mua xong cất vào balo; lấy ra rồi ngồi ghế đá bên hồ mà đọc.' : 'Ăn luôn tại quán, hoặc mang về cất vào balo để ăn lúc khác.'}</p>
       <ItemList shop={shop} basket={basket} setBasket={setBasket} />
       <div className="menu-total"><span>Tổng cộng <small>(Ví: {formatVnd(money)})</small></span><strong>{formatVnd(total)}</strong></div>
-      <button className="primary-button modal-primary" disabled={!basketCount(basket) || total > money} onClick={() => buyAtCounter(id, basket)}>
-        {total > money ? 'Không đủ tiền' : `Mua · ${formatVnd(total)}`}
-      </button>
+      <div className="shop-buttons">
+        {shop.id !== 'books' && <button className="primary-button modal-primary" disabled={!basketCount(basket) || total > money} onClick={() => buyAtCounter(id, basket, true)}>
+          {total > money ? 'Không đủ tiền' : `Ăn luôn · ${formatVnd(total)}`}
+        </button>}
+        <button className={`${shop.id === 'books' ? 'primary-button modal-primary' : 'text-button'}`} disabled={!basketCount(basket) || total > money} onClick={() => buyAtCounter(id, basket, false)}>
+          {total > money && shop.id === 'books' ? 'Không đủ tiền' : shop.id === 'books' ? `Mua, cất vào balo · ${formatVnd(total)}` : 'Mang về (cất vào balo)'}
+        </button>
+      </div>
     </section>
   </div>;
 }

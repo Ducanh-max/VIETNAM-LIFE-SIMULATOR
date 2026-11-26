@@ -3,6 +3,7 @@ import { type Point } from './geo';
 import { findRoute, routeLength } from './navigation';
 import { restaurantToWorld, RESTAURANT } from './osm';
 import { addMoney, formatVnd, game, MENU, player, pushMessage } from './state';
+import { addToBag, bagStore, takeOut } from './bag';
 
 /*
  * The shops next to Bún chả Đức Anh on Phố Đinh Tiên Hoàng (cà phê, bánh mì, phở bò, nhà sách) and the Food app:
@@ -32,9 +33,9 @@ export const SHOPS: Shop[] = [
     { id: 'suadau', name: 'Sữa đậu nành', note: 'Chai 300ml, ướp lạnh', price: 10_000, hunger: 6, thirst: 25 },
   ] },
   { id: 'pho', name: 'Phở bò Gia truyền', sign: 'PHỞ BÒ', tagline: 'Nước dùng ninh xương 12 tiếng', color: '#a3251c', seller: 'Bác Hùng', role: 'Nấu phở', x: HW + 2.1, w: 4.2, walkIn: true, items: [
-    { id: 'tai', name: 'Phở bò tái', note: 'Thịt bò tái, hành lá, nước dùng trong', price: 50_000, hunger: 62, thirst: 12 },
-    { id: 'chin', name: 'Phở bò chín', note: 'Thịt bò chín thái mỏng', price: 50_000, hunger: 62, thirst: 12 },
-    { id: 'dacbiet', name: 'Phở đặc biệt', note: 'Tái, chín, nạm, gầu, trứng chần', price: 70_000, hunger: 80, thirst: 14 },
+    { id: 'tai', name: 'Phở bò tái', note: 'Thịt bò tái, hành lá, nước dùng trong', price: 40_000, hunger: 62, thirst: 12 },
+    { id: 'chin', name: 'Phở bò chín', note: 'Thịt bò chín thái mỏng', price: 40_000, hunger: 62, thirst: 12 },
+    { id: 'dacbiet', name: 'Phở đặc biệt', note: 'Tái, chín, nạm, gầu, trứng chần', price: 55_000, hunger: 80, thirst: 14 },
     { id: 'quay', name: 'Quẩy', note: 'Hai chiếc, chấm nước phở', price: 5_000, hunger: 8, thirst: 0 },
     { id: 'tra', name: 'Trà đá', note: 'Cốc to', price: 5_000, hunger: 0, thirst: 28 },
   ] },
@@ -58,8 +59,8 @@ export type FoodOrder = {
   shop: ShopId; basket: Basket; food: number; fee: number; distance: number;
   stage: 'cooking' | 'riding' | 'arrived'; readyAt: number; shipper: string; reroutes: number;
 };
-type ShopState = { counter: ShopId | null; books: string[]; food: FoodOrder | null };
-let st: ShopState = { counter: null, books: [], food: null };
+type ShopState = { counter: ShopId | null; food: FoodOrder | null };
+let st: ShopState = { counter: null, food: null };
 const subs = new Set<() => void>();
 export const shopStore = {
   get: () => st,
@@ -70,23 +71,22 @@ export function useShops<T>(sel: (s: ShopState) => T): T { return useSyncExterna
 
 export const basketTotal = (shop: Shop, b: Basket) => shop.items.reduce((s, it) => s + it.price * (b[it.id] ?? 0), 0);
 export const basketCount = (b: Basket) => Object.values(b).reduce((s, n) => s + n, 0);
-function consume(shop: Shop, b: Basket) {
-  const g = game.get(); let hunger = g.hunger, thirst = g.thirst; const books: string[] = [];
-  for (const it of shop.items) { const n = b[it.id] ?? 0; hunger += it.hunger * n; thirst += it.thirst * n; if (it.book && n) books.push(it.name); }
-  game.set({ hunger: Math.min(100, hunger), thirst: Math.min(100, thirst) });
-  if (books.length) shopStore.set({ books: [...st.books, ...books] });
-  return books;
-}
-
-/** Buy at the counter: pay and eat / drink on the spot (books go in the bag). */
-export function buyAtCounter(id: ShopId, b: Basket) {
+/**
+ * Buy at the counter. Everything goes in the balo; with `eatNow` the first dish or drink comes straight out and you
+ * eat it there (the rest, and books, stay in the bag).
+ */
+export function buyAtCounter(id: ShopId, b: Basket, eatNow = true) {
   const shop = shopById(id); const total = basketTotal(shop, b);
   if (!basketCount(b)) return;
   if (total > game.get().money) { game.toast(`Không đủ tiền: cần ${formatVnd(total)}.`); return; }
   addMoney(-total, `${shop.name} (${basketCount(b)} món)`);
-  const books = consume(shop, b);
+  const before = new Set(bagStore.get().items.map((i) => i.uid));
+  addToBag(id, b);
   shopStore.set({ counter: null });
-  game.toast(books.length ? `Đã mua ${books.join(', ')} · ${formatVnd(total)}. Cảm ơn bạn!` : id === 'coffee' ? `Mát lạnh! · ${formatVnd(total)}` : `Ngon quá! · ${formatVnd(total)}`);
+  const fresh = bagStore.get().items.filter((i) => !before.has(i.uid));
+  const first = fresh.find((i) => !shop.items.find((x) => x.id === i.item)?.book);
+  if (eatNow && first) takeOut(first.uid);
+  else game.toast(`Đã mua ${basketCount(b)} món · ${formatVnd(total)}. Đã cho vào balo (B để mở).`);
 }
 
 // ---- Food app: delivery by a shipper on a xe máy --------------------------------------------------
@@ -116,14 +116,14 @@ export function placeFoodOrder(id: ShopId, b: Basket) {
   game.toast(`Đã đặt ${basketCount(b)} món ở ${shop.name}. Khoảng ${q.minutes} phút nữa shipper tới.`);
   return true;
 }
-/** The shipper hands the bag over. */
+/** The shipper hands the bag over: it goes in the balo. */
 export function receiveFood() {
   const f = st.food; if (!f) return;
   const shop = shopById(f.shop);
-  const books = consume(shop, f.basket);
+  addToBag(f.shop, f.basket);
   pushMessage(`Shipper ${f.shipper}`, `Đơn ${shop.name} đã giao xong. Chúc bạn ngon miệng!`);
   shopStore.set({ food: null });
-  game.toast(books.length ? `Đã nhận ${books.join(', ')}.` : `Đã nhận đồ ăn từ ${shop.name}. Ngon quá!`);
+  game.toast(`Đã nhận đồ từ ${shop.name}, cất vào balo. Mở balo (B) để ăn.`);
 }
 export function cancelFood() {
   const f = st.food; if (!f || f.stage !== 'cooking') return;

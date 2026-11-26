@@ -7,6 +7,7 @@ import { actions, game, useGame } from './game/state';
 import { NameEntry } from './ui/Entry';
 import { BossDialog, JobPanel, MenuPanel, NeedsHud, PromptAndToast, Speedometer } from './ui/Hud';
 import { ShopCounterPanel } from './ui/ShopPanel';
+import { Backpack } from './ui/Backpack';
 import { LiftPanel } from './game/world/Lotte';
 import { MultiplayerPanel, roomFromUrl } from './ui/MultiplayerPanel';
 import { RentalPanel } from './ui/RentalPanel';
@@ -151,6 +152,7 @@ function App() {
       {phone && !paused && !panel && <Phone onClose={() => game.set({ phone: false })} />}
       {menuOpen && !paused && !panel && <MenuPanel />}
       {!paused && !panel && <ShopCounterPanel />}
+      {!paused && !panel && !freeCamera && <Backpack />}
       {dialog === 'boss' && !paused && !panel && <BossDialog />}
       {!panel && !paused && !menuOpen && !dialog && !phone && <button className="capture-tip" onClick={lockPointer}>Nhấp vào cảnh để điều khiển camera</button>}
       {paused && !panel && <div className="pause-scrim"><div className="pause-card"><span className="modal-kicker">TẠM DỪNG</span><h2>Dừng chân bên hồ.</h2><p>Thành phố vẫn ở đây khi bạn quay lại.</p><button className="primary-button" onClick={() => setPaused(false)}><Icon name="play" /> Tiếp tục</button><button className="text-button" onClick={returnHome}>Về màn hình chính →</button></div></div>}

@@ -365,3 +365,25 @@
 .food-app .menu-price { color: #c2410c; }
 .food-app .qty button { background: #f3efe6; color: #1f1f24; border-color: #d9d2c2; }
 .food-app .text-button { color: #2f6fd0; justify-self: start; padding: 0; }
+
+/* balo (backpack) and the book reader */
+.bag-button { position: fixed; right: 24px; top: 216px; z-index: 12; width: 54px; height: 54px; border-radius: 16px; border: 1px solid rgba(230, 189, 131, .45); background: rgba(16, 38, 34, .86); font-size: 26px; cursor: pointer; display: grid; place-items: center; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+.bag-button i { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; border-radius: 10px; background: #e8542f; color: #fff; font: 800 11px/20px "Be Vietnam Pro", Arial, sans-serif; font-style: normal; }
+.bag-button small { position: absolute; bottom: 2px; right: 6px; font: 700 9px "Be Vietnam Pro", Arial, sans-serif; color: #e6bd83; }
+.bag-panel { position: fixed; right: 88px; top: 216px; z-index: 25; width: 330px; max-height: 62vh; overflow: auto; padding: 12px; border-radius: 18px; background: rgba(250, 246, 237, .97); color: #222; box-shadow: 0 14px 40px rgba(0,0,0,.35); font: 13px "Be Vietnam Pro", Arial, sans-serif; }
+.bag-panel header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; } .bag-panel header span { color: #778; flex: 1; }
+.bag-panel header button { border: 0; background: none; font-size: 16px; cursor: pointer; }
+.bag-panel ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.bag-panel li { display: grid; grid-template-columns: 30px 1fr auto; gap: 8px; align-items: center; padding: 8px; border-radius: 12px; background: #fff; border: 1px solid #ece4d4; }
+.bag-icon { font-size: 22px; } .bag-name small { display: block; color: #778; font-size: 11px; }
+.bag-panel li button, .bag-held button { border: 0; border-radius: 10px; padding: 6px 10px; background: #1f6b52; color: #fff; font-weight: 700; cursor: pointer; }
+.bag-panel li button:disabled { opacity: .45; cursor: default; }
+.bag-held { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px; margin-bottom: 8px; border-radius: 12px; background: #fff3dc; }
+.bag-empty { color: #667; } .bag-panel footer { margin-top: 8px; color: #778; font-size: 11px; }
+.reader { position: fixed; left: 24px; top: 200px; z-index: 24; width: min(440px, 46vw); padding: 18px 22px; border-radius: 16px; background: #fbf6e9; color: #2a2118; box-shadow: 0 16px 44px rgba(0,0,0,.4); border: 1px solid #e3d5b5; font: 15px/1.6 "Be Vietnam Pro", Arial, sans-serif; }
+.reader h3 { margin: 2px 0 8px; font-size: 20px; } .reader-kicker { font: 700 10px "Be Vietnam Pro", Arial, sans-serif; letter-spacing: .12em; color: #9a7a4a; }
+.reader-page { white-space: pre-line; min-height: 110px; margin: 0 0 10px; }
+.reader-nav, .reader-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; font: 12px "Be Vietnam Pro", Arial, sans-serif; }
+.reader button { border: 1px solid #d8c8a4; border-radius: 10px; padding: 6px 12px; background: #fff; cursor: pointer; font: 600 12px "Be Vietnam Pro", Arial, sans-serif; }
+.reader button:disabled { opacity: .4; cursor: default; } .reader small { color: #9a8a6a; font: 11px "Be Vietnam Pro", Arial, sans-serif; }
+.shop-buttons { display: grid; gap: 6px; } .shop-buttons .text-button { color: #f2d9a6; }

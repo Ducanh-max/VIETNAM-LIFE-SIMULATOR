@@ -1,6 +1,7 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { registerSeats, type Seat } from '../bag';
 import * as THREE from 'three';
-import { RESTAURANT } from '../osm';
+import { RESTAURANT, restaurantToWorld } from '../osm';
 import { SHOPS, type Shop } from '../shops';
 import { Instances, trs, unitBox } from './Instances';
 import { NameTag, Person, type PersonAnim } from './Person';
@@ -208,6 +209,19 @@ function OpenShop({ s }: { s: Shop }) {
   </group>;
 }
 
+/** The plastic stools in the shops, as seats: restaurant-frame x, z and the way the sitter faces (local dx, dz). */
+function shopStools(): [number, number, number, number][] {
+  const out: [number, number, number, number][] = [];
+  for (const s of walkInShops) {
+    const back = HD - SHOP_DEPTH;
+    if (s.id === 'banhmi') out.push([s.x + 1.2, HD - 2.4, 0, -1], [s.x + 0.6, HD - 3.4, 0, -1]);
+    if (s.id === 'pho') for (const dz of [2.4, 4.6]) out.push([s.x - 1.0, back + dz - 0.7, 0, 1], [s.x - 1.0, back + dz + 0.7, 0, -1], [s.x - 0.2, back + dz, -1, 0]);
+    if (s.id === 'coffee') for (const [dx, z] of [[-1.0, HD - 2.0], [1.0, HD - 3.6]]) out.push([s.x + dx - 0.5, z, 1, 0], [s.x + dx + 0.5, z, -1, 0]);
+  }
+  return out;
+}
+
 export function StreetShops() {
+  useEffect(() => registerSeats(shopStools().map(([x, z, dx, dz]): Seat => ({ p: restaurantToWorld(x, z), facing: RESTAURANT.angle + Math.atan2(dx, dz), height: 0.4, kind: 'stool' }))), []);
   return <>{walkInShops.map((s) => <OpenShop key={s.id} s={s} />)}</>;
 }

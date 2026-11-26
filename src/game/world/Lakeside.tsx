@@ -1,5 +1,6 @@
 import { useFrame } from '@react-three/fiber';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { registerSeats, type Seat } from '../bag';
 import * as THREE from 'three';
 import { Water } from 'three/examples/jsm/objects/Water.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -149,7 +150,7 @@ function Ground() {
 /** Cast-iron lamp posts, benches and the lakeside trees (willows on the water's edge, shade trees behind). */
 function StreetLife({ time }: { time: TimeOfDay }) {
   const m = materials();
-  const { trees, poles, lanterns, benches, benchLegs } = useMemo(() => {
+  const { trees, poles, lanterns, benches, benchLegs, seats } = useMemo(() => {
     const r = rng(17);
     const list: Tree[] = [];
     const nearBridge = (p: Point) => distanceToSegment(p, bridgeEnds[0], [bridgeEnds[0][0] + (bridgeEnds[0][0] - bridgeEnds[1][0]) * 0.4, bridgeEnds[0][1] + (bridgeEnds[0][1] - bridgeEnds[1][1]) * 0.4]) < 7;
@@ -165,14 +166,18 @@ function StreetLife({ time }: { time: TimeOfDay }) {
     }
     const bench: THREE.Matrix4[] = [];
     const legs: THREE.Matrix4[] = [];
+    const seats: Seat[] = [];
     for (const { point, angle } of sampleRing(streetRing(7.4), 26)) {
       if (nearBridge(point) || r() < 0.3) continue;
       bench.push(trs(point[0], GROUND_HEIGHT + 0.45, point[1], -angle, 1.8, 0.08, 0.5));
       bench.push(trs(point[0] + Math.sin(angle) * 0.22, GROUND_HEIGHT + 0.75, point[1] - Math.cos(angle) * 0.22, -angle, 1.8, 0.4, 0.06));
       legs.push(trs(point[0], GROUND_HEIGHT + 0.22, point[1], -angle, 1.6, 0.44, 0.42));
+      // two places on each ghế đá, facing away from the backrest (toward the lake)
+      for (const along of [-0.45, 0.45]) seats.push({ p: [point[0] + Math.cos(angle) * along - Math.sin(angle) * 0.05, point[1] + Math.sin(angle) * along + Math.cos(angle) * 0.05], facing: -angle, height: 0.49, kind: 'bench' });
     }
-    return { trees: list, poles: pole, lanterns: lamp, benches: bench, benchLegs: legs };
+    return { trees: list, poles: pole, lanterns: lamp, benches: bench, benchLegs: legs, seats };
   }, []);
+  useEffect(() => registerSeats(seats), [seats]);
   const glow = useMemo(() => new THREE.MeshStandardMaterial({ color: '#fff4d6', emissive: '#ffc46b', emissiveIntensity: time === 'night' ? 2.2 : time === 'sunset' ? 0.8 : 0.05, roughness: 0.4 }), [time]);
   const wood = useMemo(() => new THREE.MeshStandardMaterial({ color: '#7a5233', roughness: 0.8 }), []);
   return <group>

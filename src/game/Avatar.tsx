@@ -13,6 +13,8 @@ import { taxi } from './ride';
 import { bike, game, player, useGame } from './state';
 import { Bottle, bottleLip, Chopsticks, IceGlass, Morsel, TakeawayBag } from './world/food';
 import { GRIP, PILLION, SEAT } from './world/Scooter';
+import { bagStore, useBag } from './bag';
+import { HeldModel } from './world/HeldItems';
 
 /*
  * The player's chibi avatar, driven by an animation state machine (IDLE, WALK, RUN, SPRINT, SIT_DOWN,
@@ -87,6 +89,10 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
   const [idleLook, setIdleLook] = useState(false);
   const sitBlend = useRef(0);
   const phone3d = useRef<THREE.Group>(null);
+  const heldRef = useRef<THREE.Group>(null);
+  const held = useBag((s) => s.held);
+  const seatedNow = useRef(false);
+  const [readingOpen, setReadingOpen] = useState(false);
   const sticks = useRef<THREE.Group>(null);
   const morsel = useRef<THREE.Group>(null);
   const heldBottle = useRef<THREE.Group>(null);
@@ -129,6 +135,10 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
     avatarAnim.state = state;
 
     let showSticks = false, showMorsel = false, showBottle = false, showGlass = false, showStream = false, showBag = false, showPhone = false;
+    // something from the balo in the hands: eaten in bites / sips, or a book held open to read
+    const H = s.phase === 'none' ? bagStore.get().held : null;
+    let showHeld = false;
+    const bite = (period: number) => { const u = (c.t % period) / period; return u < 0.3 ? 0 : u < 0.45 ? (u - 0.3) / 0.15 : u < 0.7 ? 1 : u < 0.85 ? 1 - (u - 0.7) / 0.15 : 0; };
     let headPitch = 0;
     const R = -1, L = 1; // right arm at −x, left arm at +x
     const leg = (side: number, thigh: number, knee: number, splay = 0) => {
@@ -281,10 +291,25 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
         }
         if (!rightBusy) handR = tip.clone().addScaledVector(tipDir, -STICK);
       }
+      let heldAt: 'R' | 'mid' | null = null;
+      if (H && !eating) {
+        if (H.kind === 'book') { handR = V(-0.09, 0.86, 0.3); handL = V(0.09, 0.86, 0.3); handPoseR = 'grip'; handPoseL = 'grip'; headPitch = 0.42; heldAt = 'mid'; }
+        else {
+          const mouthB = toBody(MOUTH, t.rotation.x).add(V(-0.03, -0.07, 0.09));
+          const restB = V(-0.11, 0.78, 0.3);
+          handR = restB.clone().lerp(mouthB, bite(H.kind === 'drink' ? 3 : 2.6)); handPoseR = 'grip'; heldAt = 'R';
+          if (H.shop === 'pho' || (H.shop === 'buncha' && H.item === 'buncha')) { handL = V(0.08, 0.74, 0.3); handPoseL = 'grip'; }
+        }
+      }
       // blend the seated reach in as the avatar settles onto the stool
       const al = lean(leanTarget * k);
       const hr = arm(R, toTorso(handR, al));
       const hl = arm(L, toTorso(handL, al));
+      if (heldAt && heldRef.current) {
+        showHeld = true;
+        if (heldAt === 'mid') { heldRef.current.position.copy(hr).add(hl).multiplyScalar(0.5).add(V(0, 0.02, 0.03)); heldRef.current.rotation.set(0.75 - al, 0, 0); }
+        else { heldRef.current.position.copy(hr).add(V(0.01, -0.01, 0.02)); heldRef.current.rotation.set(-al, 0, 0); }
+      }
       const dirT = tipDir.clone().applyAxisAngle(X, -al);
       if (sticks.current) { sticks.current.position.copy(hr).addScaledVector(dirT, STICK - 0.12); sticks.current.quaternion.setFromUnitVectors(V(0, 0, 1), dirT); }
       if (morsel.current) morsel.current.position.copy(hr).addScaledVector(dirT, STICK).add(V(0, -0.008, 0));
@@ -341,6 +366,21 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
       showPhone = state === 'USING_PHONE';
       const carrying = s.job?.stage === 'deliver';
       for (const side of [R, L]) {
+        if (H && !showPhone && !carrying) {
+          if (H.kind === 'book') {
+            // the closed book carried in front of the chest (sit down on a bench or stool to read it)
+            const w = arm(side, V(side * 0.07, 0.24, 0.24), V(side, -0.6, -0.2));
+            if (side === R) { handPoseR = 'grip'; if (heldRef.current) { heldRef.current.position.copy(w).add(V(0.07, 0.02, 0.02)); heldRef.current.rotation.set(-0.3, 0, 0); showHeld = true; } } else handPoseL = 'grip';
+            continue;
+          }
+          if (side === R) {
+            const w = arm(R, V(-0.1, 0.18, 0.24).lerp(MOUTH.clone().add(V(-0.03, -0.07, 0.08)), bite(H.kind === 'drink' ? 3 : 2.6)), V(-1, -0.6, -0.2));
+            handPoseR = 'grip';
+            if (heldRef.current) { heldRef.current.position.copy(w).add(V(0.01, -0.01, 0.02)); heldRef.current.rotation.set(0, 0, 0); showHeld = true; }
+            continue;
+          }
+          if (H.shop === 'pho' || (H.shop === 'buncha' && H.item === 'buncha')) { arm(L, V(0.07, 0.15, 0.24), V(1, -0.6, -0.2)); handPoseL = 'grip'; continue; }
+        }
         if (showPhone && side === L) {
           // holding the phone in front of the chest, looking down at it; the other hand taps
           const hl = arm(L, V(0.04, 0.27, 0.25), V(1, -0.6, -0.2));
@@ -391,6 +431,10 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
     if (heldGlass.current) heldGlass.current.visible = showGlass;
     if (stream.current) stream.current.visible = showStream;
     if (bag.current) bag.current.visible = showBag;
+    if (heldRef.current) heldRef.current.visible = showHeld;
+    const reading = !!H && H.kind === 'book' && !!player.seat;
+    if (reading !== readingOpen) setReadingOpen(reading);
+    seatedNow.current = !!player.seat;
     if (phone3d.current) phone3d.current.visible = showPhone;
     R0.setHand('L', handPoseL); R0.setHand('R', handPoseR);
     if (idle !== idleLook) setIdleLook(idle);
@@ -409,6 +453,7 @@ export function Avatar({ speed, expressionOverride }: { speed: { current: number
         <mesh ref={stream} visible={false} material={streamMat}><cylinderGeometry args={[0.005, 0.008, 1, 8]} /></mesh>
         <group ref={bag} visible={false} scale={0.85}><TakeawayBag /></group>
         <group ref={phone3d} visible={false}><Phone3D /></group>
+        <group ref={heldRef} visible={false}>{held && <HeldModel shop={held.shop} item={held.item} open={readingOpen} />}</group>
       </group>
     </group>
   </group>;
