@@ -2,46 +2,32 @@ import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GROUND_HEIGHT, registerBlocker, registerHeight } from '../geo';
-import { DOOR_HALF, CABIN, cabinAt, cabinFloorShown, CORE, floorY, FLOOR_H, FLOORS, inCabin, insideTower, LOTTE, lift, lotteBlocks, lotteHeight, sendLift, stepLift, taper, toTower, TOWER, TOWER_TOP } from '../lotte';
+import { insidePolygon } from '../geo';
+import { DOOR_HALF, CABIN, cabinAt, cabinFloorShown, CORE, floorY, FLOOR_H, FLOORS, GROOVE_LIPS, inCabin, insideTower, LOTTE, lift, lotteBlocks, lotteHeight, sendLift, stepLift, taper, toTower, TOWER, TOWER_TOP, towerRing } from '../lotte';
+import { materials as worldMaterials } from './materials';
 import { game, player, useGame } from '../state';
 
 /*
- * Lotte Center Hà Nội: a glass tower tapering from 56 × 32 m to the crown at 272 m beside a six-storey
- * podium, with a walk-in lobby, a working lift (see lotte.ts) and the interior of the floor you are on:
+ * Lotte Center Hà Nội: a 56 × 32 m glass tower to 272 m, its broad faces split by a vertical groove into two
+ * leaves that draw in at mid-height and open out at the crown (the áo dài idea), beside a six-storey patterned
+ * blue-glass podium, with a walk-in lobby, a working lift (see lotte.ts) and the interior of the floor you are on:
  * department store (1–6), offices (7–32), hotel corridors (33–64) and the glass observation deck (65).
  * Only the player's floor and the cabin are drawn inside; the outside is one merged shaft mesh.
  */
-const ROUND = 7;
-/** Rounded-rectangle outline; long straight sides are split into ≤ 2 m pieces so a doorway can be cut out of one. */
-function roundedRing(hu: number, hv: number, r: number, seg = 5) {
-  const raw = roundedRingRaw(hu, hv, r, seg);
-  const pts: [number, number][] = [];
-  for (let i = 0; i < raw.length; i++) {
-    // pieces of about 2 m at the tower's base size; the count depends only on the shape (not the taper), so every
-    // ring of the tapered shaft has the same number of vertices and the walls don't twist
-    const a = raw[i], b = raw[(i + 1) % raw.length]; const n = Math.max(1, Math.ceil((Math.hypot(b[0] - a[0], b[1] - a[1]) / hu) * TOWER.halfU / 2 - 1e-4));
-    for (let k = 0; k < n; k++) pts.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]);
-  }
-  return pts;
-}
-function roundedRingRaw(hu: number, hv: number, r: number, seg = 5) {
-  const pts: [number, number][] = [];
-  const corners: [number, number, number][] = [[hu - r, hv - r, 0], [-hu + r, hv - r, Math.PI / 2], [-hu + r, -hv + r, Math.PI], [hu - r, -hv + r, Math.PI * 1.5]];
-  for (const [cx, cz, a0] of corners) for (let i = 0; i <= seg; i++) { const a = a0 + (i / seg) * (Math.PI / 2); pts.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); }
-  return pts;
-}
-/** Tapered rounded shaft from y0 to y1 (tower local: x = u, z = v), UVs: u by perimeter (4 m bays), v by floors. */
+/** The facade texture repeats every 32 m round the tower and every 16 floors up it. */
+const FACADE_U = 32, FACADE_FLOORS = 16;
+/** The shaft from y0 to y1 (tower local: x = u, z = v), its rings following towerRing; UVs per FACADE_U / FACADE_FLOORS. */
 function shaft(y0: number, y1: number, scale = 1, rings = 14) {
   const pos: number[] = [], uv: number[] = [], idx: number[] = [];
   let ringLen = 0;
   for (let k = 0; k <= rings; k++) {
-    const y = y0 + ((y1 - y0) * k) / rings; const s = taper(y) * scale;
-    const ring = roundedRing(TOWER.halfU * s, TOWER.halfV * s, ROUND * s);
+    const y = y0 + ((y1 - y0) * k) / rings;
+    const ring = towerRing(y - GROUND_HEIGHT).map(([u, v]): [number, number] => [u * scale, v * scale]);
     ringLen = ring.length;
     let acc = 0;
     for (let i = 0; i <= ring.length; i++) {
       const p = ring[i % ring.length]; if (i) { const q = ring[i - 1]; acc += Math.hypot(p[0] - q[0], p[1] - q[1]); }
-      pos.push(p[0], y, p[1]); uv.push(acc / 8, y / FLOOR_H);
+      pos.push(p[0], y, p[1]); uv.push(acc / FACADE_U, (y - GROUND_HEIGHT) / (FLOOR_H * FACADE_FLOORS));
     }
   }
   const w = ringLen + 1;
@@ -53,25 +39,25 @@ function shaft(y0: number, y1: number, scale = 1, rings = 14) {
 }
 /** Floor-1 glass of the tower seen from outside, with the lobby door opening on the east face. */
 function lobbyBand() {
-  const ring = roundedRing(TOWER.halfU, TOWER.halfV, ROUND);
+  const ring = towerRing(0);
   const pos: number[] = [], uv: number[] = [];
   const y0 = GROUND_HEIGHT - 0.02, y1 = GROUND_HEIGHT + FLOOR_H + 0.02;
   let acc = 0;
   for (let i = 0; i < ring.length; i++) {
     const a = ring[i], b = ring[(i + 1) % ring.length]; const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    const u0 = acc / 8, u1 = (acc + l) / 8; acc += l;
+    const u0 = acc / FACADE_U, u1 = (acc + l) / FACADE_U; acc += l;
     if (a[0] > TOWER.halfU - 0.5 && b[0] > TOWER.halfU - 0.5 && Math.abs((a[1] + b[1]) / 2) < DOOR_HALF) continue; // the door
     // counter-clockwise ring seen from above: this winding faces outward
     pos.push(a[0], y0, a[1], a[0], y1, a[1], b[0], y0, b[1], b[0], y0, b[1], a[0], y1, a[1], b[0], y1, b[1]);
-    uv.push(u0, 0, u0, 1, u1, 0, u1, 0, u0, 1, u1, 1);
+    const t = 1 / FACADE_FLOORS; uv.push(u0, 0, u0, t, u1, 0, u1, 0, u0, t, u1, t);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.computeVertexNormals();
   return g;
 }
-function cap(y: number, scale: number) {
-  const s = taper(y) * scale; const ring = roundedRing(TOWER.halfU * s, TOWER.halfV * s, ROUND * s);
+function cap(y: number, scale: number, inset = 0) {
+  const ring = towerRing(y - GROUND_HEIGHT, inset).map(([u, v]): [number, number] => [u * scale, v * scale]);
   const shape = new THREE.Shape(ring.map(([x, z]) => new THREE.Vector2(x, -z)));
   const g = new THREE.ShapeGeometry(shape); g.rotateX(-Math.PI / 2); g.translate(0, y, 0); return g;
 }
@@ -83,29 +69,93 @@ function canvasTex(w: number, h: number, draw: (c: CanvasRenderingContext2D) => 
 }
 
 let M: ReturnType<typeof makeMats> | null = null;
-function makeMats() {
-  const glass = canvasTex(128, 128, (c) => {
-    const g = c.createLinearGradient(0, 0, 0, 128); g.addColorStop(0, '#7f98a6'); g.addColorStop(1, '#5c7482');
-    c.fillStyle = g; c.fillRect(0, 0, 128, 128);
-    c.fillStyle = 'rgba(255,255,255,.08)'; c.fillRect(0, 0, 64, 128);
-    c.fillStyle = '#c8d0d4'; c.fillRect(0, 112, 128, 16); // floor band
-    c.fillStyle = '#9aa6ad'; for (const x of [0, 64]) c.fillRect(x, 0, 4, 128); // mullions
-  }, true);
-  const podium = canvasTex(128, 128, (c) => {
-    c.fillStyle = '#d9d4ca'; c.fillRect(0, 0, 128, 128);
-    c.fillStyle = '#56656e'; c.fillRect(8, 30, 112, 70);
-    c.fillStyle = '#c3bcb0'; for (const x of [40, 72, 104]) c.fillRect(x, 30, 4, 70);
-  }, true);
-  const sign = canvasTex(512, 96, (c) => {
-    c.fillStyle = '#c8102e'; c.fillRect(0, 0, 512, 96);
-    c.fillStyle = '#fff'; c.font = 'bold 54px Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('LOTTE CENTER', 256, 50);
+/** A small deterministic random sequence, so the facade looks the same on every load. */
+function rng(seed: number) { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
+/** Colours of the spec sheet (section 13): glass, glass highlight, aluminium, brand red. */
+const C = { glass: '#548EB4', light: '#A8CBDC', alu: '#B8C3C9', red: '#D51D32' };
+function shade(hex: string, k: number) { return '#' + new THREE.Color(hex).multiplyScalar(k).getHexString(); }
+/**
+ * Facade atlas: 32 m round × 16 floors up. 20 panes of 1.6 m per row, a frit spandrel band at each slab, silver
+ * mullions; every pane a slightly different blue with the sky's highlight in its upper part. The night map
+ * draws the same grid with uneven lit windows (whole lit runs on some floors, scattered rooms on others).
+ */
+function facadeMaps() {
+  const W = 512, H = 1024, cols = 20, rows = FACADE_FLOORS; const pw = W / cols, ph = H / rows;
+  const r = rng(54);
+  const day = document.createElement('canvas'); day.width = W; day.height = H; const d = day.getContext('2d')!;
+  const night = document.createElement('canvas'); night.width = W; night.height = H; const n = night.getContext('2d')!;
+  n.fillStyle = '#0c1c2c'; n.fillRect(0, 0, W, H); // unlit glass still reads faintly blue against the night sky
+  for (let row = 0; row < rows; row++) {
+    const busy = r(); // how busy this floor is tonight
+    for (let col = 0; col < cols; col++) {
+      const x = col * pw, y = row * ph; const k = 0.9 + r() * 0.2; const sky = r() < 0.18;
+      const g = d.createLinearGradient(0, y, 0, y + ph);
+      g.addColorStop(0, sky ? C.light : shade('#7fb0cf', k)); g.addColorStop(0.55, shade(C.glass, k)); g.addColorStop(1, shade('#3f7397', k));
+      d.fillStyle = g; d.fillRect(x, y, pw, ph);
+      if ((busy > 0.72 && r() < 0.75) || r() < busy * 0.28) {
+        n.fillStyle = r() < 0.7 ? '#ffd9a0' : '#e8f0ff'; n.globalAlpha = 0.45 + r() * 0.4; n.fillRect(x + 1, y + ph * 0.14, pw - 2, ph * 0.86 - 2); n.globalAlpha = 1;
+      }
+    }
+    d.fillStyle = '#6f8ea3'; d.fillRect(0, row * ph, W, ph * 0.13); // frit spandrel at the slab
+    d.fillStyle = C.alu; d.fillRect(0, row * ph, W, 2);
+  }
+  d.fillStyle = C.alu; for (let col = 0; col < cols; col++) d.fillRect(col * pw, 0, 2, H);
+  const tex = (c: HTMLCanvasElement) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; return t; };
+  return { day: tex(day), night: tex(night) };
+}
+/** A text sign: letters in `fg` on `bg` (transparent background when null), shrunk to fit the width. */
+function textSign(text: string, fg: string, bg: string | null, w = 1024, h = 192, px = 132) {
+  return canvasTex(w, h, (c) => {
+    if (bg) { c.fillStyle = bg; c.fillRect(0, 0, w, h); }
+    let size = px; c.font = `bold ${size}px Arial, sans-serif`;
+    while (c.measureText(text).width > w * 0.92 && size > 10) { size -= 4; c.font = `bold ${size}px Arial, sans-serif`; }
+    c.fillStyle = fg; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, w / 2, h / 2 + 4);
   });
+}
+function makeMats() {
+  const facade = facadeMaps();
+  // podium: blue glass behind a geometric (diamond) aluminium frame; one floor and 6 m per repeat
+  const podium = canvasTex(256, 256, (c) => {
+    const g = c.createLinearGradient(0, 0, 0, 256); g.addColorStop(0, '#78a9c8'); g.addColorStop(1, '#3e7398');
+    c.fillStyle = g; c.fillRect(0, 0, 256, 256);
+    c.strokeStyle = C.alu; c.lineWidth = 5;
+    for (let k = -2; k <= 2; k++) { c.beginPath(); c.moveTo(k * 128, 256); c.lineTo(k * 128 + 256, 0); c.stroke(); c.beginPath(); c.moveTo(k * 128, 0); c.lineTo(k * 128 + 256, 256); c.stroke(); }
+    c.fillStyle = '#d4dbe0'; c.fillRect(0, 0, 256, 14); c.fillStyle = C.alu; c.fillRect(0, 252, 256, 4);
+  }, true);
+  const podiumNight = canvasTex(256, 256, (c) => {
+    c.fillStyle = '#000'; c.fillRect(0, 0, 256, 256);
+    const g = c.createLinearGradient(0, 0, 0, 256); g.addColorStop(0, 'rgba(255,230,190,.25)'); g.addColorStop(1, 'rgba(255,236,200,.75)');
+    c.fillStyle = g; c.fillRect(0, 14, 256, 238);
+  }, true);
+  const signMat = (t: THREE.Texture, transparent = false) => new THREE.MeshStandardMaterial({ map: t, emissive: '#ffffff', emissiveMap: t, emissiveIntensity: 0.6, transparent, alphaTest: transparent ? 0.4 : 0 });
+  // billboard on the podium: a made-up sale poster (no real brand artwork)
+  const billboard = canvasTex(1024, 512, (c) => {
+    const g = c.createLinearGradient(0, 0, 1024, 512); g.addColorStop(0, '#f7c948'); g.addColorStop(1, '#e8553f');
+    c.fillStyle = g; c.fillRect(0, 0, 1024, 512);
+    c.fillStyle = 'rgba(255,255,255,.18)'; for (let i = 0; i < 9; i++) { c.beginPath(); c.arc(80 + i * 120, 420 - (i % 3) * 60, 40 + (i % 4) * 18, 0, Math.PI * 2); c.fill(); }
+    c.textAlign = 'center'; c.fillStyle = '#fff'; c.font = 'bold 92px Arial, sans-serif'; c.fillText('ĐẠI TIỆC MUA SẮM', 512, 190);
+    c.font = 'bold 150px Arial, sans-serif'; c.fillStyle = '#7a0f1c'; c.fillText('GIẢM 50%', 512, 350);
+    c.font = '44px Arial, sans-serif'; c.fillStyle = '#fff'; c.fillText('Tầng 1–6 · Trung tâm thương mại', 512, 450);
+  });
+  const sign = textSign('LOTTE CENTER', '#fff', C.red, 512, 96, 54);
   return {
-    glass: new THREE.MeshStandardMaterial({ map: glass, roughness: 0.18, metalness: 0.55 }),
-    podium: new THREE.MeshStandardMaterial({ map: podium, roughness: 0.6 }),
+    glass: new THREE.MeshStandardMaterial({ map: facade.day, emissive: '#ffffff', emissiveMap: facade.night, emissiveIntensity: 0, roughness: 0.22, metalness: 0.12 }),
+    crown: new THREE.MeshStandardMaterial({ map: facade.day, emissive: '#ffffff', emissiveMap: facade.night, emissiveIntensity: 0, roughness: 0.22, metalness: 0.12, side: THREE.DoubleSide }),
+    podium: new THREE.MeshStandardMaterial({ map: podium, emissive: '#ffffff', emissiveMap: podiumNight, emissiveIntensity: 0, roughness: 0.25, metalness: 0.1 }),
+    fin: new THREE.MeshStandardMaterial({ color: C.alu, roughness: 0.35, metalness: 0.6, side: THREE.DoubleSide }),
+    brand: signMat(textSign('LOTTE', C.red, null, 1024, 256, 210), true),
+    signCenter: signMat(textSign('LOTTE CENTER Hanoi', C.red, '#ffffff')),
+    signHotel: signMat(textSign('LOTTE HOTEL', '#ffffff', C.red)),
+    signStore: signMat(textSign('DEPARTMENT STORE', C.red, '#ffffff')),
+    signMart: signMat(textSign('LOTTE Mart', '#ffffff', C.red)),
+    billboard: signMat(billboard),
+    stone: new THREE.MeshStandardMaterial({ color: '#8d9194', roughness: 0.8 }),
+    planter: new THREE.MeshStandardMaterial({ color: '#b9b3a8', roughness: 0.85 }),
+    shrub: new THREE.MeshStandardMaterial({ color: '#4f7f3a', roughness: 0.9 }),
+    canopyGlass: new THREE.MeshStandardMaterial({ color: '#cfe2ea', roughness: 0.1, transparent: true, opacity: 0.45, depthWrite: false }),
     roof: new THREE.MeshStandardMaterial({ color: '#8f989d', roughness: 0.7 }),
     frame: new THREE.MeshStandardMaterial({ color: '#c9cfd3', roughness: 0.3, metalness: 0.8 }),
-    sign: new THREE.MeshStandardMaterial({ map: sign, emissive: '#ffffff', emissiveMap: sign, emissiveIntensity: 0.6 }),
+    sign: signMat(sign),
     floor: new THREE.MeshStandardMaterial({ color: '#d8d2c6', roughness: 0.35 }),
     carpet: new THREE.MeshStandardMaterial({ color: '#7d5a4a', roughness: 0.95 }),
     ceiling: new THREE.MeshStandardMaterial({ color: '#f1efe9', roughness: 0.9, side: THREE.DoubleSide }),
@@ -142,9 +192,10 @@ function Interior({ f, doorsRef, display }: { f: number; doorsRef: React.RefObje
     if (kind === 'store') for (let u = -hu + 4; u < hu - 3; u += 5) for (const v of [-hv + 3.5, hv - 3.5]) boxes.push({ p: [u, 0.9, v], s: [3, 1.8, 0.6], m: 'rack' }, { p: [u, 1.3, v + Math.sign(v) * -0.32], s: [2.6, 0.5, 0.05], m: 'goods' });
     if (kind === 'lobby') boxes.push({ p: [hu - 9, 0.55, -hv + 4], s: [5, 1.1, 1.2], m: 'desk' }, { p: [hu - 9, 1.15, -hv + 4], s: [5.2, 0.08, 1.4], m: 'steel' });
     if (kind === 'deck') for (let u = -hu + 6; u < hu - 4; u += 8) boxes.push({ p: [u, 0.25, hv - 1.8], s: [2.4, 0.45, 0.6], m: 'desk' }, { p: [u, 0.25, -hv + 1.8], s: [2.4, 0.45, 0.6], m: 'desk' });
-    return boxes;
-  }, [kind, hu, hv, H]);
-  const ring = useMemo(() => roundedRing(hu + 0.3, hv + 0.3, ROUND * s - 0.4), [hu, hv, s]);
+    const plate = towerRing(floorY(f), 1.6);
+    return boxes.filter((b) => insidePolygon([b.p[0], b.p[2]], plate));
+  }, [kind, hu, hv, H, f]);
+  const ring = useMemo(() => towerRing(floorY(f), 0.1), [f]);
   const windowGeo = useMemo(() => {
     // floor-to-ceiling glass (on floor 1 with the door gap on the east face)
     const pos: number[] = [];
@@ -173,7 +224,7 @@ function Interior({ f, doorsRef, display }: { f: number; doorsRef: React.RefObje
     {kind === 'lobby' && <mesh material={m.sign} position={[0, 2.9, -CORE.halfV - 0.17]} rotation={[0, Math.PI, 0]}><planeGeometry args={[5, 0.94]} /></mesh>}
     {items.map((b, i) => <mesh key={i} material={m[b.m] as THREE.Material} position={b.p}><boxGeometry args={b.s} /></mesh>)}
     {/* ceiling lights */}
-    {Array.from({ length: Math.floor(hu / 4) }, (_, i) => -hu + 4 + i * 8).flatMap((u) => [-hv + 4, hv - 4].map((v) => <mesh key={`${u}${v}`} material={m.light} position={[u, H - 0.02, v]} rotation={[Math.PI / 2, 0, 0]}><planeGeometry args={[2.4, 0.5]} /></mesh>))}
+    {Array.from({ length: Math.floor(hu / 4) }, (_, i) => -hu + 4 + i * 8).flatMap((u) => [-hv + 4, hv - 4].filter((v) => insidePolygon([u, v], ring)).map((v) => <mesh key={`${u}${v}`} material={m.light} position={[u, H - 0.02, v]} rotation={[Math.PI / 2, 0, 0]}><planeGeometry args={[2.4, 0.5]} /></mesh>))}
   </group>;
 }
 
@@ -194,23 +245,62 @@ export function Lotte() {
   const m = mats();
   const geo = useMemo(() => {
     if (!LOTTE) return null;
-    const top65 = floorY(FLOORS) + FLOOR_H;
+    // a podium wall that is shared with the tower (its south side) gets no sign
+    const tb = towerRing(0, -1.5);
+    const insideTowerish = (a: [number, number], b: [number, number]) => insidePolygon([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], tb);
     const pd = LOTTE.podium;
-    // podium: the OSM footprint west of the tower, extruded to six storeys, standing on the ground
+    // podium: the OSM footprint west of the tower, extruded to six storeys, standing on the ground;
+    // ExtrudeGeometry's groups are [caps, walls]: a plain roof on top, patterned glass round the sides
     const shape = new THREE.Shape(LOTTE.podiumRing.map(([u, v]) => new THREE.Vector2(u, -v)));
     const podium = new THREE.ExtrudeGeometry(shape, { depth: pd.h, bevelEnabled: false });
     podium.rotateX(-Math.PI / 2); podium.translate(0, GROUND_HEIGHT, 0);
-    const uv = podium.getAttribute('uv'); const pos = podium.getAttribute('position'); const nor = podium.getAttribute('normal');
     podium.computeVertexNormals();
-    for (let i = 0; i < uv.count; i++) { const along = Math.abs(nor.getX(i)) > 0.5 ? pos.getZ(i) : pos.getX(i) + pos.getZ(i); uv.setXY(i, along / 6, (pos.getY(i) - GROUND_HEIGHT) / FLOOR_H); }
+    const uv = podium.getAttribute('uv'); const pos = podium.getAttribute('position'); const nor = podium.getAttribute('normal');
+    for (let i = 0; i < uv.count; i++) { const along = Math.abs(nor.getX(i)) > 0.5 ? pos.getZ(i) : pos.getX(i) + pos.getZ(i); uv.setXY(i, along / 6, (pos.getY(i) - GROUND_HEIGHT) / (pd.h / 6)); }
+    // podium signs: on its four longest outside walls (not the one against the tower), facing out
+    const ring = LOTTE.podiumRing;
+    const walls = ring.map((a, i) => { const b = ring[(i + 1) % ring.length]; const len = Math.hypot(b[0] - a[0], b[1] - a[1]); return { a, b, len }; })
+      .filter((w) => w.len > 12 && !insideTowerish(w.a, w.b))
+      .sort((p, q) => q.len - p.len).slice(0, 4)
+      .map(({ a, b, len }) => {
+        const d = [(b[0] - a[0]) / len, (b[1] - a[1]) / len]; let n = [-d[1], d[0]];
+        const mid: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+        if (insidePolygon([mid[0] + n[0], mid[1] + n[1]], ring)) n = [-n[0], -n[1]];
+        return { mid, n, len, yaw: Math.atan2(n[0], n[1]) };
+      });
+    // vertical aluminium fins along both edges of the groove on each broad face, standing 0.7 m proud
+    const finPos: number[] = [];
+    const levels = 24;
+    for (let k = 0; k < levels; k++) {
+      const y0 = FLOOR_H + ((268 - FLOOR_H) * k) / levels, y1 = FLOOR_H + ((268 - FLOOR_H) * (k + 1)) / levels;
+      const r0 = towerRing(y0), r1 = towerRing(y1);
+      for (const i of GROOVE_LIPS) {
+        const at = (r: [number, number][], y: number, out: number) => { const [u, v] = r[i]; return [u, GROUND_HEIGHT + y, v + Math.sign(v) * out]; };
+        const p = [at(r0, y0, 0), at(r0, y0, 0.8), at(r1, y1, 0), at(r1, y1, 0.8)];
+        finPos.push(...p[0], ...p[2], ...p[1], ...p[1], ...p[2], ...p[3]);
+      }
+    }
+    const fins = new THREE.BufferGeometry(); fins.setAttribute('position', new THREE.Float32BufferAttribute(finPos, 3)); fins.computeVertexNormals();
+    const yb = 255; const rb = towerRing(yb);
+    /** The facade edge of ring rb nearest to local point (u, v): its middle, outward normal and yaw for a plane. */
+    const faceAt = (u: number, v: number) => {
+      let best = 0, bd = Infinity;
+      for (let i = 0; i < rb.length; i++) { const a = rb[i], b = rb[(i + 1) % rb.length]; const d = Math.hypot((a[0] + b[0]) / 2 - u, (a[1] + b[1]) / 2 - v); if (d < bd) { bd = d; best = i; } }
+      const a = rb[best], b = rb[(best + 1) % rb.length]; const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const n = [(b[1] - a[1]) / l, -(b[0] - a[0]) / l]; // outward for a counter-clockwise ring
+      const t = (u - a[0]) * (b[0] - a[0]) / (l * l) + (v - a[1]) * (b[1] - a[1]) / (l * l);
+      const m = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+      return { p: [m[0] + n[0] * 0.25, GROUND_HEIGHT + yb, m[1] + n[1] * 0.25] as const, r: Math.atan2(n[0], n[1]) };
+    };
     return {
-      shaft: shaft(GROUND_HEIGHT + FLOOR_H, GROUND_HEIGHT + top65),
+      shaft: shaft(GROUND_HEIGHT + FLOOR_H, GROUND_HEIGHT + 268, 1, 24),
       band: lobbyBand(),
-      crown: shaft(GROUND_HEIGHT + top65, GROUND_HEIGHT + 267 + 1.5, 0.82, 2),
-      roof: cap(GROUND_HEIGHT + 267 + 1.5, 0.82),
-      shoulder: cap(GROUND_HEIGHT + top65, 1),
-      podium,
-      parapet: roundedRing(TOWER.halfU * taper(268) * 0.82, TOWER.halfV * taper(268) * 0.82, ROUND * 0.7),
+      // the facade runs on 4 m past the roof as an open screen round the rooftop terrace (seen from inside too)
+      crown: shaft(GROUND_HEIGHT + 268, GROUND_HEIGHT + TOWER_TOP, 1, 1),
+      roof: cap(GROUND_HEIGHT + 268, 1, 0.3),
+      podium, walls, fins,
+      // "LOTTE" high on the right-hand leaf of both broad faces and on the east end, like the photos
+      brand: [{ ...faceAt(TOWER.halfU * 0.55, TOWER.halfV), w: 24 }, { ...faceAt(-TOWER.halfU * 0.55, -TOWER.halfV), w: 24 }, { ...faceAt(TOWER.halfU, 0), w: 20 }],
     };
   }, []);
   const cabin = useRef<THREE.Group>(null);
@@ -227,6 +317,8 @@ export function Lotte() {
     if (!LOTTE) return;
     const dt = Math.min(delta, 0.05);
     stepLift(dt);
+    const lamp = worldMaterials().lampGlow.emissiveIntensity; const glow = lamp > 2 ? 1 : lamp > 0.5 ? 0.3 : 0;
+    if (m.podium.emissiveIntensity !== glow) { m.glass.emissiveIntensity = m.crown.emissiveIntensity = glow * 0.75; m.podium.emissiveIntensity = glow * 0.55; }
     const p: [number, number] = [player.position.x, player.position.z];
     const [u, v] = toTower(p);
     const isNear = Math.abs(u) < 260 && Math.abs(v) < 260;
@@ -282,23 +374,35 @@ export function Lotte() {
   });
   if (!LOTTE || !geo) return null;
   return <group position={[LOTTE.center[0], 0, LOTTE.center[1]]} rotation={[0, LOTTE.rotY, 0]}>
-    <mesh geometry={geo.podium} material={m.podium} castShadow receiveShadow />
+    <mesh geometry={geo.podium} material={[m.roof, m.podium]} castShadow receiveShadow />
+    {geo.walls.map((w, i) => {
+      const sign = [m.signCenter, m.signStore, m.signMart, m.signHotel][i]; const wide = Math.min(w.len * 0.55, 26);
+      return <group key={i} position={[w.mid[0] + w.n[0] * 0.12, 0, w.mid[1] + w.n[1] * 0.12]} rotation={[0, w.yaw, 0]}>
+        <mesh material={sign} position={[0, GROUND_HEIGHT + 30, 0]}><planeGeometry args={[wide, wide * 0.1875]} /></mesh>
+        {i === 0 && <mesh material={m.billboard} position={[0, GROUND_HEIGHT + 17, 0]}><planeGeometry args={[Math.min(w.len * 0.45, 18), Math.min(w.len * 0.45, 18) / 2]} /></mesh>}
+      </group>;
+    })}
     <mesh geometry={geo.shaft} material={m.glass} castShadow />
-    <mesh geometry={geo.shoulder} material={m.roof} />
-    <mesh geometry={geo.crown} material={m.glass} />
+    <mesh geometry={geo.crown} material={m.crown} />
     <mesh geometry={geo.roof} material={m.roof} />
-    {/* open-air top ("Top of Hanoi"): a frame parapet up to 272 m */}
-    {geo.parapet.filter((_, i) => i % 3 === 0).map(([x, z], i) => <mesh key={i} material={m.frame} position={[x, GROUND_HEIGHT + (268.5 + TOWER_TOP) / 2, z]}><boxGeometry args={[0.35, TOWER_TOP - 268.5, 0.35]} /></mesh>)}
-    <mesh material={m.sign} position={[TOWER.halfU * taper(270) + 0.1, GROUND_HEIGHT + 258, 0]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[16, 3]} /></mesh>
-    {/* entrance: canopy on two posts over the lobby door, the name above it */}
-    <mesh material={m.frame} position={[TOWER.halfU + 2, GROUND_HEIGHT + 3.6, 0]}><boxGeometry args={[4, 0.22, DOOR_HALF * 2 + 2]} /></mesh>
-    {[-DOOR_HALF - 0.6, DOOR_HALF + 0.6].map((v) => <mesh key={v} material={m.frame} position={[TOWER.halfU + 3.8, GROUND_HEIGHT + 1.8, v]}><cylinderGeometry args={[0.1, 0.1, 3.6, 8]} /></mesh>)}
+    <mesh geometry={geo.fins} material={m.fin} />
+    {geo.brand.map((b, i) => <mesh key={i} material={m.brand} position={b.p as unknown as [number, number, number]} rotation={[0, b.r, 0]}><planeGeometry args={[b.w, b.w / 4]} /></mesh>)}
+    {/* entrance: a glass canopy in a slim steel frame on two posts over the lobby door, the name above it */}
+    <mesh material={m.frame} position={[TOWER.halfU + 3, GROUND_HEIGHT + 3.75, 0]}><boxGeometry args={[6, 0.18, DOOR_HALF * 2 + 3]} /></mesh>
+    <mesh material={m.canopyGlass} position={[TOWER.halfU + 3, GROUND_HEIGHT + 3.86, 0]}><boxGeometry args={[5.7, 0.04, DOOR_HALF * 2 + 2.7]} /></mesh>
+    {[-DOOR_HALF - 1.2, DOOR_HALF + 1.2].map((v) => <mesh key={v} material={m.frame} position={[TOWER.halfU + 5.6, GROUND_HEIGHT + 1.85, v]}><cylinderGeometry args={[0.13, 0.13, 3.7, 10]} /></mesh>)}
     <mesh material={m.sign} position={[TOWER.halfU + 0.12, GROUND_HEIGHT + 4.6, 0]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[7, 1.25]} /></mesh>
+    {/* two low grey stone steps up to the door, and planters with clipped shrubs either side */}
+    {[0, 1].map((k) => <mesh key={`st${k}`} material={m.stone} position={[TOWER.halfU + 1.2 + (1 - k) * 0.8, GROUND_HEIGHT + 0.04 + k * 0.04, 0]} receiveShadow><boxGeometry args={[2.4 - k * 0.8, 0.08, DOOR_HALF * 2 + 1.6 - k * 0.6]} /></mesh>)}
+    {[-1, 1].flatMap((sd) => [0, 1].map((k) => <group key={`pl${sd}${k}`} position={[TOWER.halfU + 2.2 + k * 4, GROUND_HEIGHT, sd * (DOOR_HALF + 3.6)]}>
+      <mesh material={m.planter} position={[0, 0.3, 0]} castShadow><boxGeometry args={[2.6, 0.6, 1.4]} /></mesh>
+      <mesh material={m.shrub} position={[0, 0.85, 0]} scale={[1.2, 0.55, 0.6]}><sphereGeometry args={[1, 10, 6]} /></mesh>
+    </group>))}
     {/* door frame and the sliding glass doors (they part as you walk up) */}
     {[-DOOR_HALF, DOOR_HALF].map((v) => <mesh key={`jamb${v}`} material={m.frame} position={[TOWER.halfU, GROUND_HEIGHT + 1.5, v]}><boxGeometry args={[0.5, 3, 0.25]} /></mesh>)}
     <mesh material={m.frame} position={[TOWER.halfU, GROUND_HEIGHT + 3.05, 0]}><boxGeometry args={[0.5, 0.2, DOOR_HALF * 2]} /></mesh>
     <group ref={entry}>{[-1, 1].map((s) => <mesh key={`sd${s}`} material={m.window} position={[TOWER.halfU, GROUND_HEIGHT + 1.45, s * DOOR_HALF / 2]}><boxGeometry args={[0.06, 2.9, DOOR_HALF - 0.1]} /></mesh>)}</group>
-    <mesh position={[TOWER.halfU + 2.2, GROUND_HEIGHT + 0.02, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}><planeGeometry args={[DOOR_HALF * 2 - 1, 3.5]} /><meshStandardMaterial color="#7a1f2a" roughness={0.9} /></mesh>
+    <mesh position={[TOWER.halfU + 2.2, GROUND_HEIGHT + 0.09, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}><planeGeometry args={[DOOR_HALF * 2 - 1, 3.5]} /><meshStandardMaterial color="#7a1f2a" roughness={0.9} /></mesh>
     {near && <>
       <Interior key={floor} f={floor} doorsRef={landingDoors} display={display} />
       <group position={[0, 0, 0]}><Cabin cabin={cabin} doors={cabinDoors} /></group>
