@@ -149,7 +149,9 @@ export function PrivateRigCar({ url, model, paint, control, rigKey }: { url: str
     r.updateMatrixWorld(true);
     const anchors: Record<string, THREE.Vector3> = {};
     r.traverse((o) => { if (o.name.startsWith('Anchor_') || o.name.startsWith('Lock_')) anchors[o.name] = o.getWorldPosition(new THREE.Vector3()); });
-    return { r, lights, brakes, doors, steer, spin, sw, tg, anchors };
+    const ua = sw?.userData?.axis as number[] | undefined; const swAxis = ua ? new THREE.Vector3(ua[0], ua[1], ua[2]).normalize() : PRIVATE_STEER_AXIS;
+    const swBase = sw ? sw.quaternion.clone() : null;
+    return { r, lights, brakes, doors, steer, spin, sw, swAxis, swBase, tg, anchors };
   }, [g, paint, gl]);
   useEffect(() => {
     rigAnchors.set(rigKey, built.anchors);
@@ -169,7 +171,7 @@ export function PrivateRigCar({ url, model, paint, control, rigKey }: { url: str
     s.spin += (c.speed * dt) / 0.37;
     for (const w of built.spin) w.rotation.x = s.spin;
     for (const w of built.steer) w.rotation.y = c.steer * 0.55;
-    if (built.sw) built.sw.quaternion.setFromAxisAngle(PRIVATE_STEER_AXIS, -c.steer * 2.4);
+    if (built.sw && built.swBase) { const ang = THREE.MathUtils.clamp(c.steer * 2.6, -2.5, 2.5); built.sw.quaternion.copy(built.swBase).multiply(new THREE.Quaternion().setFromAxisAngle(built.swAxis, ang)); } // about the column's own axis, from the rest pose
     for (const m of built.lights) { m.emissiveIntensity = c.lights.low ? 3 : 1; }
     for (const m of built.brakes) { m.emissiveIntensity = c.lights.brake ? 3 : c.lights.low ? 1.2 : 0.6; }
   });

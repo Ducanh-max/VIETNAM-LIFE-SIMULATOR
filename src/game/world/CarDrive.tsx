@@ -66,6 +66,20 @@ export function DriveCamera({ rigKey }: { rigKey: string }) {
   const mode = useCam(); const { camera } = useThree();
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.code === 'KeyC' && !e.repeat && (e.target as HTMLElement)?.tagName !== 'INPUT') cycleCam(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, []);
   useEffect(() => () => { const a = player.avatar as THREE.Object3D | null | undefined; if (a) a.visible = true; const cam = camera as THREE.PerspectiveCamera; cam.near = 0.3; cam.updateProjectionMatrix(); }, [camera]);
+  // mouse-look in the driver's / bonnet camera: with the pointer locked, or by dragging while the cursor is free
+  const lookRef = useRef({ yaw: 0, pitch: 0, last: 0, drag: false });
+  useEffect(() => {
+    const L = lookRef.current;
+    const move = (e: MouseEvent) => {
+      if (drive.cam === 'chase') return;
+      if (!document.pointerLockElement && !L.drag) return;
+      L.yaw = THREE.MathUtils.clamp(L.yaw - e.movementX * 0.0035, -2.1, 2.1); L.pitch = THREE.MathUtils.clamp(L.pitch - e.movementY * 0.0035, -1.05, 1.05); L.last = performance.now();
+    };
+    const down = (e: MouseEvent) => { if ((e.target as HTMLElement)?.tagName === 'CANVAS') L.drag = true; };
+    const up = () => { L.drag = false; };
+    window.addEventListener('mousemove', move); window.addEventListener('mousedown', down); window.addEventListener('mouseup', up);
+    return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mousedown', down); window.removeEventListener('mouseup', up); };
+  }, []);
   const m = new THREE.Matrix4(); const v = new THREE.Vector3(); const look = new THREE.Vector3();
   useFrame((st) => {
     const a = rigAnchors.get(rigKey); const av = player.avatar as THREE.Object3D | null | undefined;
@@ -76,7 +90,10 @@ export function DriveCamera({ rigKey }: { rigKey: string }) {
       const eye = mode === 'driver' ? a.Anchor_CameraInterior : (a.Anchor_CameraHood ?? a.Anchor_CameraInterior);
       if (eye) {
         cam.position.copy(v.copy(eye).applyMatrix4(m));
-        look.set(eye.x, eye.y - (mode === 'driver' ? 0.12 : 0.18), eye.z + 6).applyMatrix4(m); cam.lookAt(look);
+        const L = lookRef.current;
+        if (Math.abs(bike.speed) > 2 && performance.now() - L.last > 1500) { L.yaw *= 0.95; L.pitch *= 0.95; } // drift back to straight ahead when driving off
+        const pitch = L.pitch - (mode === 'driver' ? 0.02 : 0.03);
+        look.set(eye.x + Math.sin(L.yaw) * Math.cos(pitch) * 6, eye.y + Math.sin(pitch) * 6, eye.z + Math.cos(L.yaw) * Math.cos(pitch) * 6).applyMatrix4(m); cam.lookAt(look);
         const near = 0.05; if (cam.near !== near) { cam.near = near; cam.updateProjectionMatrix(); }
       }
     } else if (cam.near !== 0.3) { cam.near = 0.3; cam.updateProjectionMatrix(); }
