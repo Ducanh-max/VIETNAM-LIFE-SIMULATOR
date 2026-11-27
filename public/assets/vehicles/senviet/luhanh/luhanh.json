@@ -1,0 +1,157 @@
+{
+ "vehicleId": "luhanh",
+ "brandId": "senviet",
+ "displayModel": "Lữ Hành",
+ "vehicleClass": "MPV",
+ "rightsStatus": "ORIGINAL_DESIGN",
+ "dimensions": {
+  "length": 5.155,
+  "width": 2.01,
+  "height": 1.775
+ },
+ "wheelbase": 3.09,
+ "wheelRadius": 0.3705,
+ "seatLayout": [
+  2,
+  2,
+  3
+ ],
+ "triangles": {
+  "lod0": 78034,
+  "lod0_meshes": 16,
+  "lod1": 25603,
+  "lod2": 5437
+ },
+ "nodes": [
+  "Anchor_CameraInterior",
+  "Anchor_CameraRear",
+  "Anchor_CameraShowroom",
+  "Anchor_CameraThirdPerson",
+  "Anchor_Cargo",
+  "Anchor_DriverSeat",
+  "Anchor_EnterDriver",
+  "Anchor_ExitDriver",
+  "Anchor_FrontPassenger",
+  "Anchor_RearSeats",
+  "Anchor_ThirdRow",
+  "Anchors",
+  "BodyRoot",
+  "CollisionProxies",
+  "Dashboard",
+  "Door_FL_Pivot",
+  "Door_FR_Pivot",
+  "Door_RL_Pivot",
+  "Door_RR_Pivot",
+  "Interior",
+  "Lights",
+  "SeatFold_R3",
+  "Seat_R1_1",
+  "Seat_R1_2",
+  "Seat_R2_1",
+  "Seat_R2_2",
+  "Seat_R3_1",
+  "Seat_R3_2",
+  "Seat_R3_3",
+  "Seats",
+  "SteeringWheel_Pivot",
+  "Trunk_Pivot",
+  "VehicleRoot",
+  "Wheel_FL_Spin",
+  "Wheel_FL_Steer",
+  "Wheel_FR_Spin",
+  "Wheel_FR_Steer",
+  "Wheel_RL_Spin",
+  "Wheel_RR_Spin"
+ ],
+ "anchors": {
+  "Anchor_CameraInterior": [
+   0.45,
+   1.38,
+   0.2
+  ],
+  "Anchor_CameraRear": [
+   0.0,
+   1.2,
+   -3.178
+  ],
+  "Anchor_CameraShowroom": [
+   -4.5,
+   1.8,
+   5.8
+  ],
+  "Anchor_CameraThirdPerson": [
+   0.0,
+   2.6,
+   -6.186
+  ],
+  "Anchor_Cargo": [
+   0.0,
+   0.55,
+   -2.0
+  ],
+  "Anchor_DriverSeat": [
+   0.45,
+   0.74,
+   0.3
+  ],
+  "Anchor_EnterDriver": [
+   1.605,
+   0.0,
+   0.4
+  ],
+  "Anchor_ExitDriver": [
+   1.805,
+   0.0,
+   0.3
+  ],
+  "Anchor_FrontPassenger": [
+   -0.45,
+   0.74,
+   0.3
+  ],
+  "Anchor_RearSeats": [
+   0.0,
+   0.74,
+   -0.68
+  ],
+  "Anchor_ThirdRow": [
+   0.0,
+   0.81,
+   -1.62
+  ]
+ },
+ "materials": [
+  "BlackGloss",
+  "BlackTrim",
+  "Brake",
+  "BuckleRed",
+  "Caliper",
+  "Carpet",
+  "Chrome",
+  "Dash",
+  "Emblem",
+  "Glass",
+  "Headliner",
+  "Leather",
+  "LeatherDark",
+  "Light_Brake",
+  "Light_DRL",
+  "Light_Head",
+  "Light_Indicator",
+  "Light_Interior",
+  "Light_Reverse",
+  "Light_Tail",
+  "Liner",
+  "MirrorGlass",
+  "Paint",
+  "Plate",
+  "Rim",
+  "RimDark",
+  "Satin",
+  "Screen",
+  "Tyre",
+  "Underbody",
+  "Wood"
+ ],
+ "source": "tools/blender/vehicles/build_vehicle.py + designs/luhanh.json"
+}
