@@ -29,7 +29,7 @@ Hai mẫu Carnival tải từ Sketchfab (của geyges và tonielpro520) không �
   8. Xuất `.blend` + GLB LOD0 / LOD1 / LOD2 + metadata JSON + 12 ảnh render.
 - **`assets-source/vehicles/senviet/luhanh/luhanh.blend`**: file nguồn. Mỗi bộ phận là một object riêng có tên chuẩn (Headlight_L, Door_FL, …).
 - **`public/assets/vehicles/senviet/luhanh/`**:
-  - `luhanh_lod0/1/2.glb`, đã nén meshopt: 412 / 228 / 125 KB;
+  - `luhanh_lod0/1/2.glb`, đã nén meshopt: 276 / 162 / 59 KB;
   - `luhanh.json` (metadata, `rightsStatus: ORIGINAL_DESIGN`).
 
   File GLB chỉ tải khi người chơi lại gần showroom (dưới khoảng 140 m).
@@ -49,7 +49,13 @@ Hai mẫu Carnival tải từ Sketchfab (của geyges và tonielpro520) không �
 
 Node trong GLB: VehicleRoot, BodyRoot, BodyShell, Glass, Door_FL/FR/RL/RR_Pivot, Trunk_Pivot, Wheel_FL/FR_Steer, Wheel_FL/FR/RL/RR_Spin, SteeringWheel_Pivot, Interior, Dashboard, Seats, SeatFold_R3, Lights, Anchors (Anchor_DriverSeat, Anchor_FrontPassenger, Anchor_RearSeats, Anchor_ThirdRow, Anchor_EnterDriver, Anchor_ExitDriver, Anchor_Cargo, Anchor_CameraInterior, Anchor_CameraThirdPerson, Anchor_CameraRear, Anchor_CameraShowroom), CollisionProxies.
 
-Để giảm lệnh vẽ, khi xuất GLB các mesh được gộp theo từng bộ phận chuyển động: 257 → 91 lệnh vẽ ở LOD0. Vì vậy trong GLB, đèn tách theo kênh vật liệu (Light_Head, Light_DRL, Light_Tail, Light_Brake, Light_Reverse, Light_Indicator, Light_Interior). Các node đèn riêng (Headlight_L, …) vẫn còn đủ trong file `.blend`.
+Để giảm lệnh vẽ, khi xuất GLB:
+- các vật liệu giống nhau được gộp làm một;
+- LOD0 gộp mesh theo từng bộ phận chuyển động;
+- LOD1 gộp hết, chỉ để riêng 4 bánh;
+- LOD2 gộp thành một mesh với vài vật liệu.
+
+Vì vậy trong GLB, đèn tách theo kênh vật liệu (Light_Head, Light_DRL, Light_Tail, Light_Brake, Light_Reverse, Light_Indicator, Light_Interior). Các node đèn riêng (Headlight_L, …) vẫn còn đủ trong file `.blend`.
 
 ## Ảnh
 
@@ -68,20 +74,29 @@ Trong game (showroom phố Kim Mã):
 
 | | LOD0 (< 18 m) | LOD1 (18–50 m) | LOD2 (> 50 m) |
 |---|---|---|---|
-| Tam giác | 78.046 | 25.615 | 5.405 |
-| Lệnh vẽ (primitive) | 91 | 79 | 71 |
-| GLB (meshopt) | 412 KB | 228 KB | 125 KB |
+| Tam giác | 40.906 | 19.989 | 3.992 |
+| Lệnh vẽ (primitive) | 78 | 39 | 14 |
+| GLB (meshopt) | 276 KB | 162 KB | 59 KB |
 | Ngân sách spec | 25–60k | 8–20k | 1–4k |
 
-Cả ba mức đều vượt ngân sách của spec.
-- LOD0 dư phần lớn ở thân subdivision cấp 3 và nội thất.
-- LOD1 và LOD2 chưa giảm tiếp; lệnh vẽ ở LOD1 và LOD2 vẫn còn cao vì nhiều bộ phận nhỏ giữ vật liệu riêng.
+Cả ba mức nằm trong ngân sách của spec. Bản đầu (c93f543) là 78k / 26k / 5k tam giác với 91 / 79 / 71 lệnh vẽ.
 
-FPS đo trong showroom (Edge headless, 1280×800, máy đang tải nặng):
-- có xe Blender: 16–24 FPS;
-- cùng kịch bản, thay bằng xe tự dựng bằng code: 21–38 FPS.
+Thân xe dùng subdivision cấp 2 thay cho cấp 3. Phần mất độ mượt được bù bằng crease ở các đường gân.
 
-Xe Blender làm giảm FPS thấy rõ. Đã tắt bóng đổ cho mọi phần trừ thân sơn.
+FPS đo trong showroom, hai lượt chạy liền nhau cùng một kịch bản (Edge headless, 1280×800, máy đang tải nặng nên số dao động mạnh):
+- xe dựng bằng code: 14–23 FPS;
+- xe Blender: 14–39 FPS.
+
+Trong độ nhiễu của phép đo, không thấy xe Blender làm chậm hơn. Bóng đổ chỉ bật cho thân sơn.
+
+### Lượt chỉnh 2 (sau khi chủ dự án xem bản đầu)
+
+- Capo phẳng hơn. Mép capo, mép mũi và mép đuôi có crease nên sắc hơn.
+- Gương chiếu hậu hình khối bo cạnh, có đế đen, thay cho hình quả trứng.
+- Trụ A ở lại thân xe, nên mở cửa không còn "vây" đen dựng lên. Phần trước của kính cửa trước là kính thật.
+- Biển số trước dời lên trên hốc gió, không còn bị che.
+- Có viền nhựa đen ôm quanh hốc bánh, che mép cắt răng cưa.
+- Táp-lô và da màu sáng hơn, vật liệu trong cabin phát sáng nhẹ để nội thất đọc được trong showroom.
 
 ## Đánh giá thật về hình ảnh
 
@@ -94,9 +109,9 @@ Xe Blender làm giảm FPS thấy rõ. Đã tắt bóng đổ cho mọi phần t
 - Nội thất đủ: táp-lô, 2 màn hình, vô lăng có logo, ghế 2+2+3, ghế VIP hàng 2, dây đai, đèn trần, gương, tấm che nắng, đồ trong cốp.
 
 Chưa đạt, cần làm tiếp:
-- Capo và mũi xe còn tròn và phồng. Gương chiếu hậu hình quả trứng.
-- Khung kính đi theo cửa nên khi mở cửa trước có một "vây" đen dựng lên.
-- Nội thất khá tối trong showroom. Biển số trước bị cản che.
-- Mép cắt hốc bánh hơi răng cưa khi nhìn gần.
+- Mũi xe vẫn khá tròn so với MPV thật. Mặt trước còn đơn giản: chưa có chi tiết hốc đèn sương mù và cảm biến.
+- Mâm xe còn đơn giản.
+- Nội thất chưa có tay mở cửa, nút chỉnh kính, loa, tay nắm trần.
+- Khung kính cửa trước bên kia vẫn lộ một gờ mảnh khi mở cửa.
 - Chưa lái được: hệ thống lái là phần phiên khác đang làm dở, chưa commit. Hệ đó dùng `createCar()` với cùng kiểu node (bánh có pivot, cửa, đèn, neo), nên có thể nối vào sau.
 - Phố Nhỏ và Đồi Xa vẫn là xe tự dựng bằng code, chưa có bản Blender.

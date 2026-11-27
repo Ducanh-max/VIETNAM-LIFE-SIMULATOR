@@ -7,10 +7,10 @@ for s, sfx in ((1, 'L'), (-1, 'R')):
     my = -(ws0 - 0.22); p, n = on_side(my, sb['belt'] + 0.1, s)
     if p is not None:
         cx = p.x + s * 0.13
-        bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=10, radius=1); bm.transform(Matrix.Translation((cx, my, p.z + 0.02)) @ Matrix.Diagonal((0.12, 0.06, 0.075, 1)))
-        mesh_obj(f'Mirror_{sfx}', bm, [MAT['Paint']], col='Body', parent=door)
+        rbox(f'Mirror_{sfx}', (0.2, 0.07, 0.1), (cx, my, p.z + 0.02), 'Paint', 0.025, rot=(0.0, 0.0, -s * 0.12), col='Body', parent=door)
+        rbox(f'MirrorBase_{sfx}', (0.2, 0.072, 0.03), (cx, my, p.z - 0.035), 'BlackGloss', 0.01, rot=(0.0, 0.0, -s * 0.12), col='Body', parent=door)
         rbox(f'MirrorArm_{sfx}', (0.1, 0.04, 0.03), (p.x + s * 0.05, my + 0.02, p.z - 0.02), 'BlackTrim', 0.01, col='Body', parent=door)
-        rbox(f'MirrorGlass_{sfx}', (0.2, 0.004, 0.1), (cx, my + 0.057, p.z + 0.02), 'Mirror', 0.002, col='Body', parent=door)
+        rbox(f'MirrorGlass_{sfx}', (0.18, 0.004, 0.085), (cx, my + 0.037, p.z + 0.025), 'Mirror', 0.002, rot=(0.0, 0.0, -s * 0.12), col='Body', parent=door)
         ribbon(f'Indicator_Mirror{sfx}', [(my - 0.05 + 0.1 * t, p.z - 0.035) for t in np.linspace(0, 1, 4)], 0.006, 'Light_Indicator', side=s, parent=door) if False else None
     for nm in ('Door_F', 'Door_R'):
         piv = PIVOTS.get(nm + sfx)
@@ -201,51 +201,88 @@ os.makedirs(BLEND_DIR, exist_ok=True)
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(BLEND_DIR, f"{D['id']}.blend"))
 if '--no-previews' not in argv: render_previews()
 
-# game export: join meshes per rigid group (one mesh per moving part, one primitive per material) to cut draw calls
+# game export: fewer materials (similar ones share), meshes joined per rigid group (one mesh per moving part,
+# one primitive per material) to cut draw calls; LOD1 / LOD2 are joined further and decimated to the spec budgets
+REMAP0 = {'Underbody': 'BlackTrim', 'Liner': 'BlackTrim', 'MirrorGlass': 'Chrome', 'Rim': 'Satin', 'Brake': 'RimDark', 'Caliper': 'BuckleRed', 'LeatherDark': 'Dash', 'Wood': 'Dash', 'GlassDark': 'Glass'}
+REMAP2 = {'BlackGloss': 'BlackTrim', 'Satin': 'Chrome', 'RimDark': 'BlackTrim', 'Tyre': 'BlackTrim', 'Emblem': 'Chrome', 'Plate': 'Chrome', 'BuckleRed': 'Light_Tail',
+          'Light_DRL': 'Light_Head', 'Light_Brake': 'Light_Tail', 'Light_Reverse': 'Light_Head', 'Light_Indicator': 'Light_Tail', 'Light_Interior': 'Light_Head'}
+def remap(objs, table):
+    for o in objs:
+        if o.type != 'MESH': continue
+        for i, m in enumerate(o.data.materials):
+            if m and m.name in table: o.data.materials[i] = bpy.data.materials[table[m.name]]
+        # merge duplicate slots
+        names = [m.name if m else '' for m in o.data.materials]; first = {}
+        idx_map = {}
+        for i, n in enumerate(names): idx_map[i] = first.setdefault(n, i)
+        for poly in o.data.polygons: poly.material_index = idx_map[poly.material_index]
+        used = {pp.material_index for pp in o.data.polygons}
+        for i in sorted(range(len(o.data.materials)), reverse=True):
+            if i not in used: o.data.materials.pop(index=i)
 ANIMATED = ('_Pivot', '_Spin', '_Steer', 'SeatFold_')
-def group_of(o):
-    q = o.parent
-    while q is not None:
-        if q.type == 'EMPTY' and any(k in q.name for k in ANIMATED): return q, q.name
-        q = q.parent
-    under = lambda root: any(x is root for x in iter_parents(o))
-    if under(SEATS): return SEATS, 'Seats'
-    if under(INT): return INT, 'Interior'
-    return BODYROOT, 'Body'
 def iter_parents(o):
     q = o.parent
     while q is not None:
         yield q; q = q.parent
-groups = {}
-for o in [o for o in descendants(ROOT) if o.type == 'MESH' and not o.name.startswith('CollisionProxy')]:
-    node, key = group_of(o); groups.setdefault(key, (node, []))[1].append(o)
-for key, (node, objs) in groups.items():
-    me = bpy.data.meshes.new('G_' + key); tgt = bpy.data.objects.new('G_' + key, me); collection('Body').objects.link(tgt)
-    tgt.parent = node; tgt.matrix_world = node.matrix_world.copy()
-    bpy.ops.object.select_all(action='DESELECT')
-    for o in objs: o.select_set(True)
-    tgt.select_set(True); bpy.context.view_layer.objects.active = tgt
-    bpy.ops.object.join()
-GROUPS = {k: bpy.data.objects['G_' + k] for k in groups}
-ALL = descendants(ROOT)
-stats = {'lod0': tris_of([o for o in ALL if o.type == 'MESH' and not o.name.startswith('CollisionProxy')]), 'lod0_meshes': len(GROUPS)}
-export(os.path.join(GLB_DIR, f"{D['id']}_lod0.glb"), ALL)
-def decimate_all(objs, ratio):
+def group_of(o, animated=ANIMATED):
+    for q in iter_parents(o):
+        if q.type == 'EMPTY' and any(k in q.name for k in animated): return q, q.name
+    ps = list(iter_parents(o))
+    if any(x is SEATS for x in ps): return SEATS, 'Seats'
+    if any(x is INT for x in ps): return INT, 'Interior'
+    return BODYROOT, 'Body'
+def join_groups(objs, animated=ANIMATED, tag=''):
+    groups = {}
     for o in objs:
-        if o.type != 'MESH' or len(o.data.polygons) < 60: continue
-        m = o.modifiers.new('dec', 'DECIMATE'); m.ratio = ratio; apply_mods(o)
-# LOD1: no cabin furniture except the seats, decimated
+        if o.type == 'MESH' and not o.name.startswith('CollisionProxy'):
+            node, key = group_of(o, animated); groups.setdefault(key, (node, []))[1].append(o)
+    out = {}
+    for key, (node, members) in groups.items():
+        me = bpy.data.meshes.new(f'G{tag}_' + key); tgt = bpy.data.objects.new(f'G{tag}_' + key, me); collection('Body').objects.link(tgt)
+        tgt.parent = node; tgt.matrix_world = node.matrix_world.copy()
+        bpy.ops.object.select_all(action='DESELECT')
+        for o in members: o.select_set(True)
+        tgt.select_set(True); bpy.context.view_layer.objects.active = tgt
+        bpy.ops.object.join(); out[key] = tgt
+    return out
+def game_meshes(objs): return [o for o in objs if o.type == 'MESH' and not o.name.startswith('CollisionProxy')]
+def decimate_to(objs, target, protect=()):
+    ms = [o for o in game_meshes(objs) if len(o.data.polygons) > 40]
+    fixed = sum(tris_of([o]) for o in ms if o.name in protect)
+    cur = tris_of([o for o in ms if o.name not in protect])
+    if cur <= 0: return
+    r = max(0.02, min(1.0, (target - fixed - tris_of([o for o in game_meshes(objs) if o not in ms])) / cur))
+    for o in ms:
+        if o.name in protect or r >= 0.999: continue
+        m = o.modifiers.new('dec', 'DECIMATE'); m.ratio = r; apply_mods(o)
+def primitives(objs): return sum(len({pp.material_index for pp in o.data.polygons}) for o in game_meshes(objs))
+
+ALL = descendants(ROOT)
+remap(game_meshes(ALL), REMAP0)
+GROUPS = join_groups(ALL)
+ALL = descendants(ROOT)
+decimate_to(ALL, 60000)
+stats = {'lod0': tris_of(game_meshes(ALL)), 'lod0_primitives': primitives(ALL)}
+export(os.path.join(GLB_DIR, f"{D['id']}_lod0.glb"), ALL)
+# LOD1 (18–50 m): no cabin furniture except the seats; everything static joined into one mesh (wheels keep spinning)
 cabin = GROUPS.get('Interior')
-keep1 = [o for o in ALL if o is not cabin]
-decimate_all([o for o in keep1 if o.type == 'MESH' and not o.name.startswith('CollisionProxy')], 0.35)
-stats['lod1'] = tris_of([o for o in keep1 if o.type == 'MESH' and not o.name.startswith('CollisionProxy')])
-export(os.path.join(GLB_DIR, f"{D['id']}_lod1.glb"), keep1)
-# LOD2: body, glass and wheels only, heavy decimation
-drop2 = {GROUPS.get('Interior'), GROUPS.get('Seats'), GROUPS.get('SteeringWheel_Pivot')} | {g for k, g in GROUPS.items() if k.startswith('SeatFold')}
-keep2 = [o for o in ALL if o not in drop2]
-decimate_all([o for o in keep2 if o.type == 'MESH' and not o.name.startswith('CollisionProxy')], 0.25)
-stats['lod2'] = tris_of([o for o in keep2 if o.type == 'MESH' and not o.name.startswith('CollisionProxy')])
-export(os.path.join(GLB_DIR, f"{D['id']}_lod2.glb"), keep2)
+if cabin: bpy.data.objects.remove(cabin, do_unlink=True)
+ALL = descendants(ROOT)
+G1 = join_groups(ALL, animated=('_Spin',), tag='1')
+ALL = descendants(ROOT)
+decimate_to(ALL, 20000)
+stats['lod1'] = tris_of(game_meshes(ALL)); stats['lod1_primitives'] = primitives(ALL)
+export(os.path.join(GLB_DIR, f"{D['id']}_lod1.glb"), ALL)
+# LOD2 (> 50 m): no seats, one mesh, a handful of materials
+for o in [o for o in game_meshes(ALL)]:
+    pass
+ALL = descendants(ROOT)
+G2 = join_groups(ALL, animated=(), tag='2')
+ALL = descendants(ROOT)
+remap(game_meshes(ALL), REMAP2)
+decimate_to(ALL, 4000)
+stats['lod2'] = tris_of(game_meshes(ALL)); stats['lod2_primitives'] = primitives(ALL)
+export(os.path.join(GLB_DIR, f"{D['id']}_lod2.glb"), ALL)
 meshes = [o for o in ALL if o.type == 'MESH']
 nodes = sorted(o.name for o in ALL if o.type == 'EMPTY')
 meta = {'vehicleId': D['id'], 'brandId': D['brand'], 'displayModel': D['name'], 'vehicleClass': D['class'], 'rightsStatus': 'ORIGINAL_DESIGN',

@@ -67,7 +67,7 @@ export function GltfCar({ model, paint, plate = '30A-000.00', control }: { model
         else if (n.startsWith('Light_')) { let lm = lights.get(n); if (!lm) { lm = mat.clone(); lights.set(n, lm); } m.material = lm; m.castShadow = false; }
         else if (n === 'CollisionProxy_Body' || m.name.startsWith('CollisionProxy')) m.visible = false;
         else if (mat.metalness > 0.5) { mat.envMap = env; mat.envMapIntensity = 0.9; }
-        else if (CABIN_MATS.has(n) && !mat.userData.lit) { mat.emissive = mat.color.clone().multiplyScalar(0.35); mat.userData.lit = true; } // soft cabin light so the interior reads in the dark
+        else if (CABIN_MATS.has(n) && !mat.userData.lit) { mat.emissive = mat.color.clone().multiplyScalar(0.55); mat.userData.lit = true; } // soft cabin light so the interior reads in the dark
         if (m.name.startsWith('CollisionProxy')) m.visible = false;
       });
       const rig: Rig = { doors: [], trunk: root.getObjectByName('Trunk_Pivot') ?? null, spins: [], steers: [], steering: root.getObjectByName('SteeringWheel_Pivot') ?? null, folds: [] };

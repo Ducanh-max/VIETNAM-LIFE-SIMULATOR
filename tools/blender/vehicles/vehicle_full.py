@@ -9,8 +9,8 @@ MAT.update({
     'Brake': material('Brake', srgb('#5d6166'), 0.4, 0.9),
     'Caliper': material('Caliper', srgb('#a3262c'), 0.4, 0.2),
     'Leather': material('Leather', srgb(D.get('interior', '#8a4b3a')), 0.6),
-    'LeatherDark': material('LeatherDark', srgb('#2a2624'), 0.6),
-    'Dash': material('Dash', srgb('#2a2c30'), 0.75),
+    'LeatherDark': material('LeatherDark', srgb('#3a3330'), 0.6),
+    'Dash': material('Dash', srgb('#3c3f44'), 0.7),
     'Wood': material('Wood', srgb('#5a3b26'), 0.45),
     'Carpet': material('Carpet', srgb('#1c1d20'), 0.97),
     'Headliner': material('Headliner', srgb('#d6d0c4'), 0.9),
@@ -78,6 +78,23 @@ from mathutils import Euler
 # ---------------------------------------------------------------- body: apply, arches, split parts
 apply_mods(body); cut_arches(body)
 for p in body.data.polygons: p.use_smooth = True
+# wheel-arch trims: a slim dark band round each arch hides the cut edge
+for a in AXLES:
+    for sd in (1, -1):
+        bm = bmesh.new(); r0, r1 = TYRE_R + 0.035, TYRE_R + 0.085; segs = 40; ring_o, ring_i = [], []
+        for k in range(segs + 1):
+            ang = math.radians(-12 + (204 * k / segs)); cy, cz = math.cos(ang), math.sin(ang)
+            ring_i.append(bm.verts.new((0, -a + r0 * cy, TYRE_R + 0.01 + r0 * cz))); ring_o.append(bm.verts.new((0, -a + r1 * cy, TYRE_R + 0.01 + r1 * cz)))
+        for k in range(segs): bm.faces.new((ring_i[k], ring_o[k], ring_o[k + 1], ring_i[k + 1]))
+        # push every vertex onto the body side (ray from outside) so the band hugs the panel
+        tmp = bmesh.new(); tmp.from_mesh(body.data); tree = __import__('mathutils').bvhtree.BVHTree.FromBMesh(tmp)
+        for v in bm.verts:
+            hit = tree.ray_cast(Vector((sd * 2.0, v.co.y, v.co.z)), Vector((-sd, 0, 0)))
+            v.co.x = (hit[0].x + sd * 0.006) if hit[0] is not None else sd * (D['width'] / 2)
+        tmp.free()
+        if sd < 0: bmesh.ops.reverse_faces(bm, faces=bm.faces)
+        me = bpy.data.meshes.new('ArchTrim'); bm.to_mesh(me); bm.free(); me.materials.append(MAT['BlackTrim'])
+        ob = bpy.data.objects.new('ArchTrim', me); collection('Body').objects.link(ob)
 
 def split_by(ob, pred, name):
     """Move faces whose material name satisfies pred(name, face_center) into a new object (same world space)."""
@@ -221,7 +238,7 @@ ribbon('LowerIntake', [(x, 0.365) for x in ix], 0, 'BlackGloss', depth=0.006, pa
 ribbon('IntakeFrame', [(x, 0.445) for x in np.linspace(-hwF * 0.55, hwF * 0.55, 20)], 0.006, 'Satin', depth=0.004, parent=BODYROOT)
 patch('SkidFront', -hwF * 0.42, hwF * 0.42, 0.262, 0.292, 'Satin', nx=10, nz=1)
 pe, ne = on_surface(0, gz1 + 0.035, True, off=0.008); disc_on('Emblem_Front', pe, ne, 0.05, 'Emblem', parent=BODYROOT)
-pp, pn = on_surface(0, 0.35, True, off=0.012); plate('Plate_Front', pp, pn, BODYROOT)
+pp, pn = on_surface(0, 0.54, True, off=0.012); plate('Plate_Front', pp, pn, BODYROOT)
 # ---- rear: a full-width tail bar with petal ends, brake / reverse / indicator units, emblem, plate
 rz = DR_.get('barZ', 1.12); hwR = DR_.get('halfW', 0.84)
 TGP = PIVOTS.get('Trunk')

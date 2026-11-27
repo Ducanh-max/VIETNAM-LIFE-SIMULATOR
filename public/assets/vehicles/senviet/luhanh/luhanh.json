@@ -17,10 +17,12 @@
   3
  ],
  "triangles": {
-  "lod0": 78034,
-  "lod0_meshes": 16,
-  "lod1": 25603,
-  "lod2": 5437
+  "lod0": 40906,
+  "lod0_primitives": 78,
+  "lod1": 19989,
+  "lod1_primitives": 39,
+  "lod2": 3992,
+  "lod2_primitives": 14
  },
  "nodes": [
   "Anchor_CameraInterior",
@@ -121,37 +123,15 @@
   ]
  },
  "materials": [
-  "BlackGloss",
   "BlackTrim",
-  "Brake",
-  "BuckleRed",
-  "Caliper",
-  "Carpet",
   "Chrome",
   "Dash",
-  "Emblem",
   "Glass",
-  "Headliner",
   "Leather",
-  "LeatherDark",
-  "Light_Brake",
-  "Light_DRL",
   "Light_Head",
-  "Light_Indicator",
-  "Light_Interior",
-  "Light_Reverse",
   "Light_Tail",
-  "Liner",
-  "MirrorGlass",
   "Paint",
-  "Plate",
-  "Rim",
-  "RimDark",
-  "Satin",
-  "Screen",
-  "Tyre",
-  "Underbody",
-  "Wood"
+  "Underbody"
  ],
  "source": "tools/blender/vehicles/build_vehicle.py + designs/luhanh.json"
 }

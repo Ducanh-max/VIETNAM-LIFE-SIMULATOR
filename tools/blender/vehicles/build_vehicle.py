@@ -87,8 +87,8 @@ def part_and_mat(zm, j, nose, tail):
     if j == 1: k = 'BlackTrim'
     elif j <= 4: k = 'Paint'
     elif j <= 6:  # side glass band
-        if zone('windshield', zm) and j == 6: k = 'BlackGloss'          # A pillar
-        elif zone('windshield', zm): k = 'BlackGloss'
+        if zone('windshield', zm) and j == 6: k = 'BlackGloss'          # A pillar (stays on the body)
+        elif zone('windshield', zm): k = 'Glass' if zone('frontDoor', zm) else 'BlackGloss'  # front of the door window
         elif zone('bPillar', zm) or zone('cPillar', zm) or zone('dPillar', zm): k = 'BlackGloss'
         elif zone('frontDoor', zm) or zone('rearDoor', zm) or zone('quarterGlass', zm): k = 'Glass'
         else: k = 'Paint'
@@ -102,7 +102,7 @@ def part_and_mat(zm, j, nose, tail):
         else: k = 'Paint'
         if nose: k = 'Paint'
     # part tags (which faces become doors / tailgate)
-    if 2 <= j <= 7 and not nose:
+    if 2 <= j <= 7 and not nose and not (j >= 6 and zone('windshield', zm)):
         if zone('frontDoor', zm): part = 'DF'
         elif zone('rearDoor', zm): part = 'DR'
     if zone('tailgate', zm) and j >= 4: part = 'TG'
@@ -137,8 +137,10 @@ def build_cage():
     cr = bm.edges.layers.float.new('crease_edge')
     zcab = max(Z['windshield'])
     for i in range(len(allrings) - 1):
-        for j, w in ((5, 0.55), (7, 0.85), (8, 0.85), (4, 0.25)):
-            if zs[i] <= zcab + 0.01 and zs[i + 1] <= zcab + 0.01 or j == 4:
+        for j, w in ((5, 0.6), (7, 0.85), (8, 0.85), (4, 0.3)):
+            hood = zs[i] > zcab - 0.01 and zs[i + 1] > zcab - 0.01
+            if hood and j in (5, 7): w = 0.75  # crisp hood shoulder and hood edge lines
+            if (zs[i] <= zcab + 0.01 and zs[i + 1] <= zcab + 0.01) or j == 4 or hood:
                 e = bm.edges.get((allrings[i][j], allrings[i + 1][j]))
                 if e: e[cr] = w
     for i in range(1, len(allrings) - 1):  # transverse edges where the side material changes (pillar edges)
@@ -147,6 +149,10 @@ def build_cage():
             if part_and_mat(za, j, False, False)[0] != part_and_mat(zb_, j, False, False)[0]:
                 e = bm.edges.get((allrings[i][j], allrings[i][j + 1]))
                 if e: e[cr] = 0.9
+    for j in range(3, NP - 1):  # the leading edge of the hood / nose face and the tail face
+        for ring in (allrings[1], allrings[-2]):
+            e = bm.edges.get((ring[j], ring[j + 1]))
+            if e: e[cr] = 0.7
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(me); bm.free()
@@ -162,7 +168,7 @@ def build_cage():
 
 body = build_cage()
 mod = body.modifiers.new('Mirror', 'MIRROR'); mod.use_axis[0] = True; mod.use_clip = True; mod.use_mirror_merge = True; mod.merge_threshold = 0.002
-sub = body.modifiers.new('Subsurf', 'SUBSURF'); sub.levels = 3; sub.render_levels = 3
+sub = body.modifiers.new('Subsurf', 'SUBSURF'); sub.levels = 2; sub.render_levels = 2
 for p in body.data.polygons: p.use_smooth = True
 
 def render_views(prefix, views=None, res=(1100, 680)):
