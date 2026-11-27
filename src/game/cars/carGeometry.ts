@@ -68,22 +68,24 @@ function profAt(spec: CarSpec, z: number): Prof {
   const L = spec.length, t = z / L; const { rw, rh } = sectionAt(spec, t);
   let hw = (spec.width / 2) * rw; const ys = spec.height * rh;
   // plan-view rounding of the nose and tail
-  const nose = z - (L / 2 - 0.32), tail = -L / 2 + 0.28 - z;
-  if (nose > 0) hw *= 1 - 0.13 * (nose / 0.32) ** 2;
+  const nl = spec.id === 'luhanh' ? 0.42 : 0.32; const nose = z - (L / 2 - nl), tail = -L / 2 + 0.28 - z;
+  if (nose > 0) hw *= 1 - (spec.id === 'luhanh' ? 0.17 : 0.13) * (nose / nl) ** 2;
+  let ysR = ys; if (nose > 0 && spec.id === 'luhanh') ysR -= 0.07 * (nose / nl) ** 2.2; // rounded leading edge of the hood
   if (tail > 0) hw *= 1 - (spec.id === 'luhanh' ? 0.07 : 0.1) * (tail / 0.28) ** 2;
   // the bumpers lift the underside at both overhangs
   const fo = z - (spec.axleF + 0.35), ro = spec.axleR - 0.35 - z;
   const yb = spec.clearance + Math.max(0, fo) * 0.18 + Math.max(0, ro) * 0.22;
-  return { hw, ys, yb };
+  return { hw, ys: ysR, yb };
 }
 /**
  * Half profile from the bottom centre to the top centre: [x, y][]. The side (from index 2 to TOP − 1) has `sideN`
  * extra points so the wheel arches come out round; TOP is the first point of the hood / deck surface.
  */
 function halfProfile(p: Prof, sideN: number): [number, number][] {
-  const { hw, ys, yb } = p; const crown = 0.025; const out: [number, number][] = [[0, yb], [hw * 0.86, yb], [hw * 0.97, yb + 0.06], [hw, yb + 0.18]];
-  for (let k = 1; k <= sideN; k++) out.push([hw * (1 - 0.003 * (k / sideN)), lerp(yb + 0.18, ys - 0.12, k / (sideN + 1))]);
-  out.push([hw * 0.996, ys - 0.12], [hw * 0.975, ys - 0.035], [hw * 0.93, ys], [hw * 0.6, ys + crown * 0.8], [0, ys + crown]);
+  const { hw, ys, yb } = p; const crown = 0.03; const out: [number, number][] = [[0, yb], [hw * 0.85, yb], [hw * 0.965, yb + 0.05], [hw * 0.99, yb + 0.16]];
+  // the side bulges a little at mid height; above the crease line (u > 0,76) it steps in, so light breaks along it
+  for (let k = 1; k <= sideN; k++) { const u = k / (sideN + 1); out.push([hw * (0.99 + 0.01 * Math.sin(Math.PI * Math.min(1, u / 0.76)) - (u > 0.76 ? 0.007 : 0)), lerp(yb + 0.16, ys - 0.1, u)]); }
+  out.push([hw * 0.982, ys - 0.1], [hw * 0.962, ys - 0.035], [hw * 0.925, ys - 0.005], [hw * 0.62, ys + crown * 0.85], [0, ys + crown]);
   return out;
 }
 const topIndex = (sideN: number) => 4 + sideN + 2;
@@ -112,10 +114,10 @@ export function buildCar(spec: CarSpec, lod: 0 | 1 | 2 | 3, mats: (k: MatKey) =>
   const zDoorR: [number, number] = [spec.doors.rear[1] * L, spec.doors.rear[0] * L];
   const zWs0 = spec.glass.ws0 * L, zWs1 = spec.glass.ws1 * L, zRoof1 = spec.glass.roof1 * L, zTail = spec.glass.tail * L;
   const split = lod === 0; // doors, tailgate as separate groups
-  const zs = zSamples(spec, lod === 0 ? 0.12 : lod === 1 ? 0.24 : 0.9, lod === 0 ? 0.035 : lod === 1 ? 0.07 : 0.26);
+  const zs = zSamples(spec, lod === 0 ? 0.08 : lod === 1 ? 0.22 : 0.9, lod === 0 ? 0.03 : lod === 1 ? 0.07 : 0.26);
   const archR = r + 0.045, innerX = spec.track / 2 - tw / 2 - 0.04;
   const isSuv = spec.id !== 'luhanh';
-  const SIDE_N = lod === 0 ? 7 : lod === 1 ? 3 : 1; const TOP = topIndex(SIDE_N);
+  const SIDE_N = lod === 0 ? 9 : lod === 1 ? 3 : 1; const TOP = topIndex(SIDE_N);
   // profile rings (with arch recesses) for every z
   const rings = zs.map((z) => {
     const p = profAt(spec, z); const half = halfProfile(p, SIDE_N);
@@ -161,7 +163,7 @@ export function buildCar(spec: CarSpec, lod: 0 | 1 | 2 | 3, mats: (k: MatKey) =>
       const a = loop[i], b = loop[(i + 1) % loop.length];
       const P0 = [0, cy, ring.z], P1 = [a[0], a[1], ring.z], P2 = [b[0], b[1], ring.z];
       const yC = (a[1] + b[1] + cy) / 3;
-      const tri = front ? [...P0, ...P2, ...P1] : [...P0, ...P1, ...P2];
+      const tri = [...P0, ...P2, ...P1]; // same winding for both caps (the loop runs the other way round seen from behind)
       if (!front && split && yC > ring.p.yb + 0.42) tgB.tri('paint', ...tri); else body.tri(yC < ring.p.yb + 0.2 ? 'black' : 'paint', ...tri);
     }
   }
@@ -192,11 +194,20 @@ export function buildCar(spec: CarSpec, lod: 0 | 1 | 2 | 3, mats: (k: MatKey) =>
       const ym = (A.y + B.y) / 2;
       let k: MatKey = lod === 0 ? (zm < spec.pillars[0] * L - 0.08 ? 'glassPrivacy' : 'glass') : 'glassDark';
       if (zm > zWs1) k = 'black'; else if (pillarAt(zm)) k = 'black';
+      if (spec.cPillar !== undefined && zm < spec.cPillar * L) k = 'paint';
+      if (spec.id === 'luhanh' && Math.abs(zm - spec.pillars[2] * L) < 0.085) k = 'silver'; // the bright D-pillar piece
       const quad = side > 0 ? [a, b, c, d] : [a, d, c, b];
       const door = split && ym > 0 && (zm > zDoorF[0] && zm < zDoorF[1] ? 'F' : zm > zDoorR[0] && zm < zDoorR[1] ? 'R' : null);
       if (door && zm < zWs1) { const id = (door + (side > 0 ? 'L' : 'R')) as DoorId; (doorB[id] ??= new Batch()).quad(k, quad[0], quad[1], quad[2], quad[3]); }
       else if (split && zm < zRoof1) tgB.quad(k, quad[0], quad[1], quad[2], quad[3]);
       else body.quad(k, quad[0], quad[1], quad[2], quad[3]);
+      // chrome window line along the belt (moves with the doors)
+      if (spec.chromeBelt && lod < 2 && zm < zWs0 - 0.12 && (spec.cPillar === undefined || zm > spec.cPillar * L - 0.02)) {
+        const ox = 1.004, sq = [[A.wb * side * ox, A.p.ys - 0.005, A.z], [A.wb * side * ox, A.p.ys + 0.022, A.z], [B.wb * side * ox, B.p.ys + 0.022, B.z], [B.wb * side * ox, B.p.ys - 0.005, B.z]];
+        const sqq = side > 0 ? sq : [sq[0], sq[3], sq[2], sq[1]];
+        const dst = door && zm < zWs1 ? doorB[(door + (side > 0 ? 'L' : 'R')) as DoorId]! : body;
+        dst.quad('chrome', sqq[0], sqq[1], sqq[2], sqq[3]);
+      }
       // window rubber along the roof edge
       if (lod === 0 && zm < zWs1) body.quad('black', [A.w * side * 1.001, A.y - 0.03, A.z], [A.w * side * 1.001, A.y, A.z], [B.w * side * 1.001, B.y, B.z], [B.w * side * 1.001, B.y - 0.03, B.z]);
     }
@@ -268,12 +279,19 @@ function frontAndRear(spec: CarSpec, lod: number, body: Batch, tg: Batch, split:
   const e = 0.012; // proud of the cap
   // grille
   if (id === 'luhanh') {
-    body.box('grille', 1.12, ysF - 0.1 - 0.38, 0.02, 0, (ysF - 0.1 + 0.38) / 2, zf + e);
-    body.box('silver', 1.16, 0.025, 0.03, 0, ysF - 0.09, zf + e); // chrome edge
+    // a wide grille nearly the full width of the face, framed in chrome, fine mesh
+    const gw = hwF * 2 - 0.34, gt = ysF - 0.07, gb = ybF + 0.3;
+    body.box('grille', gw, gt - gb, 0.02, 0, (gt + gb) / 2, zf + e);
+    body.box('chrome', gw + 0.04, 0.022, 0.026, 0, gt + 0.005, zf + e); body.box('chrome', gw - 0.1, 0.018, 0.026, 0, gb - 0.005, zf + e);
+    for (const s of [1, -1]) body.box('chrome', 0.02, gt - gb, 0.026, s * (gw / 2 + 0.01), (gt + gb) / 2, zf + e);
+    for (let i = 1; i < 4; i++) body.box('silver', gw - 0.06, 0.008, 0.024, 0, gb + (gt - gb) * i / 4, zf + e); // horizontal bars of the mesh
   } else if (id === 'phonho') {
-    // tiger-nose: wide at the top, pinched in the middle, a smaller lower part
-    body.box('grille', 0.9, 0.16, 0.02, 0, ysF - 0.15, zf + e);
-    body.box('grille', 0.7, 0.12, 0.02, 0, ysF - 0.29, zf + e);
+    // tiger-nose: a wide upper band between the lamps, pinched waist, a narrower lower part; bright frame and top bar
+    body.box('grille', 1.06, 0.17, 0.02, 0, ysF - 0.16, zf + e);
+    body.box('grille', 0.84, 0.13, 0.02, 0, ysF - 0.31, zf + e);
+    body.box('chrome', 1.1, 0.02, 0.026, 0, ysF - 0.065, zf + e); // the bar linking both lamps
+    for (const s of [1, -1]) { body.box('chrome', 0.018, 0.17, 0.026, s * 0.54, ysF - 0.16, zf + e, 0, 0, s * 0.12); body.box('chrome', 0.018, 0.14, 0.026, s * 0.43, ysF - 0.31, zf + e, 0, 0, -s * 0.25); }
+    body.box('chrome', 0.84, 0.016, 0.026, 0, ysF - 0.38, zf + e);
   } else {
     body.box('grille', 1.0, ysF - 0.12 - 0.42, 0.02, 0, (ysF - 0.12 + 0.42) / 2, zf + e);
     body.box('silver', 0.06, ysF - 0.12 - 0.42, 0.025, 0.52, (ysF - 0.12 + 0.42) / 2, zf + e); body.box('silver', 0.06, ysF - 0.12 - 0.42, 0.025, -0.52, (ysF - 0.12 + 0.42) / 2, zf + e);
@@ -281,16 +299,24 @@ function frontAndRear(spec: CarSpec, lod: number, body: Batch, tg: Batch, split:
   // headlamps and DRLs
   for (const s of [1, -1]) {
     if (id === 'luhanh') {
-      body.box('black', 0.2, 0.32, 0.025, s * (hwF - 0.2), ysF - 0.24, zf + e - 0.004); body.box('lowBeam', 0.09, 0.22, 0.03, s * (hwF - 0.2), ysF - 0.22, zf + e); // vertical cluster at the corner
-      body.box('drl', hwF * 2 - 0.3, 0.025, 0.03, 0, ysF - 0.02, zf + e - 0.02, 0, 0, 0); // star-line along the hood edge (drawn once per side, overlapping)
-      body.box('drl', 0.025, 0.28, 0.03, s * (hwF - 0.09), ysF - 0.16, zf + e);
-      body.box('turn', 0.16, 0.04, 0.03, s * (hwF - 0.2), ysF - 0.42, zf + e);
+      // slim vertical lamp at each corner of the face, an LED line over the grille joining them
+      body.box('black', 0.13, 0.4, 0.025, s * (hwF - 0.1), ysF - 0.26, zf + e - 0.004);
+      body.box('lowBeam', 0.05, 0.3, 0.03, s * (hwF - 0.12), ysF - 0.25, zf + e);
+      body.box('drl', 0.018, 0.38, 0.032, s * (hwF - 0.055), ysF - 0.25, zf + e);
+      if (s > 0) body.box('drl', hwF * 2 - 0.2, 0.016, 0.032, 0, ysF - 0.035, zf + e); // the line over the grille
+      body.box('turn', 0.1, 0.03, 0.031, s * (hwF - 0.1), ysF - 0.47, zf + e);
+      // fog lamp and dark side intake in the lower corners
+      body.box('black', 0.16, 0.14, 0.025, s * (hwF - 0.13), ybF + 0.2, zf + e); body.box('lowBeam', 0.08, 0.025, 0.03, s * (hwF - 0.13), ybF + 0.22, zf + e);
     } else if (id === 'phonho') {
-      body.box('drl', hwF * 2 - 0.3, 0.03, 0.03, 0, ysF - 0.05, zf + e); // horizontal LED strip
-      body.box('drl', 0.03, 0.12, 0.03, s * (hwF - 0.15), ysF - 0.12, zf + e);
-      body.box('black', 0.28, 0.14, 0.025, s * (hwF - 0.3), ysF - 0.14, zf + e - 0.004); body.box('lowBeam', 0.16, 0.07, 0.03, s * (hwF - 0.3), ysF - 0.14, zf + e);
-      body.box('black', 0.08, 0.2, 0.03, s * (hwF - 0.12), ybF + 0.18, zf + e); // vertical corner intakes
-      body.box('turn', 0.06, 0.12, 0.031, s * (hwF - 0.12), ybF + 0.2, zf + e);
+      // slim lamp unit at the upper corner: dark housing, LED line on top, a row of projectors
+      body.box('black', 0.26, 0.11, 0.025, s * (hwF - 0.19), ysF - 0.11, zf + e - 0.004);
+      body.box('drl', 0.26, 0.022, 0.03, s * (hwF - 0.19), ysF - 0.065, zf + e);
+      body.box('drl', 0.022, 0.1, 0.03, s * (hwF - 0.065), ysF - 0.11, zf + e);
+      for (const k of [0, 1, 2]) body.box('lowBeam', 0.05, 0.04, 0.03, s * (hwF - 0.27 + k * 0.07), ysF - 0.12, zf + e);
+      body.box('turn', 0.18, 0.018, 0.031, s * (hwF - 0.2), ysF - 0.155, zf + e);
+      // vertical fog / LED stacks in the bumper corners
+      body.box('black', 0.1, 0.24, 0.03, s * (hwF - 0.14), ybF + 0.24, zf + e);
+      for (const k of [0, 1, 2, 3]) body.box('lowBeam', 0.035, 0.035, 0.032, s * (hwF - 0.14), ybF + 0.15 + k * 0.055, zf + e);
     } else {
       body.box('drl', hwF * 2 - 0.4, 0.025, 0.03, 0, ysF - 0.03, zf + e);
       body.box('black', 0.14, 0.32, 0.025, s * (hwF - 0.13), ysF - 0.2, zf + e - 0.004); body.box('lowBeam', 0.07, 0.2, 0.03, s * (hwF - 0.13), ysF - 0.19, zf + e); // vertical clusters at the corners
@@ -299,19 +325,32 @@ function frontAndRear(spec: CarSpec, lod: number, body: Batch, tg: Batch, split:
   }
   // lower front bumper: intake, silver skid plate, fog lamps, plate
   body.box('black', id === 'luhanh' ? 1.3 : 1.1, 0.12, 0.02, 0, ybF + 0.12, zf + e);
-  body.box('silver', id === 'luhanh' ? 1.0 : 0.85, 0.05, 0.03, 0, ybF + 0.04, zf + e);
-  if (lod === 0) for (const s of [1, -1]) body.box('lowBeam', 0.08, 0.04, 0.03, s * (hwF - 0.25), ybF + 0.12, zf + e + 0.002);
+  body.box('silver', id === 'luhanh' ? 1.0 : id === 'phonho' ? 1.05 : 0.85, id === 'phonho' ? 0.07 : 0.05, 0.03, 0, ybF + 0.04, zf + e);
+  if (lod === 0 && id !== 'phonho') for (const s of [1, -1]) body.box('lowBeam', 0.08, 0.04, 0.03, s * (hwF - 0.25), ybF + 0.12, zf + e + 0.002);
   body.box('plate', 0.52, 0.11, 0.01, 0, ybF + 0.25, zf + e + 0.008);
   body.box('emblem', 0.13, 0.13, 0.01, 0, ysF - 0.04, zf + e + 0.01);
   // rear
   const ysR = pr.ys, hwR = pr.hw, ybR = pr.yb; const zb = zr - e;
   const T = split ? tg : body; // lamps on the tailgate move with it
   if (spec.rearLamps === 'barAndCorners') {
-    T.box('tail', hwR * 2 - 0.4, 0.05, 0.03, 0, ysR - 0.06, zb);
-    for (const s of [1, -1]) { body.box('tail', 0.07, 0.42, 0.03, s * (hwR - 0.05), ysR - 0.22, zb); body.box('brake', 0.06, 0.12, 0.031, s * (hwR - 0.05), ysR - 0.12, zb - 0.002); body.box('reverse', 0.06, 0.06, 0.031, s * (hwR - 0.05), ysR - 0.38, zb - 0.002); body.box('turn', 0.06, 0.06, 0.031, s * (hwR - 0.05), ysR - 0.3, zb - 0.002); }
+    T.box('black', hwR * 2 - 0.16, 0.08, 0.025, 0, ysR - 0.06, zb + 0.004);
+    T.box('tail', hwR * 2 - 0.18, 0.03, 0.03, 0, ysR - 0.06, zb); // full-width bar
+    for (const s of [1, -1]) {
+      body.box('black', 0.1, 0.46, 0.025, s * (hwR - 0.06), ysR - 0.24, zb + 0.004);
+      body.box('tail', 0.035, 0.44, 0.03, s * (hwR - 0.035), ysR - 0.24, zb); body.box('brake', 0.05, 0.14, 0.031, s * (hwR - 0.075), ysR - 0.14, zb - 0.002);
+      body.box('turn', 0.05, 0.07, 0.031, s * (hwR - 0.075), ysR - 0.3, zb - 0.002); body.box('reverse', 0.05, 0.07, 0.031, s * (hwR - 0.075), ysR - 0.39, zb - 0.002);
+      body.box('tail', 0.12, 0.03, 0.031, s * (hwR - 0.15), ybR + 0.2, zb - 0.004); // bumper reflector
+    }
   } else if (spec.rearLamps === 'joinedBar') {
     T.box('tail', hwR * 2 - 0.3, 0.035, 0.03, 0, ysR - 0.04, zb);
-    for (const s of [1, -1]) { body.box('tail', 0.05, 0.2, 0.03, s * (hwR - 0.06), ysR - 0.12, zb); body.box('brake', 0.14, 0.06, 0.031, s * (hwR - 0.14), ysR - 0.06, zb - 0.002); body.box('turn', 0.05, 0.06, 0.031, s * (hwR - 0.06), ysR - 0.2, zb - 0.002); body.box('reverse', 0.12, 0.05, 0.031, s * 0.5, ybR + 0.2, zb - 0.002); }
+    T.box('black', hwR * 2 - 0.3, 0.05, 0.025, 0, ysR - 0.04, zb + 0.004);
+    for (const s of [1, -1]) {
+      body.box('black', 0.2, 0.26, 0.025, s * (hwR - 0.11), ysR - 0.13, zb + 0.004);
+      body.box('tail', 0.04, 0.24, 0.03, s * (hwR - 0.04), ysR - 0.13, zb); body.box('tail', 0.18, 0.03, 0.03, s * (hwR - 0.11), ysR - 0.03, zb);
+      body.box('brake', 0.13, 0.05, 0.031, s * (hwR - 0.12), ysR - 0.09, zb - 0.002); body.box('turn', 0.1, 0.035, 0.031, s * (hwR - 0.12), ysR - 0.16, zb - 0.002);
+      body.box('reverse', 0.08, 0.04, 0.031, s * (hwR - 0.12), ysR - 0.21, zb - 0.002);
+      body.box('tail', 0.035, 0.14, 0.031, s * (hwR - 0.08), ybR + 0.17, zb - 0.002); // bumper reflector
+    }
   } else {
     // paired vertical lamps on each side, nothing joining them across the tailgate
     for (const s of [1, -1]) for (const dx of [0.05, 0.14]) { body.box('tail', 0.045, 0.34, 0.03, s * (hwR - dx), ysR - 0.14, zb); }
@@ -321,7 +360,8 @@ function frontAndRear(spec: CarSpec, lod: number, body: Batch, tg: Batch, split:
   T.box('emblem', 0.12, 0.12, 0.01, 0, ysR - 0.14, zb - 0.006);
   if (lod === 0) T.box('brake', 0.3, 0.02, 0.02, 0, spec.height * spec.glass.tailY + 0.02, zb + 0.03); // high-mount stop lamp
   body.box('black', hwR * 2 - 0.2, 0.14, 0.03, 0, ybR + 0.08, zb);
-  body.box('silver', 0.9, 0.04, 0.035, 0, ybR + 0.02, zb - 0.002);
+  body.box('silver', spec.id === 'luhanh' ? 1.3 : 0.9, spec.id === 'luhanh' ? 0.06 : 0.04, 0.035, 0, ybR + 0.03, zb - 0.002);
+  if (spec.id === 'luhanh') for (let i = -3; i <= 3; i++) body.box('black', 0.02, 0.05, 0.036, i * 0.14, ybR + 0.03, zb - 0.004); // diffuser fins
   // underbody: dark tray so the car is never see-through from below
   body.box('black', spec.width - 0.3, 0.02, spec.length - 0.6, 0, spec.clearance + 0.01, 0);
 }
@@ -333,7 +373,12 @@ function sideDetails(spec: CarSpec, lod: number, body: Batch, doorB: Partial<Rec
     // mirrors on the front doors (with an amber repeater)
     const pm = profAt(spec, zWs0 - 0.12); const mx = s * (pm.hw * 0.93 + 0.13), my = pm.ys + 0.1, mz = zWs0 - 0.16;
     const MB = split ? doorB[(s > 0 ? 'FL' : 'FR') as DoorId] : body;
-    if (MB) { MB.box('paint', 0.2, 0.12, 0.09, mx, my, mz); MB.box('black', 0.08, 0.06, 0.06, mx - s * 0.1, my - 0.05, mz + 0.01); MB.box('turn', 0.16, 0.015, 0.02, mx, my - 0.02, mz + 0.05); MB.box('mirror', 0.005, 0.09, 0.07, mx - s * 0.002, my, mz - 0.046, 0, 0, 0); }
+    if (MB) {
+      const shell = new THREE.SphereGeometry(1, lod === 0 ? 14 : 8, lod === 0 ? 8 : 5); MB.add('paint', shell, new THREE.Matrix4().compose(new THREE.Vector3(mx, my, mz), new THREE.Quaternion(), new THREE.Vector3(0.115, 0.07, 0.055)));
+      MB.box('black', 0.1, 0.035, 0.07, mx - s * 0.09, my - 0.045, mz + 0.01); // stalk to the door
+      MB.box('mirror', 0.19, 0.11, 0.004, mx, my, mz - 0.052);
+      MB.box('turn', 0.12, 0.012, 0.02, mx + s * 0.02, my - 0.035, mz + 0.035, 0, s * 0.3, 0);
+    }
     // door handles
     for (const [zr, id] of [[zF, 'F'], [zR, 'R']] as const) {
       const z = (zr[0] + zr[1]) / 2 - 0.15; const p = profAt(spec, z);
@@ -347,7 +392,7 @@ function sideDetails(spec: CarSpec, lod: number, body: Batch, doorB: Partial<Rec
     body.box('black', 0.05, 0.09, zs1 - zs0, s * (pmid.hw * 0.97), pmid.yb + 0.08, (zs0 + zs1) / 2);
     if (spec.id === 'luhanh') body.box('silver', 0.012, 0.012, zR[1] - zR[0], s * (profAt(spec, zR[0]).hw * 0.99), profAt(spec, zR[0]).ys - 0.14, (zR[0] + zR[1]) / 2); // sliding-door rail
     // roof rails
-    if (spec.roofRails) { const pr = profAt(spec, (spec.glass.ws1 * L + zRoof1) / 2); body.box('black', 0.04, 0.05, spec.glass.ws1 * L - zRoof1 - 0.1, s * pr.hw * 0.78, H + 0.04, (spec.glass.ws1 * L + zRoof1) / 2); }
+    if (spec.roofRails) { const pr = profAt(spec, (spec.glass.ws1 * L + zRoof1) / 2); body.box(spec.id === 'luhanh' ? 'silver' : 'black', 0.04, 0.05, spec.glass.ws1 * L - zRoof1 - 0.1, s * pr.hw * 0.78, H + 0.04, (spec.glass.ws1 * L + zRoof1) / 2); }
   }
   // fuel flap (left rear quarter) and a shark-fin antenna
   { const z = spec.axleR + 0.55; const p = profAt(spec, z); body.box('paint', 0.006, 0.16, 0.16, p.hw * 0.995 + 0.002, p.ys - 0.18, z); body.box('black', 0.003, 0.17, 0.004, p.hw + 0.004, p.ys - 0.18, z + 0.08); }
@@ -360,30 +405,37 @@ function sideDetails(spec: CarSpec, lod: number, body: Batch, doorB: Partial<Rec
 const W2 = (spec: CarSpec) => (spec.width / 2) * 0.86 * 0.9;
 
 // ---------------- wheels ----------------
+/** A spoke: thin in x, `len` along y, tapering from wIn (hub) to wOut (rim), its outer end set back like a dished wheel. */
+function spokeGeometry(len: number, wIn: number, wOut: number, depth: number) {
+  const g = new THREE.BoxGeometry(depth, len, 1); const p = g.getAttribute('position');
+  for (let i = 0; i < p.count; i++) { const t = p.getY(i) / len + 0.5; p.setZ(i, p.getZ(i) * lerp(wIn, wOut, t)); p.setX(i, p.getX(i) - t * 0.02); }
+  g.computeVertexNormals(); return g;
+}
 function wheelGeometry(spec: CarSpec, lod: number, mats: (k: MatKey) => THREE.Material) {
   const r = tyreRadius(spec.tyre), tw = spec.tyre[0] / 1000, rimR = (spec.tyre[2] * 0.0254) / 2 * 0.96;
   const seg = lod === 0 ? 24 : lod === 1 ? 14 : 8;
   const B = new Batch();
   const rot = new THREE.Matrix4().makeRotationZ(Math.PI / 2);
-  // tyre: tread drum plus slightly rounded shoulders
-  B.add('tyre', new THREE.CylinderGeometry(r - 0.015, r - 0.015, tw, seg, 1, true), rot);
-  B.add('tyre', new THREE.CylinderGeometry(r, r, tw - 0.04, seg, 1, true), rot);
-  // outer sidewall ring and the dark inner disc
-  const ring = new THREE.RingGeometry(rimR, r - 0.012, seg); ring.rotateY(Math.PI / 2); B.add('tyre', ring, new THREE.Matrix4().makeTranslation(tw / 2, 0, 0));
-  const inner = new THREE.CircleGeometry(r - 0.01, seg); inner.rotateY(-Math.PI / 2); B.add('black', inner, new THREE.Matrix4().makeTranslation(-tw / 2 + 0.01, 0, 0));
-  // rim face and spokes
-  const face = new THREE.CircleGeometry(rimR, seg); face.rotateY(Math.PI / 2); B.add(lod === 0 ? 'black' : 'silver', face, new THREE.Matrix4().makeTranslation(tw / 2 - 0.035, 0, 0));
+  // tyre: a lathed section (bead, bulging sidewall, rounded shoulder, flat tread) round the wheel axis
+  const h = tw / 2; const prof = lod === 2 ? [[rimR, -h + 0.02], [r, -h + 0.03], [r, h - 0.03], [rimR, h - 0.02]] : [[rimR, -h + 0.015], [r - 0.06, -h], [r - 0.018, -h + 0.008], [r - 0.002, -h + 0.035], [r, -h + 0.06], [r, h - 0.06], [r - 0.002, h - 0.035], [r - 0.018, h - 0.008], [r - 0.06, h], [rimR + 0.005, h - 0.012]];
+  const tyreG = new THREE.LatheGeometry(prof.map(([a, b]) => new THREE.Vector2(a, b)), seg); B.add('tyre', tyreG, rot);
+  const inner = new THREE.CircleGeometry(rimR, seg); inner.rotateY(-Math.PI / 2); B.add('black', inner, new THREE.Matrix4().makeTranslation(-h + 0.03, 0, 0));
+  // rim: a dished barrel and a dark face behind the spokes
+  const barrel = new THREE.LatheGeometry([new THREE.Vector2(rimR, h - 0.012), new THREE.Vector2(rimR * 0.97, h - 0.04), new THREE.Vector2(rimR * 0.95, -h + 0.05)], seg); B.add('silver', barrel, rot);
+  const face = new THREE.CircleGeometry(rimR * 0.95, seg); face.rotateY(Math.PI / 2); B.add(lod === 0 ? 'black' : 'silver', face, new THREE.Matrix4().makeTranslation(h - 0.07, 0, 0));
   if (lod <= 1) {
     const n = spec.rim === 'geometric10' ? 10 : spec.rim === 'double5' ? 10 : 20;
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + (spec.rim === 'double5' ? (i % 2 ? 0.12 : -0.12) : 0);
-      const len = rimR * 0.82; const wid = spec.rim === 'sharp20' ? 0.022 : spec.rim === 'geometric10' ? 0.045 : 0.035;
-      const m = new THREE.Matrix4().compose(new THREE.Vector3(tw / 2 - 0.02, Math.cos(a) * (len / 2 + 0.03), Math.sin(a) * (len / 2 + 0.03)), new THREE.Quaternion().setFromEuler(new THREE.Euler(-a, 0, 0)), new THREE.Vector3(1, 1, 1));
-      B.add('silver', new THREE.BoxGeometry(0.02, len, wid), m);
+      const len = rimR * 0.86; const wid = spec.rim === 'sharp20' ? 0.022 : spec.rim === 'geometric10' ? 0.05 : 0.04;
+      const m = new THREE.Matrix4().compose(new THREE.Vector3(h - 0.03, Math.cos(a) * (len / 2 + 0.035), Math.sin(a) * (len / 2 + 0.035)), new THREE.Quaternion().setFromEuler(new THREE.Euler(-a, 0, 0)), new THREE.Vector3(1, 1, 1));
+      B.add('silver', spokeGeometry(len, wid * 0.55, wid, 0.028), m);
       if (spec.rim === 'geometric10' && i % 2 === 0) { const m2 = new THREE.Matrix4().compose(new THREE.Vector3(tw / 2 - 0.018, Math.cos(a + 0.31) * rimR * 0.7, Math.sin(a + 0.31) * rimR * 0.7), new THREE.Quaternion().setFromEuler(new THREE.Euler(-a - 0.31 - Math.PI / 2, 0, 0)), new THREE.Vector3(1, 1, 1)); B.add('silver', new THREE.BoxGeometry(0.018, rimR * 0.42, 0.03), m2); }
     }
     const lip = new THREE.RingGeometry(rimR * 0.93, rimR, seg); lip.rotateY(Math.PI / 2); B.add('silver', lip, new THREE.Matrix4().makeTranslation(tw / 2 - 0.01, 0, 0));
-    const hub = new THREE.CylinderGeometry(0.055, 0.055, 0.03, 12); hub.rotateZ(Math.PI / 2); B.add('chrome', hub, new THREE.Matrix4().makeTranslation(tw / 2 - 0.01, 0, 0));
+    const hub = new THREE.CylinderGeometry(0.06, 0.065, 0.035, 16); hub.rotateZ(Math.PI / 2); B.add('silver', hub, new THREE.Matrix4().makeTranslation(h - 0.02, 0, 0));
+    const cap = new THREE.CylinderGeometry(0.032, 0.032, 0.012, 16); cap.rotateZ(Math.PI / 2); B.add('emblem', cap, new THREE.Matrix4().makeTranslation(h - 0.0, 0, 0));
+    if (lod === 0) for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; const nut = new THREE.CylinderGeometry(0.009, 0.009, 0.02, 6); nut.rotateZ(Math.PI / 2); B.add('chrome', nut, new THREE.Matrix4().makeTranslation(h - 0.005, Math.cos(a) * 0.045, Math.sin(a) * 0.045)); }
     if (lod === 0) { const disc = new THREE.CylinderGeometry(rimR * 0.78, rimR * 0.78, 0.025, 20); disc.rotateZ(Math.PI / 2); B.add('liner', disc, new THREE.Matrix4().makeTranslation(tw / 2 - 0.08, 0, 0)); }
   }
   return B.build(mats);
@@ -395,13 +447,14 @@ function wheelGeometry(spec: CarSpec, lod: number, mats: (k: MatKey) => THREE.Ma
  * driver sits about 1,1 m behind its base (dashboard and steering wheel in front, like the real cabins), rows 0,85–0,95 m
  * apart. Third rows sit over the rear axle, as in the real MPV / 7-seat SUV.
  */
+export const cabinFloor = (spec: CarSpec) => spec.clearance + (spec.id === 'luhanh' ? 0.24 : 0.13);
 export function seatRows(spec: CarSpec) {
   const z0 = spec.glass.ws0 * spec.length - 1.1; const gap = spec.id === 'luhanh' ? 0.95 : spec.id === 'phonho' ? 0.85 : 0.88;
   return spec.seats.map((_, i) => z0 - i * gap);
 }
 function buildInterior(spec: CarSpec, g: THREE.Group, parts: CarParts, mats: (k: MatKey) => THREE.Material, zWs0: number, zTail: number) {
   const B = new Batch(); const L = spec.length, H = spec.height;
-  const pmid = profAt(spec, 0); const hwIn = pmid.hw - 0.09; const floorY = spec.clearance + 0.24; const belt = pmid.ys;
+  const pmid = profAt(spec, 0); const hwIn = pmid.hw - 0.09; const floorY = cabinFloor(spec); const belt = pmid.ys;
   // floor, mats, side trims below the belt, headliner
   B.box('carpet', hwIn * 2, 0.02, zWs0 - zTail - 0.2, 0, floorY, (zWs0 + zTail) / 2 - 0.05);
   for (const s of [1, -1]) for (let z = zTail + 0.05; z < zWs0 - 0.05; z += 0.2) {
@@ -441,7 +494,7 @@ function buildInterior(spec: CarSpec, g: THREE.Group, parts: CarParts, mats: (k:
   B.box('black', 0.14, 0.01, 0.12, 0, floorY + 0.33, cz0 - 0.12); // wireless pad
   for (const dx of [-0.05, 0.05]) B.box('black', 0.07, 0.012, 0.07, dx, floorY + 0.33, cz0 - 0.3);
   if (spec.shifter === 'rotary') B.add('chrome', new THREE.CylinderGeometry(0.035, 0.04, 0.04, 16), new THREE.Matrix4().makeTranslation(0, floorY + 0.35, cz0 - 0.45));
-  else B.box('black', 0.04, 0.12, 0.05, 0, floorY + 0.38, cz0 - 0.45);
+  else { B.box('chrome', 0.1, 0.012, 0.16, 0, floorY + 0.325, cz0 - 0.45); B.box('black', 0.025, 0.12, 0.025, 0, floorY + 0.39, cz0 - 0.45, -0.15, 0, 0); B.box('black', 0.05, 0.07, 0.07, 0, floorY + 0.46, cz0 - 0.46); }
   B.box('leather', 0.24, 0.06, 0.3, 0, floorY + 0.36, cz1 + 0.18);
   // sun visors and the mirror
   for (const s of [1, -1]) B.box('headliner', 0.32, 0.015, 0.16, s * 0.35, H - 0.08, zWs0 - 0.7);

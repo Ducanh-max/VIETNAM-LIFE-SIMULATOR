@@ -61,20 +61,64 @@ Kích thước, chiều dài cơ sở, khoảng sáng gầm, lốp, số ghế v
 - Thêm viền nhựa đen quanh hốc bánh.
 - Lùi ghế và táp-lô về đúng vị trí cabin. Hồ sơ ghi toạ độ ghế là "tạm"; ghế đặt theo toạ độ đó thì vô lăng nằm ngay trước mặt người lái.
 
-| Số đo (đo trong game) | LOD0 | LOD1 | LOD2 | LOD3 |
+### Bản 2: sửa sau góp ý của chủ dự án ("chưa mua được xe", "ngoại thất xấu")
+
+Trước và sau, cùng góc máy:
+- [chéo trước](luhanh-before-after-front34.png)
+- [hông](luhanh-before-after-side.png)
+- [chéo sau](luhanh-before-after-rear34.png)
+
+Ảnh so cạnh ảnh hãng chỉ gửi cho chủ dự án, không đưa vào repo vì ảnh hãng có bản quyền.
+
+**Vì sao chưa mua được xe**
+1. Ví admin luôn được nạp lại đến 999.999.999đ. Lữ Hành giá 1,499 tỷ, Đồi Xa 1,199 tỷ, nên admin cũng bị báo không đủ tiền. Người chơi thường bắt đầu với 300.000đ nên không mua được xe nào.
+2. Khung showroom canh giữa màn hình và không cuộn được. Nút "Mua xe" nhỏ, nằm ở đáy khung, nên trên màn hình thấp (laptop 768 px trừ thanh trình duyệt) nút bị đẩy ra ngoài, không bấm được. Thông báo "không đủ tiền" cũng nằm ở dưới, dễ bị che.
+
+**Đã sửa**
+- Khung giá ở đầu panel: giá lớn, nút đỏ "Mua xe · 1.499.000.000đ". Bấm vào thì hiện bước xác nhận "Mua Lữ Hành màu … với giá …?" với nút Xác nhận mua / Huỷ.
+- Mua xong: thông báo ngay trong khung, toast "Đã mua … · biển …", xe đỗ trước cửa showroom và được lưu (localStorage).
+- Thiếu tiền: nút chuyển xám, ghi rõ còn thiếu bao nhiêu.
+- Admin mua không bị trừ tiền; lịch sử ví ghi "admin, không trừ tiền".
+- Panel cuộn được, không bao giờ cao quá màn hình.
+- Đã thử trong game ở màn 1366×620, bấm phím E thật rồi bấm các nút:
+  - [bước xác nhận](luhanh-buy-confirm.png), [đã mua](luhanh-buy-done.png);
+  - người chơi có 2 tỷ: mua được, ví còn 501 triệu;
+  - admin với ví 300.000đ: mua được, không bị trừ tiền.
+
+**Ngoại thất đã làm lại**
+- Thân xe mượt hơn: mặt cắt dày hơn (8 cm thay vì 12 cm), 9 điểm hông thay vì 7. Hông hơi phồng ở giữa, có đường gân ngay dưới kính để bắt sáng.
+- Capo dài và dốc xuống mũi, mép trước capo bo tròn. Mũi xe bo tròn hơn khi nhìn từ trên.
+- Dây kính cao hơn: kính hông thấp lại, thân dày hơn như xe thật.
+- Mặt trước:
+  - lưới tản nhiệt rộng gần hết mặt xe, viền chrome, các thanh ngang;
+  - đèn pha dọc mảnh ở hai góc, dải LED chạy ngang trên lưới;
+  - đèn sương mù và hốc gió ở góc cản.
+- Sơn: MeshPhysicalMaterial có lớp clearcoat, kim loại hơn. Xe dùng một env map nhỏ (RoomEnvironment) chỉ cho vật liệu của xe, nên chrome, bạc và kính có phản chiếu mà không đổi ánh sáng của cả thành phố.
+- Thân: nẹp chrome chạy dọc chân kính, mảng bạc ở trụ D, giá nóc màu bạc.
+- Mâm và lốp:
+  - lốp tiện tròn (lathe) có hông lốp phồng và vai lốp bo;
+  - mâm có lòng chảo, chấu thuôn từ tâm ra vành;
+  - chụp tâm có logo riêng, 5 ốc bánh.
+- Gương: vỏ bo tròn trên chân gương, mặt gương phản chiếu, xi-nhan.
+- Đuôi:
+  - dải đèn hậu liền suốt chiều ngang, cụm đèn dọc ở hai góc;
+  - phản quang ở cản, ốp bạc với các khe kiểu khuếch tán gió.
+- Sửa lỗi cũ: mặt đuôi xe bị lật mặt (chiều tam giác ngược), nên bị cắt mất và nhìn thấy khoang hành lý đen bên trong. Giờ mặt đuôi hiện đúng màu sơn.
+
+| Số đo (đo trong game, bản 2) | LOD0 | LOD1 | LOD2 | LOD3 |
 |---|---|---|---|---|
-| Tam giác | 11.928 | 4.984 | 1.636 | 200 |
-| Mesh (≈ draw call) | 90 | 31 | 26 | 5 |
+| Tam giác | 18.332 | 6.844 | 2.016 | 200 |
+| Mesh (≈ draw call) | 100 | 32 | 27 | 5 |
 | Mục tiêu hồ sơ | 6–12k | 2–5k | 0,7–1,5k | 150–500 |
 
-LOD2 hơi vượt mục tiêu (1.636 so với tối đa 1.500). LOD0 nhiều draw call vì cửa, bánh, nội thất là các nhóm riêng để chạy hiệu ứng.
+Bản 1 là 11.928 / 4.984 / 1.636 / 200. Thân mượt hơn và mâm mới làm LOD0, LOD1, LOD2 vượt mục tiêu của hồ sơ. LOD0 chỉ hiện khi đứng cách xe dưới 18 m.
 
-FPS: Edge headless, 1280×800, trong showroom có 3 xe ở LOD0, dao động 13–25 FPS. Cùng máy, cùng bãi đất trước khi có showroom đo được 12–32 FPS. Máy đang tải nặng, số chỉ để tham khảo.
+FPS: Edge headless, 1280×800, trong showroom có 3 xe ở LOD0, đo được 36–46 FPS ở các góc chụp. Bản 1 đo được 13–25 FPS, nhưng lúc đó máy đang tải nặng hơn, nên hai số không so trực tiếp được.
 
 ### Còn khác ảnh thật hoặc chưa làm
 
-- **Mũi xe:** Lữ Hành vẫn vuông hơn xe thật. Xe thật có capo dốc hơn và mép trước bo tròn.
-- **Đường cửa sổ và trụ D:** xe thật có đường cửa sổ nâng lên ở trụ D và nẹp bạc; trong game chưa có.
-- **Mâm:** mâm hình học ở mức đơn giản.
+- **Mặt trước:** vẫn là một mặt phẳng đứng, chưa có độ cong như xe thật. Xe thật có lưới và đèn ôm theo mặt cong.
+- **Cửa sổ và trụ D:** xe thật có đường cửa sổ nâng lên ở trụ D; trong game chân kính vẫn thẳng.
+- **Mâm:** mâm thật hai tông tối/bạc; trong game là bạc.
 - **Lái xe:** chưa lái được ba xe này. Hệ thống ô tô người chơi lái (`src/game/vehicle/`, `Player.tsx`) là phần phiên khác đang làm dở, chưa commit, nên mình chưa nối vào được. Xe mua về hiện đứng đỗ.
 - **Phần chưa làm:** gửi xe vào hầm Lotte, hành khách ngồi theo ghế, cốp chứa đồ (hàng tồn sẽ làm sau khi đủ ba xe).

@@ -1,4 +1,5 @@
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { buildCar, type CarParts, type DoorId, type MatKey } from './carGeometry';
@@ -21,6 +22,9 @@ export const newControl = (): CarControl => ({ doors: {}, seatsFolded: false, sp
 
 // ---- shared materials (one set per paint / interior colour) ----
 const matCache = new Map<string, THREE.Material>();
+/** One small prefiltered environment for car reflections only (set per material, the city keeps its own lighting). */
+let carEnv: THREE.Texture | null = null;
+function ensureEnv(gl: THREE.WebGLRenderer) { if (!carEnv) { const pm = new THREE.PMREMGenerator(gl); carEnv = pm.fromScene(new RoomEnvironment(), 0.04).texture; pm.dispose(); } return carEnv; }
 const std = (key: string, make: () => THREE.Material) => { let m = matCache.get(key); if (!m) { m = make(); matCache.set(key, m); } return m; };
 function emblemTexture() {
   // an original emblem: a ring with a stylised lotus leaf, not any manufacturer's mark
@@ -57,14 +61,14 @@ function materialsFor(model: ModelId, paint: string, plate: string) {
   const plateMat = new THREE.MeshBasicMaterial({ map: plateTexture(plate) });
   const get = (k: MatKey): THREE.Material => {
     switch (k) {
-      case 'paint': return std(`paint${paint}`, () => new THREE.MeshStandardMaterial({ color: paint, roughness: 0.42, metalness: 0.25 }));
+      case 'paint': return std(`paint${paint}`, () => new THREE.MeshPhysicalMaterial({ color: paint, roughness: 0.38, metalness: 0.45, clearcoat: 1, clearcoatRoughness: 0.06, envMap: carEnv, envMapIntensity: 0.75 }));
       case 'black': return std('black', () => new THREE.MeshStandardMaterial({ color: TRIM.black, roughness: 0.8 }));
-      case 'silver': return std('silver', () => new THREE.MeshStandardMaterial({ color: TRIM.silver, roughness: 0.35, metalness: 0.6 }));
-      case 'chrome': return std('chrome', () => new THREE.MeshStandardMaterial({ color: '#e4e8ea', roughness: 0.15, metalness: 0.9 }));
-      case 'tyre': return std('tyre', () => new THREE.MeshStandardMaterial({ color: TRIM.tyre, roughness: 0.9 }));
-      case 'glass': return std('glass', () => new THREE.MeshStandardMaterial({ color: TRIM.glass, roughness: 0.2, metalness: 0.2, transparent: true, opacity: 0.58, depthWrite: false, side: THREE.DoubleSide }));
-      case 'glassPrivacy': return std('glassPrivacy', () => new THREE.MeshStandardMaterial({ color: '#1a252d', roughness: 0.2, metalness: 0.3, transparent: true, opacity: 0.82, depthWrite: false, side: THREE.DoubleSide }));
-      case 'glassDark': return std('glassDark', () => new THREE.MeshStandardMaterial({ color: TRIM.glass, roughness: 0.25, metalness: 0.3 }));
+      case 'silver': return std('silver', () => new THREE.MeshStandardMaterial({ color: TRIM.silver, roughness: 0.3, metalness: 0.75, envMap: carEnv, envMapIntensity: 0.9 }));
+      case 'chrome': return std('chrome', () => new THREE.MeshStandardMaterial({ color: '#eef1f3', roughness: 0.08, metalness: 1, envMap: carEnv, envMapIntensity: 1.1 }));
+      case 'tyre': return std('tyre', () => new THREE.MeshStandardMaterial({ color: TRIM.tyre, roughness: 0.88, side: THREE.DoubleSide }));
+      case 'glass': return std('glass', () => new THREE.MeshStandardMaterial({ color: TRIM.glass, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide, envMap: carEnv, envMapIntensity: 0.2 }));
+      case 'glassPrivacy': return std('glassPrivacy', () => new THREE.MeshStandardMaterial({ color: '#1a252d', roughness: 0.05, metalness: 0.4, transparent: true, opacity: 0.84, depthWrite: false, side: THREE.DoubleSide, envMap: carEnv, envMapIntensity: 0.15 }));
+      case 'glassDark': return std('glassDark', () => new THREE.MeshStandardMaterial({ color: TRIM.glass, roughness: 0.1, metalness: 0.4, envMap: carEnv, envMapIntensity: 0.7 }));
       case 'liner': return std('liner', () => new THREE.MeshStandardMaterial({ color: '#111214', roughness: 0.95, side: THREE.DoubleSide }));
       case 'leather': return std(`leather${spec.interior}`, () => new THREE.MeshStandardMaterial({ color: spec.interior, roughness: 0.7 }));
       case 'dash': return std('dash', () => new THREE.MeshStandardMaterial({ color: '#2a2d31', roughness: 0.75 }));
@@ -74,7 +78,7 @@ function materialsFor(model: ModelId, paint: string, plate: string) {
       case 'emblem': return std('emblem', () => new THREE.MeshStandardMaterial({ map: emblemTexture(), roughness: 0.4, metalness: 0.4 }));
       case 'plate': return plateMat;
       case 'red': return std('redbuckle', () => new THREE.MeshStandardMaterial({ color: '#c8102e', roughness: 0.5 }));
-      case 'mirror': return std('mirrorglass', () => new THREE.MeshStandardMaterial({ color: '#7d93a0', roughness: 0.05, metalness: 0.9 }));
+      case 'mirror': return std('mirrorglass', () => new THREE.MeshStandardMaterial({ color: '#9fb2bd', roughness: 0.03, metalness: 1, envMap: carEnv }));
       case 'screen': return std('screen', () => new THREE.MeshBasicMaterial({ color: '#0d1620' }));
       case 'drl': return lights.drl; case 'lowBeam': return lights.low; case 'brake': return lights.brake; case 'tail': return lights.tail; case 'turn': return lights.turn; case 'reverse': return lights.reverse;
     }
@@ -87,14 +91,16 @@ export function CarModel({ model, paint, plate = '30A-000.00', control, lodOverr
   model: ModelId; paint: string; plate?: string; control: React.RefObject<CarControl>; lodOverride?: 0 | 1 | 2 | 3; onParts?: (p: CarParts[], lod: THREE.LOD) => void;
 }) {
   const spec = CAR_SPECS[model];
+  const { gl } = useThree();
   const { lod, levels, lights } = useMemo(() => {
+    ensureEnv(gl);
     const M = materialsFor(model, paint, plate);
     const levels = ([0, 1, 2, 3] as const).map((l) => buildCar(spec, l, M.get));
     const lod = new THREE.LOD(); lod.name = 'VehicleRoot';
     const dist = [0, 18, 45, 110];
     levels.forEach((p, i) => lod.addLevel(p.root, dist[i], 0.12)); // 12 % hysteresis between levels
     return { lod, levels, lights: M.lights };
-  }, [model, paint, plate, spec]);
+  }, [model, paint, plate, spec, gl]);
   useEffect(() => { onParts?.(levels, lod); }, [levels, lod, onParts]);
   useEffect(() => () => { lod.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.geometry.dispose(); }); }, [lod]);
   const anim = useRef({ door: {} as Record<string, number>, fold: 0, spin: 0, lastScreen: 0, blink: 0 });

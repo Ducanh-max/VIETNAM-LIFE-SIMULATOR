@@ -3,10 +3,12 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { GROUND_HEIGHT, registerBlocker, type Point } from '../geo';
 import { CarModel, newControl, type CarControl } from '../cars/CarModel';
-import { seatRows } from '../cars/carGeometry';
+import { cabinFloor, seatRows } from '../cars/carGeometry';
 import { buyCar, carPrices, cars, useCars } from '../cars/carRegistry';
 import { CAR_COLORS, CAR_SPECS, tyreRadius, type ModelId } from '../cars/carSpecs';
+import { useAdmin } from '../admin';
 import { formatVnd, game, player, useGame } from '../state';
+import { useState } from 'react';
 
 /*
  * "Ô tô Đời Việt" dealership on the open paved lot beside Phố Kim Mã (bible section 10): a glass pavilion facing the
@@ -102,7 +104,7 @@ function ViewerCamera() {
     else if (v === 'top') { pos.copy(P(0.01, Math.min(L * 1.45, PAV.h - 0.5 - 0.13), 0)); look.copy(P(0, 0, 0)); }
     else if (v === 'front34') { pos.copy(P(R * 0.8, H * 0.9, L / 2 + 2.6)); look.copy(P(0, H * 0.45, 0.4)); }
     else if (v === 'rear34') { pos.copy(P(-R * 0.8, H * 0.9, -L / 2 - 2.6)); look.copy(P(0, H * 0.45, -0.4)); }
-    else { const z = seatRows(spec)[0]; pos.copy(P(0.4, H * 0.72, z - 0.25)); look.copy(P(0.3, H * 0.62, L / 2)); }
+    else { const z = seatRows(spec)[0]; const eye = Math.max(H * 0.72, cabinFloor(spec) + 0.45 + 0.52); pos.copy(P(0.4, eye, z - 0.3)); look.copy(P(0.3, eye - 0.18, L / 2)); }
     st.camera.position.copy(pos); st.camera.lookAt(look);
     const cam = st.camera as THREE.PerspectiveCamera; const near = v === 'interior' ? 0.05 : 0.3; const fov = v === 'top' ? 80 : 55; if (cam.near !== near || cam.fov !== fov) { cam.near = near; cam.fov = fov; cam.updateProjectionMatrix(); }
     st.gl.render(st.scene, st.camera);
@@ -141,11 +143,23 @@ const specRows = (m: ModelId): [string, string][] => {
 /** Viewer panel (DOM): colours, views, doors, tailgate, seats, interior, buy. */
 export function DealerPanel() {
   const viewer = useCars((s) => s.viewer); const msg = useCars((s) => s.message); const money = useGame((g) => g.money); const owned = useCars((s) => s.cars.length);
+  const admin = useAdmin(); const [confirm, setConfirm] = useState(false);
   if (!viewer) return null;
+  const price = carPrices[viewer.model]; const enough = admin || money >= price; const colorName = CAR_COLORS.find((c) => c.hex === viewer.color)?.name ?? '';
   const s = CAR_SPECS[viewer.model]; const set = (p: Partial<NonNullable<typeof viewer>>) => cars.set({ viewer: { ...viewer, ...p } });
   const btn = { margin: 3, padding: '4px 9px', borderRadius: 6, border: '1px solid #777', background: '#f4f2ee', color: '#23262a', cursor: 'pointer' } as const;
-  return <div className="lift-panel parking-panel" role="dialog" aria-label={s.name} style={{ maxWidth: 440 }}>
-    <div className="lift-head"><b>Ô TÔ ĐỜI VIỆT · {s.name.toUpperCase()}</b><span>{s.kind} · ví {formatVnd(money)}</span></div>
+  const buyBtn = { padding: '9px 14px', borderRadius: 10, border: 'none', fontWeight: 700, fontSize: 15, cursor: 'pointer' } as const;
+  return <div className="lift-panel parking-panel" role="dialog" aria-label={s.name} style={{ maxWidth: 440, maxHeight: 'calc(100vh - 150px)', overflowY: 'auto' }}>
+    <div className="lift-head"><b>Ô TÔ ĐỜI VIỆT · {s.name.toUpperCase()}</b><span>{s.kind} · ví {admin ? 'admin (không trừ tiền)' : formatVnd(money)}</span></div>
+    <div style={{ background: '#2a2d30', borderRadius: 12, padding: 10, margin: '4px 0 8px' }}>
+      <div style={{ fontSize: 13, color: '#c3c9cd' }}>Giá {s.name} · màu {colorName}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: '#ffd36b', margin: '2px 0 8px' }}>{formatVnd(price)}</div>
+      {!confirm && <button style={{ ...buyBtn, width: '100%', background: enough ? '#e0313f' : '#5a5f63', color: '#fff' }} onClick={() => { if (enough) { setConfirm(true); cars.set({ message: '' }); } else cars.set({ message: `Chưa đủ tiền: còn thiếu ${formatVnd(price - money)}. Đi làm kiếm thêm rồi quay lại nhé.` }); }}>{enough ? `Mua xe · ${formatVnd(price)}` : `Chưa đủ tiền · thiếu ${formatVnd(price - money)}`}</button>}
+      {confirm && <div><div style={{ fontSize: 14, marginBottom: 6 }}>Mua {s.name} màu {colorName} với giá {admin ? '0đ (admin)' : formatVnd(price)}?</div>
+        <div style={{ display: 'flex', gap: 8 }}><button style={{ ...buyBtn, flex: 1, background: '#2fa35b', color: '#fff' }} onClick={() => { buyCar(viewer.model, viewer.color, FORECOURT(owned)); setConfirm(false); }}>Xác nhận mua</button>
+          <button style={{ ...buyBtn, flex: 1, background: '#f4f2ee', color: '#23262a' }} onClick={() => setConfirm(false)}>Huỷ</button></div></div>}
+      {msg && <p className="parking-msg" style={{ marginTop: 8 }}>{msg}</p>}
+    </div>
     <div>{CAR_COLORS.map((c) => <button key={c.id} title={c.name} onClick={() => set({ color: c.hex })} style={{ ...btn, width: 28, height: 28, padding: 0, background: c.hex, outline: viewer.color === c.hex ? '3px solid #ffd36b' : 'none' }} />)}</div>
     <div>{VIEWS.filter((v) => v !== 'interior').map((v) => <button key={v} style={btn} onClick={() => { viewState.view = v; set({ interior: false }); }}>{{ orbit: 'Xoay 360°', front: 'Trước', side: 'Hông', rear: 'Sau', top: 'Trên', front34: 'Chéo trước', rear34: 'Chéo sau', interior: 'Nội thất' }[v]}</button>)}
       <button style={btn} onClick={() => set({ interior: !viewer.interior })}>{viewer.interior ? 'Ra ngoài' : 'Vào ghế lái'}</button></div>
@@ -153,9 +167,8 @@ export function DealerPanel() {
       <button style={btn} onClick={() => set({ tailgate: !viewer.tailgate })}>{viewer.tailgate ? 'Đóng cốp' : 'Mở cốp'}</button>
       <button style={btn} onClick={() => set({ fold: !viewer.fold })}>{viewer.fold ? 'Dựng hàng ghế cuối' : 'Gập hàng ghế cuối'}</button></div>
     <table className="parking-table"><tbody>{specRows(viewer.model).map(([k, v]) => <tr key={k}><td>{k}</td><td>{v}</td></tr>)}</tbody></table>
-    {msg && <p className="parking-msg">{msg}</p>}
     <div className="lift-foot"><span>Mẫu xe và tên trong game là hư cấu, kích thước theo xe thật cùng loại.</span>
-      <button onClick={() => buyCar(viewer.model, viewer.color, FORECOURT(owned))}>Mua xe</button><button onClick={() => cars.set({ viewer: null, message: '' })}>Đóng</button></div>
+      <button onClick={() => { setConfirm(false); cars.set({ viewer: null, message: '' }); }}>Đóng</button></div>
   </div>;
 }
 

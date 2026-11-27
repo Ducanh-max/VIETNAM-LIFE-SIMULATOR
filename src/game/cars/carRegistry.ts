@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { isAdmin } from '../admin';
 import { addMoney, formatVnd, game } from '../state';
 import { CAR_COLORS, CAR_SPECS, type ModelId } from './carSpecs';
 
@@ -25,12 +26,16 @@ const plateFor = (n: number) => `30A-${String(100 + (n * 7919) % 900)}.${String(
 /** Buy once: checks the wallet first, charges a single time, issues a vehicleId and parks the car outside. */
 export function buyCar(model: ModelId, color: string, spot: { x: number; z: number; heading: number }) {
   const price = carPrices[model]; const money = game.get().money; const spec = CAR_SPECS[model];
-  if (money < price) { cars.set({ message: `Không đủ tiền: ${spec.name} giá ${formatVnd(price)}, ví còn ${formatVnd(money)}.` }); return null; }
-  addMoney(-price, `Mua ô tô ${spec.name} (${CAR_COLORS.find((c) => c.hex === color)?.name ?? color})`);
+  const colorName = CAR_COLORS.find((c) => c.hex === color)?.name ?? color;
+  // admins have the endless wallet (topped up to 999.999.999đ, less than the MPV's price): they get cars for free
+  const admin = isAdmin();
+  if (!admin && money < price) { cars.set({ message: `Chưa đủ tiền: ${spec.name} giá ${formatVnd(price)}, ví còn ${formatVnd(money)} (thiếu ${formatVnd(price - money)}).` }); return null; }
+  if (admin) addMoney(0, `Mua ô tô ${spec.name} (${colorName}) · admin, không trừ tiền`);
+  else addMoney(-price, `Mua ô tô ${spec.name} (${colorName})`);
   const n = Date.now();
   const car: OwnedCar = { vehicleId: `V${n.toString(36)}`, modelId: model, trim: spec.trim, color, ownerId: 'local', seatCapacity: spec.seats.reduce((a, b) => a + b, 0), priceGame: price, fuelCapacity: spec.tankL, fuel: spec.tankL * 0.6, inventorySlots: spec.inventorySlots, featureFlags: spec.featureFlags, plate: plateFor(n % 100000), parked: spot };
-  cars.set({ cars: [...st.cars, car], message: `Chúc mừng! Bạn đã mua ${spec.name}, biển ${car.plate}. Xe đỗ ngay trước showroom.` });
-  game.toast(`Đã mua ${spec.name} · ${formatVnd(price)} · biển ${car.plate}`);
+  cars.set({ cars: [...st.cars, car], message: `Đã mua ${spec.name} màu ${colorName}, biển ${car.plate}. Xe đỗ ngay trước cửa showroom.` });
+  game.toast(`Đã mua ${spec.name} · ${admin ? 'admin, miễn phí' : formatVnd(price)} · biển ${car.plate}`);
   return car;
 }
 

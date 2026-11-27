@@ -28,6 +28,10 @@ export type CarSpec = {
   rearLamps: 'barAndCorners' | 'joinedBar' | 'pairedVertical';
   rim: 'geometric10' | 'double5' | 'sharp20';
   inventorySlots: number; featureFlags: string[];
+  /** a thick body-coloured rear pillar from this t back to the tail glass (no glass behind it) */
+  cPillar?: number;
+  /** a bright strip along the bottom of the side windows */
+  chromeBelt?: boolean;
 };
 export const tyreRadius = ([w, a, rim]: [number, number, number]) => (rim * 0.0254 + 2 * (w / 1000) * (a / 100)) / 2;
 
@@ -36,10 +40,10 @@ export const CAR_SPECS: Record<ModelId, CarSpec> = {
     id: 'luhanh', name: 'Lữ Hành', kind: 'MPV 7 chỗ', basedOn: 'Kia New Carnival', trim: '2.2D Premium 7S',
     length: 5.155, width: 2.01, height: 1.775, wheelbase: 3.09, clearance: 0.172, axleF: 1.608, axleR: -1.482, track: 1.70,
     tyre: [235, 55, 19], tankL: 72, priceGame: 1_499_000_000, seats: [2, 2, 3], doorType: 'slidingRear',
-    sections: [[-0.5, 0.90, 0.52], [-0.4, 0.98, 0.56], [-0.22, 1, 0.56], [0, 0.98, 0.56], [0.22, 0.97, 0.56], [0.36, 0.96, 0.54], [0.5, 0.88, 0.48]],
+    sections: [[-0.5, 0.90, 0.54], [-0.4, 0.98, 0.585], [-0.22, 1, 0.585], [0, 0.98, 0.58], [0.22, 0.97, 0.57], [0.29, 0.965, 0.55], [0.4, 0.94, 0.51], [0.5, 0.87, 0.47]],
     glass: { ws0: 0.28, ws1: 0.05, roof1: -0.45, tail: -0.49, tailY: 0.58 },
-    pillars: [-0.02, -0.25, -0.43], doors: { front: [0.255, 0.04], rear: [0.03, -0.22] },
-    interior: '#9B5743', screens: '12,3 + 12,3 inch', shifter: 'rotary', roofRails: false, spoiler: true,
+    pillars: [-0.02, -0.25, -0.43], doors: { front: [0.255, 0.04], rear: [0.03, -0.22] }, chromeBelt: true,
+    interior: '#9B5743', screens: '12,3 + 12,3 inch', shifter: 'rotary', roofRails: true, spoiler: true,
     rearLamps: 'barAndCorners', rim: 'geometric10', inventorySlots: 12, featureFlags: ['slidingDoors', 'powerTailgate', 'vipSeats', 'triZoneAC'],
   },
   phonho: {
@@ -47,8 +51,8 @@ export const CAR_SPECS: Record<ModelId, CarSpec> = {
     length: 4.365, width: 1.8, height: 1.645, wheelbase: 2.61, clearance: 0.19, axleF: 1.323, axleR: -1.287, track: 1.52,
     tyre: [215, 60, 17], tankL: 50, priceGame: 689_000_000, seats: [2, 3], doorType: 'hinged',
     sections: [[-0.5, 0.82, 0.51], [-0.4, 0.97, 0.58], [-0.22, 1, 0.58], [0, 0.97, 0.58], [0.22, 0.98, 0.58], [0.36, 0.97, 0.55], [0.5, 0.88, 0.49]],
-    glass: { ws0: 0.22, ws1: 0.08, roof1: -0.36, tail: -0.47, tailY: 0.62 },
-    pillars: [-0.07, -0.30], doors: { front: [0.215, -0.03], rear: [-0.04, -0.26] },
+    glass: { ws0: 0.22, ws1: 0.02, roof1: -0.36, tail: -0.47, tailY: 0.62 },
+    pillars: [-0.07, -0.275], doors: { front: [0.215, -0.03], rear: [-0.04, -0.26] }, cPillar: -0.315, chromeBelt: true,
     interior: '#303336', screens: '10,25 + 10,25 inch', shifter: 'lever', roofRails: true, spoiler: true,
     rearLamps: 'joinedBar', rim: 'double5', inventorySlots: 8, featureFlags: ['powerTailgate', 'hud', 'wirelessCharging'],
   },
