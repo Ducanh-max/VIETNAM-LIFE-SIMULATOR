@@ -3,7 +3,10 @@ import { Suspense, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { GROUND_HEIGHT, registerBlocker, type Point } from '../geo';
 import { CarModel, newControl, type CarControl } from '../cars/CarModel';
-import { GltfCar, PrivateFullCar, anchorsOf } from '../cars/GltfCar';
+import { GltfCar, PrivateRigCar, anchorsOf } from '../cars/GltfCar';
+import { carLive, useCarLive } from '../cars/carState';
+import { DoorLocks, DriveCamera, OwnedCarPrompts } from './CarDrive';
+import { bike } from '../state';
 import { PRIVATE_CAR_URL } from '../privateBuild';
 import { BRANDS, VEHICLES, modelAsset } from '../cars/vehicleRegistry';
 import { cabinFloor, seatRows } from '../cars/carGeometry';
@@ -30,10 +33,10 @@ const viewState = { view: 'orbit' as View, t: 0, seat: 'driver' as 'driver' | 'r
 /** The Blender model loads only while the player is near the showroom (lazy loading); the procedural car stands in meanwhile. */
 const showroomNear = { v: false, subs: new Set<() => void>() };
 function useShowroomNear() { const [, f] = useState(0); useEffect(() => { const cb = () => f((n) => n + 1); showroomNear.subs.add(cb); return () => { showroomNear.subs.delete(cb); }; }, []); return showroomNear.v; }
-function AnyCar({ model, paint, plate, control }: { model: ModelId; paint: string; plate: string; control: React.RefObject<CarControl> }) {
-  const near = useShowroomNear();
+function AnyCar({ model, paint, plate, control, force, rigKey = `display-${model}` }: { model: ModelId; paint: string; plate: string; control: React.RefObject<CarControl>; force?: boolean; rigKey?: string }) {
+  const near = useShowroomNear() || !!force;
   const proc = <CarModel model={model} paint={paint} control={control} plate={plate} />;
-  if (PRIVATE_CAR_URL && model === 'luhanh' && near) return <Suspense fallback={proc}><PrivateFullCar url={PRIVATE_CAR_URL} model={model} paint={paint} /></Suspense>;
+  if (PRIVATE_CAR_URL && model === 'luhanh' && near) return <Suspense fallback={proc}><PrivateRigCar url={PRIVATE_CAR_URL} model={model} paint={paint} control={control} rigKey={rigKey} /></Suspense>;
   if (!modelAsset(model) || !near) return proc;
   return <Suspense fallback={proc}><GltfCar model={model} paint={paint} plate={plate} control={control} /></Suspense>;
 }
@@ -81,23 +84,37 @@ function DisplayCar({ i }: { i: number }) {
   const ctl = useRef<CarControl>(newControl());
   const g = useRef<THREE.Group>(null);
   useFrame((_, dt) => {
-    const c = ctl.current; c.doors = active && viewer ? { FL: viewer.doors, FR: viewer.doors, RL: viewer.doors, RR: viewer.doors, TG: viewer.tailgate } : {}; c.seatsFolded = !!(active && viewer?.fold);
+    const c = ctl.current; const lv = carLive.get(`display-${model}`).doors;
+    c.doors = active && viewer ? { FL: viewer.doors || lv.FL, FR: viewer.doors || lv.FR, RL: viewer.doors || lv.RL, RR: viewer.doors || lv.RR, TG: viewer.tailgate || lv.TG } : {}; c.seatsFolded = !!(active && viewer?.fold);
     if (g.current && !active) g.current.rotation.y += Math.min(dt, 0.05) * 0.12;
   });
   const d = disp(i);
   return <group ref={g} position={[d.x, GROUND_HEIGHT + 0.13, d.z]} rotation={[0, Math.PI * 0.85, 0]} name={`display-${model}`}>
     <AnyCar model={model} paint={active && viewer ? viewer.color : CAR_COLORS[(i * 2) % CAR_COLORS.length].hex} control={ctl} plate="SHOWROOM" />
+    {PRIVATE_CAR_URL && model === 'luhanh' && <DoorLocks rigKey={`display-${model}`} liveId={`display-${model}`} show={active} />}
   </group>;
 }
 
 /** Owned cars parked where they were left. */
 function OwnedCars() {
-  const list = useCars((s) => s.cars);
-  return <>{list.map((c) => <group key={c.vehicleId} position={[c.parked.x, GROUND_HEIGHT, c.parked.z]} rotation={[0, c.parked.heading, 0]}><OwnedCarModel id={c.vehicleId} /></group>)}</>;
+  const list = useCars((s) => s.cars); const driving = useCars((s) => s.driving);
+  return <><OwnedCarPrompts />{list.map((c) => <OwnedCarModel key={c.vehicleId} id={c.vehicleId} />)}{driving && <DriveCamera rigKey={`own-${driving}`} />}</>;
 }
 function OwnedCarModel({ id }: { id: string }) {
-  const car = useCars((s) => s.cars.find((c) => c.vehicleId === id))!; const ctl = useRef<CarControl>({ ...newControl(), fuel: car.fuel / car.fuelCapacity });
-  return <AnyCar model={car.modelId} paint={car.color} plate={car.plate} control={ctl} />;
+  const car = useCars((s) => s.cars.find((c) => c.vehicleId === id))!; const driving = useCars((s) => s.driving === id);
+  const ctl = useRef<CarControl>({ ...newControl(), fuel: car.fuel / car.fuelCapacity }); const g = useRef<THREE.Group>(null);
+  const engine = useCarLive(id, (s) => s.engine); const prev = useRef(0);
+  useFrame(() => {
+    const c = ctl.current; const lv = carLive.get(id); c.doors = { ...lv.doors };
+    const flash = performance.now() < lv.flashUntil && Math.floor(performance.now() / 180) % 2 === 0;
+    if (driving) { c.speed = bike.speed; c.steer = bike.steer; c.gear = bike.speed < -0.2 ? 'R' : Math.abs(bike.speed) < 0.2 ? 'P' : 'D'; c.lights.brake = bike.speed < prev.current - 0.05 || bike.speed < -0.2; prev.current = bike.speed; if (g.current) { g.current.position.copy(bike.position); g.current.rotation.set(0, bike.heading, 0); } }
+    else { c.speed = 0; c.steer = 0; c.gear = 'P'; c.lights.brake = false; if (g.current) { g.current.position.set(car.parked.x, GROUND_HEIGHT, car.parked.z); g.current.rotation.set(0, car.parked.heading, 0); } }
+    c.lights.low = engine || flash; c.lights.turn = flash ? 'hazard' : 'none';
+  });
+  return <group ref={g} position={[car.parked.x, GROUND_HEIGHT, car.parked.z]} rotation={[0, car.parked.heading, 0]}>
+    <AnyCar model={car.modelId} paint={car.color} plate={car.plate} control={ctl} force={driving} rigKey={`own-${id}`} />
+    {PRIVATE_CAR_URL && car.modelId === 'luhanh' && <DoorLocks rigKey={`own-${id}`} liveId={id} show />}
+  </group>;
 }
 
 /** The viewer camera: takes over the camera while the viewer is open (render priority 1 renders the frame itself). */

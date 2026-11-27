@@ -50,7 +50,8 @@ export function PrivateGate({ children }: { children: ReactNode }) {
 
 /** Admin-only: add / remove the emails allowed into the private build. */
 function TesterAdmin() {
-  const [open, setOpen] = useState(false); const [list, setList] = useState<string[]>([]); const [email, setEmail] = useState(''); const [msg, setMsg] = useState('');
+  const [open, setOpen] = useState(false);
+  useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.code === 'Digit0' || e.code === 'Numpad0') && !e.repeat && (e.target as HTMLElement)?.tagName !== 'INPUT') setOpen((o) => !o); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, []); const [list, setList] = useState<string[]>([]); const [email, setEmail] = useState(''); const [msg, setMsg] = useState('');
   const user = useAccount((s) => s.user);
   const load = () => getDocs(collection(db(), 'vlife_testers')).then((s) => setList(s.docs.map((d) => d.id).sort())).catch((e) => setMsg(String(e?.message ?? e)));
   useEffect(() => { if (open) void load(); }, [open]);
@@ -60,9 +61,9 @@ function TesterAdmin() {
   };
   const remove = async (e: string) => { try { await deleteDoc(doc(db(), 'vlife_testers', e)); setMsg(`Đã thu quyền của ${e}.`); void load(); } catch (er) { setMsg(String((er as Error).message)); } };
   return <div style={{ position: 'fixed', left: 16, bottom: 70, zIndex: 900, fontFamily: 'Be Vietnam Pro, Arial, sans-serif' }}>
-    {!open && <button style={{ ...btn, background: '#1c2624', color: '#ffd36b', border: '1px solid #ffd36b' }} onClick={() => setOpen(true)}>👥 Người được xem bản thử</button>}
+
     {open && <div style={{ ...card, width: 340, color: '#eef1f3' }}>
-      <b style={{ color: '#ffd36b' }}>Người được xem bản thử nghiệm</b>
+      <b style={{ color: '#ffd36b' }}>Người được xem bản thử nghiệm</b> <span style={{ fontSize: 11, color: '#9aa3a9' }}>(phím 0 để ẩn/hiện)</span>
       <p style={{ fontSize: 12, color: '#9aa3a9', margin: '4px 0 8px' }}>Thêm email để cấp quyền; người đó đăng nhập bằng đúng email này là vào được. Admin luôn vào được.</p>
       <div style={{ display: 'flex', gap: 6 }}><input style={{ ...input, margin: 0 }} placeholder="email@vidu.com" value={email} onChange={(e) => setEmail(e.target.value)} /><button style={{ ...btn, background: '#2fa35b', color: '#fff' }} onClick={() => void add()}>Thêm</button></div>
       <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0', maxHeight: 220, overflowY: 'auto' }}>

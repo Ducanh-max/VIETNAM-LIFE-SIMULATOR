@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { isAdmin } from '../admin';
-import { addMoney, formatVnd, game } from '../state';
+import { addMoney, formatVnd, game, pushMessage } from '../state';
 import { CAR_COLORS, CAR_SPECS, type ModelId } from './carSpecs';
 
 /*
@@ -12,13 +12,18 @@ export type OwnedCar = {
   vehicleId: string; modelId: ModelId; trim: string; color: string; ownerId: string; seatCapacity: number; priceGame: number;
   fuelCapacity: number; fuel: number; inventorySlots: number; featureFlags: string[]; plate: string;
   parked: { x: number; z: number; heading: number };
+  /** remote key: the code to type into the phone's My Car app, and the remembered lock / engine / AC state */
+  pairCode?: string; locked?: boolean; engine?: boolean; ac?: boolean;
 };
-type RegState = { cars: OwnedCar[]; viewer: { model: ModelId; color: string; doors: boolean; tailgate: boolean; interior: boolean; fold: boolean } | null; message: string };
+type RegState = { cars: OwnedCar[]; driving: string | null; paired: string | null; viewer: { model: ModelId; color: string; doors: boolean; tailgate: boolean; interior: boolean; fold: boolean } | null; message: string };
 const KEY = 'doi-viet-cars-v1'; const SCHEMA = 1;
-function load(): OwnedCar[] { try { const s = JSON.parse(localStorage.getItem(KEY) ?? 'null'); if (s?.schema === SCHEMA && Array.isArray(s.cars)) return s.cars; } catch { /* fresh */ } return []; }
-let st: RegState = { cars: load(), viewer: null, message: '' };
+function code8() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const r = new Uint32Array(8); crypto.getRandomValues(r); return Array.from(r, (x) => A[x % A.length]).join(''); }
+export const newPairCode = code8;
+function load(): OwnedCar[] { try { const s = JSON.parse(localStorage.getItem(KEY) ?? 'null'); if (s?.schema === SCHEMA && Array.isArray(s.cars)) return (s.cars as OwnedCar[]).map((c) => (c.pairCode ? c : { ...c, pairCode: code8() })); } catch { /* fresh */ } return []; }
+const PAIR_KEY = 'doi-viet-mycar-v1';
+let st: RegState = { cars: load(), viewer: null, message: '', driving: null, paired: localStorage.getItem(PAIR_KEY) };
 const subs = new Set<() => void>();
-export const cars = { get: () => st, set(p: Partial<RegState>) { st = { ...st, ...p }; if ('cars' in p) localStorage.setItem(KEY, JSON.stringify({ schema: SCHEMA, cars: st.cars })); subs.forEach((f) => f()); }, subscribe(f: () => void) { subs.add(f); return () => { subs.delete(f); }; } };
+export const cars = { get: () => st, set(p: Partial<RegState>) { st = { ...st, ...p }; if ('cars' in p) localStorage.setItem(KEY, JSON.stringify({ schema: SCHEMA, cars: st.cars })); if ('paired' in p) { if (st.paired) localStorage.setItem(PAIR_KEY, st.paired); else localStorage.removeItem(PAIR_KEY); } subs.forEach((f) => f()); }, subscribe(f: () => void) { subs.add(f); return () => { subs.delete(f); }; } };
 export function useCars<T>(sel: (s: RegState) => T): T { return useSyncExternalStore(cars.subscribe, () => sel(st)); }
 /** Prices are configurable here (game money; the bible quotes the maker's listed prices). */
 export const carPrices: Record<ModelId, number> = { luhanh: CAR_SPECS.luhanh.priceGame, phonho: CAR_SPECS.phonho.priceGame, doixa: CAR_SPECS.doixa.priceGame };
@@ -33,8 +38,9 @@ export function buyCar(model: ModelId, color: string, spot: { x: number; z: numb
   if (admin) addMoney(0, `Mua ô tô ${spec.name} (${colorName}) · admin, không trừ tiền`);
   else addMoney(-price, `Mua ô tô ${spec.name} (${colorName})`);
   const n = Date.now();
-  const car: OwnedCar = { vehicleId: `V${n.toString(36)}`, modelId: model, trim: spec.trim, color, ownerId: 'local', seatCapacity: spec.seats.reduce((a, b) => a + b, 0), priceGame: price, fuelCapacity: spec.tankL, fuel: spec.tankL * 0.6, inventorySlots: spec.inventorySlots, featureFlags: spec.featureFlags, plate: plateFor(n % 100000), parked: spot };
-  cars.set({ cars: [...st.cars, car], message: `Đã mua ${spec.name} màu ${colorName}, biển ${car.plate}. Xe đỗ ngay trước cửa showroom.` });
+  const car: OwnedCar = { vehicleId: `V${n.toString(36)}`, modelId: model, trim: spec.trim, color, ownerId: 'local', seatCapacity: spec.seats.reduce((a, b) => a + b, 0), priceGame: price, fuelCapacity: spec.tankL, fuel: spec.tankL * 0.6, inventorySlots: spec.inventorySlots, featureFlags: spec.featureFlags, plate: plateFor(n % 100000), parked: spot, pairCode: code8(), locked: false, engine: false, ac: false };
+  cars.set({ cars: [...st.cars, car], message: `Đã mua ${spec.name} màu ${colorName}, biển ${car.plate}. Xe đỗ ngay trước cửa showroom. Mã chìa khoá My Car: ${car.pairCode} (đã gửi vào Tin nhắn).` });
+  pushMessage('Ô tô Đời Việt', `Cảm ơn bạn đã mua ${spec.name} biển ${car.plate}. Mã kết nối chìa khoá từ xa: ${car.pairCode}. Mở app My Car trên điện thoại, nhập mã này để kết nối với xe.`);
   game.toast(`Đã mua ${spec.name} · ${admin ? 'admin, miễn phí' : formatVnd(price)} · biển ${car.plate}`);
   return car;
 }

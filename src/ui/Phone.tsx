@@ -14,6 +14,8 @@ import { FoodApp } from './ShopPanel';
 import { useShops } from '../game/shops';
 import { teleportTo, useAdmin } from '../game/admin';
 import { useVietnamClock, VIETNAM_TZ } from './vietnamTime';
+import { MyCarApp } from './MyCarApp';
+import { PRIVATE_BUILD } from '../game/privateBuild';
 
 const fmtDist = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`);
 const hhmm = new Intl.DateTimeFormat('vi-VN', { timeZone: VIETNAM_TZ, hour: '2-digit', minute: '2-digit', hour12: false });
@@ -46,7 +48,7 @@ export function Minimap({ onOpen }: { onOpen: () => void }) {
   </button>;
 }
 
-type App = 'home' | 'map' | 'orders' | 'food' | 'wallet' | 'messages' | 'contacts' | 'den' | 'rent';
+type App = 'home' | 'map' | 'orders' | 'food' | 'wallet' | 'messages' | 'contacts' | 'den' | 'rent' | 'mycar';
 
 /** Full map app: north-up, drag to pan, wheel or buttons to zoom, follows the player until dragged. */
 function MapApp() {
@@ -316,6 +318,7 @@ export function Phone({ onClose }: { onClose: () => void }) {
     { id: 'contacts', name: 'Danh bạ', icon: '📞', color: '#f0a020' },
     { id: 'den', name: 'Đen SM', icon: '⚡', color: '#0b0b0c', badge: ride ? '•' : undefined },
     { id: 'rent', name: 'Thuê xe', icon: '🔑', color: '#1f7fbf', badge: rentalOn ? '•' : undefined },
+    ...(PRIVATE_BUILD ? [{ id: 'mycar' as App, name: 'My Car', icon: '🚗', color: '#c0392b' }] : []),
   ];
   return <div className="phone" role="dialog" aria-label="Điện thoại">
     <div className="phone-screen">
@@ -334,6 +337,7 @@ export function Phone({ onClose }: { onClose: () => void }) {
             {app === 'messages' && <MessagesApp />}
             {app === 'contacts' && <ContactsApp />}
             {app === 'den' && <DenSMApp />}
+            {app === 'mycar' && <MyCarApp />}
             {app === 'rent' && <RentalApp onRoute={() => { nav.custom = { x: RENTAL.x, z: RENTAL.z, label: RENTAL.name }; setApp('map'); }} />}
           </div>}
       <div className="phone-homebar"><button onClick={() => (app === 'home' ? onClose() : setApp('home'))} aria-label={app === 'home' ? 'Cất điện thoại' : 'Màn hình chính'} /></div>

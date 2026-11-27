@@ -10,6 +10,7 @@ import { LotteMall, MallPanel, useMallFlow } from './LotteMall';
 import { LotteSky, SKYWALK, SkyDeskB1, SkyPanel, SKY_FLOOR, useSkyFlow } from './LotteSky';
 import { LotteRooms, RoomsPanel, useRoomsFlow, Walkers } from './LotteRooms';
 import { DealerPanel, Dealership } from './Dealership';
+import { DriveHud } from './CarDrive';
 import { materials as worldMaterials } from './materials';
 import { game, player, useGame } from '../state';
 
@@ -453,7 +454,7 @@ export function LiftPanel() {
   const [, force] = useState(0);
   const [note, setNote] = useState('');
   useEffect(() => { const id = setInterval(() => force((n) => n + 1), 200); return () => clearInterval(id); }, []);
-  if (!lift.panel) return <><ParkingPanel /><MartPanel /><MallPanel /><SkyPanel /><RoomsPanel /><DealerPanel /></>;
+  if (!lift.panel) return <><ParkingPanel /><MartPanel /><MallPanel /><SkyPanel /><RoomsPanel /><DealerPanel /><DriveHud /></>;
   return <div className="lift-panel" role="dialog" aria-label="Bảng chọn tầng">
     <div className="lift-head"><b>LOTTE CENTER</b><span>Thang máy · tầng {floorLabel(lift.cabinFloor)} · {LIFT_STATE_VI[liftState()]}</span></div>
     <div className="lift-grid">

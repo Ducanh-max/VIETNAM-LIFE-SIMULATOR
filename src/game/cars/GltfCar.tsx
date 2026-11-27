@@ -119,22 +119,60 @@ export function GltfCar({ model, paint, plate = '30A-000.00', control }: { model
   return <primitive object={built.lod} />;
 }
 
+
 /**
- * Private test build only: the full-detail test car (a file that is not in the repository, uploaded only to the
- * private deployment). Shown as it is, at full detail; the body paint is recoloured where its material allows it.
+ * Private test build only: the full-detail test car (not in the repository, uploaded only to the private deployment).
+ * It was rigged in Blender with the standard pivots (Door_*_Pivot, Trunk_Pivot, Wheel_*_Spin / _Steer,
+ * SteeringWheel_Pivot) and anchors (Anchor_*, Lock_*), so doors slide / swing, the boot lifts, wheels turn and the
+ * steering wheel follows; the body paint is recoloured. Lock icons sit on Lock_* anchors (see DoorLocks).
  */
-export function PrivateFullCar({ url, model, paint }: { url: string; model: ModelId; paint: string }) {
+export const PRIVATE_STEER_AXIS = new THREE.Vector3(0.0094, 0.8738, 0.4862).normalize();
+export const rigAnchors = new Map<string, Record<string, THREE.Vector3>>();
+export function PrivateRigCar({ url, model, paint, control, rigKey }: { url: string; model: ModelId; paint: string; control: React.RefObject<CarControl>; rigKey: string }) {
   const { gl } = useThree(); const g = useGLTF(url, false, true);
-  const root = useMemo(() => {
+  const built = useMemo(() => {
     const env = ensureEnv(gl); const r = g.scene.clone(true);
+    const lights: THREE.MeshStandardMaterial[] = []; const brakes: THREE.MeshStandardMaterial[] = [];
     r.traverse((o) => {
       const m = o as THREE.Mesh; if (!m.isMesh) return; m.castShadow = false; m.receiveShadow = false;
       const mat = m.material as THREE.MeshStandardMaterial;
-      if (mat.name === 'mat_199247467' || mat.name === 'mat_199247467_uvless') { /* the body paint of this test model */ const c = mat.clone(); c.color.set(paint); c.envMap = env; c.envMapIntensity = 0.8; m.material = c; m.castShadow = true; }
+      if (mat.name === 'mat_199247467' || mat.name === 'mat_199247467_uvless') { const c = mat.clone(); c.color.set(paint); c.envMap = env; c.envMapIntensity = 0.8; m.material = c; m.castShadow = true; }
+      else if (mat.name.startsWith('light_head') || mat.name.startsWith('light_drl')) { const c = mat.clone(); m.material = c; lights.push(c); }
+      else if (mat.name.startsWith('light_rear')) { const c = mat.clone(); m.material = c; brakes.push(c); }
       else if (mat.metalness > 0.5 && !mat.envMap) { mat.envMap = env; mat.envMapIntensity = 0.8; }
     });
-    return r;
+    const node = (n: string) => r.getObjectByName(n) ?? null;
+    const doors = (['FL', 'FR', 'RL', 'RR'] as const).map((id) => { const n = node(`Door_${id}_Pivot`); return n ? { id, n, base: n.position.clone(), side: id.endsWith('L') ? 1 : -1, slide: id.startsWith('R') } : null; }).filter(Boolean) as { id: 'FL' | 'FR' | 'RL' | 'RR'; n: THREE.Object3D; base: THREE.Vector3; side: number; slide: boolean }[];
+    const steer = (['FL', 'FR'] as const).map((id) => node(`Wheel_${id}_Steer`)).filter(Boolean) as THREE.Object3D[];
+    const spin = (['FL', 'FR', 'RL', 'RR'] as const).map((id) => node(`Wheel_${id}_Spin`)).filter(Boolean) as THREE.Object3D[];
+    const sw = node('SteeringWheel_Pivot'); const tg = node('Trunk_Pivot');
+    r.updateMatrixWorld(true);
+    const anchors: Record<string, THREE.Vector3> = {};
+    r.traverse((o) => { if (o.name.startsWith('Anchor_') || o.name.startsWith('Lock_')) anchors[o.name] = o.getWorldPosition(new THREE.Vector3()); });
+    return { r, lights, brakes, doors, steer, spin, sw, tg, anchors };
   }, [g, paint, gl]);
-  useEffect(() => { anchorsOf.set(model, { driver: new THREE.Vector3(-0.38, 1.27, 0.12), rear: new THREE.Vector3(0.0, 1.25, -0.85) }); }, [model]);
-  return <primitive object={root} />;
+  useEffect(() => {
+    rigAnchors.set(rigKey, built.anchors);
+    const a = built.anchors; if (a.Anchor_CameraInterior) anchorsOf.set(model, { driver: a.Anchor_CameraInterior, rear: a.Anchor_RearSeats ?? a.Anchor_CameraInterior });
+  }, [built, model, rigKey]);
+  const t = useRef({ door: {} as Record<string, number>, spin: 0 });
+  useFrame((_, delta) => {
+    const c = control.current; if (!c) return; const dt = Math.min(delta, 0.05); const s = t.current;
+    const ease = (k: number) => k * k * (3 - 2 * k);
+    for (const id of ['FL', 'FR', 'RL', 'RR', 'TG'] as const) { const want = c.doors[id] && Math.abs(c.speed) < 0.3 ? 1 : 0; s.door[id] = THREE.MathUtils.clamp((s.door[id] ?? 0) + (want ? 1 : -1) * dt / (id === 'TG' ? 1.4 : id.startsWith('R') ? 1.2 : 0.8), 0, 1); }
+    for (const d of built.doors) {
+      const e = ease(s.door[d.id] ?? 0);
+      if (d.slide) d.n.position.set(d.base.x + d.side * Math.min(1, e * 4) * 0.13, d.base.y, d.base.z - Math.max(0, (e - 0.25) / 0.75) * 0.82);
+      else d.n.rotation.y = -d.side * e * 1.1;
+    }
+    if (built.tg) built.tg.rotation.x = ease(s.door.TG ?? 0) * 1.25;
+    s.spin += (c.speed * dt) / 0.37;
+    for (const w of built.spin) w.rotation.x = s.spin;
+    for (const w of built.steer) w.rotation.y = c.steer * 0.55;
+    if (built.sw) built.sw.quaternion.setFromAxisAngle(PRIVATE_STEER_AXIS, -c.steer * 2.4);
+    for (const m of built.lights) { m.emissiveIntensity = c.lights.low ? 3 : 1; }
+    for (const m of built.brakes) { m.emissiveIntensity = c.lights.brake ? 3 : c.lights.low ? 1.2 : 0.6; }
+  });
+  return <primitive object={built.r} />;
 }
+if (import.meta.env.DEV) (window as unknown as { __rig?: unknown }).__rig = rigAnchors;
