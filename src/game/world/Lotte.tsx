@@ -9,6 +9,7 @@ import { LotteMart, MartPanel, useMartFlow } from './LotteMart';
 import { LotteMall, MallPanel, useMallFlow } from './LotteMall';
 import { LotteSky, SKYWALK, SkyDeskB1, SkyPanel, SKY_FLOOR, useSkyFlow } from './LotteSky';
 import { LotteRooms, RoomsPanel, useRoomsFlow, Walkers } from './LotteRooms';
+import { DealerPanel, Dealership } from './Dealership';
 import { materials as worldMaterials } from './materials';
 import { game, player, useGame } from '../state';
 
@@ -398,7 +399,8 @@ export function Lotte() {
     }
   });
   if (!LOTTE || !geo) return null;
-  return <group position={[LOTTE.center[0], 0, LOTTE.center[1]]} rotation={[0, LOTTE.rotY, 0]}>
+  // the car dealership on Phố Kim Mã, 150 m from Lotte, rides along with this component (world coordinates)
+  return <><Dealership /><group position={[LOTTE.center[0], 0, LOTTE.center[1]]} rotation={[0, LOTTE.rotY, 0]}>
     <mesh geometry={geo.podium} material={[m.roof, m.podium]} castShadow receiveShadow />
     {geo.walls.map((w, i) => {
       const sign = [m.signCenter, m.signStore, m.signMart, m.signHotel][i]; const wide = Math.min(w.len * 0.55, 26);
@@ -441,7 +443,7 @@ export function Lotte() {
     </>}
     {/* the ground-floor glass is part of Interior; seen from outside when far, a plain glass band */}
     <mesh geometry={geo.band} material={m.glass} />
-  </group>;
+  </group></>;
 }
 
 const LIFT_STATE_VI = { IDLE: 'chờ', OPENING: 'đang mở cửa', OPEN: 'cửa mở', CLOSING: 'đang đóng cửa', MOVING: 'đang chạy', ARRIVED: 'đã tới' } as const;
@@ -451,7 +453,7 @@ export function LiftPanel() {
   const [, force] = useState(0);
   const [note, setNote] = useState('');
   useEffect(() => { const id = setInterval(() => force((n) => n + 1), 200); return () => clearInterval(id); }, []);
-  if (!lift.panel) return <><ParkingPanel /><MartPanel /><MallPanel /><SkyPanel /><RoomsPanel /></>;
+  if (!lift.panel) return <><ParkingPanel /><MartPanel /><MallPanel /><SkyPanel /><RoomsPanel /><DealerPanel /></>;
   return <div className="lift-panel" role="dialog" aria-label="Bảng chọn tầng">
     <div className="lift-head"><b>LOTTE CENTER</b><span>Thang máy · tầng {floorLabel(lift.cabinFloor)} · {LIFT_STATE_VI[liftState()]}</span></div>
     <div className="lift-grid">
