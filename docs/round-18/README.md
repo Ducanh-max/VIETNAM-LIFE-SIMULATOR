@@ -221,3 +221,62 @@ Mình chạy bằng script Playwright trên Edge. Ga xe được giữ bằng sc
 - **NPC:** người mua và nhân viên chưa đi lại, chưa có hàng chờ thật ở quầy. Phần NPC đi lại để ở giai đoạn 6.
 - **Lối vào:** chỉ vào được bằng thang máy. Thang cuốn từ sảnh xuống thuộc giai đoạn 4.
 - **Tồn kho:** chỉ giảm trong lượt chơi, chưa lưu khi tải lại game.
+
+---
+
+# Giai đoạn 4: trung tâm thương mại tầng 1–6 và thang cuốn
+
+## Đã làm
+
+- **Chiều cao tầng:** tầng 1–6 giờ cao 6 m mỗi tầng, khớp với khối đế (OSM: 36 m, 6 tầng). Tầng 7–65 chia đều phần còn lại, mỗi tầng 3,92 m, nên tầng 65 vẫn ở 263 m. Thang máy, va chạm và mặt tiền đều dùng chung `floorY`.
+- **Mặt sàn:** tầng 1–6 gồm cả khối đế lẫn tháp. Tường trong không chắn phía khối đế giáp tháp, nên đi qua lại giữa hai bên được.
+- **Cửa vào khối đế ở tầng 1:** cửa kính ở tường tây nam, phía đường nội bộ. Cửa sảnh tháp phía Liễu Giai vẫn giữ.
+- **Giếng trời** giữa khối đế:
+  - Từ tầng 2 trở lên, sàn khoét lỗ, có lan can kính với tay vịn đen. Nhìn xuống thấy sàn tầng dưới.
+  - Thang cuốn nghiêng 30° (lên 6 m trên 10,4 m), mỗi cặp tầng có một thang lên và một thang xuống. Các tầng xen kẽ hai làn, nên đi vòng quanh giếng trời để sang thang tiếp theo, như ngoài đời.
+  - Bậc thang chuyển động theo deltaTime, có tay vịn kính và tay vịn đen. Đứng lên là thang chở đi 0,5 m/s, tới đầu kia thì thả ra.
+- **Cửa hàng:**
+  - Hai dãy ô cửa hàng dọc tường dài, mặt kính có lối vào 3 m, biển hiệu, giá treo quần áo, ma-nơ-canh, quầy thu ngân.
+  - Ô chưa có chủ thì đóng cửa cuốn "SẮP KHAI TRƯƠNG". Ở tầng 1 không đặt cửa hàng phía dốc hầm.
+- **Hàng hoá theo gợi ý trong đặc tả** (`src/game/lotteMall.ts`): 19 cửa hàng, thương hiệu đều hư cấu.
+
+  | Tầng | Ngành hàng |
+  |---|---|
+  | 1 | mỹ phẩm, nước hoa, trang sức, thời trang cao cấp, cà phê |
+  | 2 | thời trang nữ, phụ kiện, nhà hàng |
+  | 3 | thời trang trẻ, đồ chơi, ăn vặt |
+  | 4 | thời trang nam, đồng hồ, thể thao, vali |
+  | 5 | nhà hàng, tiệm bánh, chăm sóc khách hàng |
+  | 6 | hội chợ sự kiện |
+
+- **Mua sắm:**
+  - Quần áo, giày, mũ, kính, túi, balo đổi trực tiếp trang phục chibi (`setOutfit`). "Thử" là mặc thử; đóng bảng mà không mua thì trả lại đồ cũ. "Mua" là giữ luôn và lưu vào tủ đồ (`doi-viet-wardrobe-v1`).
+  - Đồ ăn, uống vào balo và ăn được. Đồ khác để dành trong balo.
+  - Thiếu tiền thì báo và không trừ.
+- **Tiện ích:** cột ốp đá, ghế, chậu cây, bảng chỉ dẫn tầng có màn hình, quầy thông tin ở tầng 1, đèn âm trần.
+
+## Kiểm tra trong game (Playwright, Edge)
+
+- Tầng 1: đứng trong khối đế, độ cao đúng. Ngoài ra không còn đường nào đi xuyên tường khối đế; chỉ vào được qua cửa.
+- Đứng lên thang cuốn lên ở tầng 1: thang tự chở lên, chuyển sang tầng 2 và hiện chữ "tầng 2".
+- Tầng 2, cửa hàng Lụa Hà Thành:
+  - Bấm Thử váy thì trang phục đổi. Đóng bảng thì trả lại đồ cũ.
+  - Váy 590.000đ mà ví có 300.000đ: báo không đủ tiền, không trừ.
+  - Mua áo phông hồng 220.000đ: ví còn 80.000đ, tủ đồ ghi `mall-lua:tee-hong`, đóng bảng vẫn mặc áo mới.
+- FPS (Edge headless): giếng trời tầng 1 khoảng 39, dãy cửa hàng 33, tầng 2 khoảng 40.
+- `tsc --noEmit` và `vite build` sạch trên bản đã commit cộng 4 file của giai đoạn này.
+
+## Ảnh
+
+- [giếng trời và thang cuốn, tầng 1](tttm-gieng-troi-tang1.png)
+- [cửa hàng tầng 1](tttm-cua-hang-tang1.png)
+- [tầng 2, lan can kính, thang cuốn lên tầng 3](tttm-tang2-thang-cuon.png)
+- [mặc thử váy ở Lụa Hà Thành](tttm-thu-do.png)
+
+## Chưa làm hoặc còn hạn chế
+
+- **Đi trên thang cuốn:** khi đang đứng trên thang thì gần như không tự đi thêm được, vì thang đặt lại vị trí mỗi khung hình. Phần điều khiển nhân vật không phải code của mình nên mình không sửa.
+- **Trần nhà:** thang cuốn đi xuyên qua trần (trần chưa khoét lỗ giếng trời), và tầng trên không được vẽ khi đang ở tầng dưới.
+- **NPC:** chưa có người đi dạo hay nhân viên đi lại (giai đoạn 6).
+- **Tủ đồ:** chỉ lưu tên món đã mua, chưa có màn hình tủ đồ để thay qua lại.
+- **Nội thất cửa hàng:** còn đơn giản (giá treo, ma-nơ-canh, quầy); chưa có gương thử đồ riêng.

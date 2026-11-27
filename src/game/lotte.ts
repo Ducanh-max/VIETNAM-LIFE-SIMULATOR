@@ -14,8 +14,12 @@ import { GROUND_HEIGHT, insidePolygon, offsetRing, project, type Point } from '.
 export const FLOORS = 65;
 export const FLOOR_H = 4.05; // floor-to-floor: floor 67 ("PH", top floor) at 267 m
 export const TOWER_TOP = 272;
-/** Floor level above the street: floors 1–65 at 4,05 m; basements B1 (−1) at −5 m, then 3,8 m per level down to B5. */
-export const floorY = (f: number) => (f >= 1 ? (f - 1) * FLOOR_H : -5 - (-f - 1) * 3.8);
+/**
+ * Floor level above the street. Floors 1–6 (the department store) share the podium's 6 m storeys (36 m, 6 levels in
+ * OSM); floors 7–65 fill the rest of the tower to floor 65 at 263 m (3,92 m each). Basements: B1 (−1) at −5 m, then
+ * 3,8 m per level down to B5.
+ */
+export const floorY = (f: number) => (f >= 1 ? (f <= 6 ? (f - 1) * 6 : 36 + (f - 7) * 3.918) : -5 - (-f - 1) * 3.8);
 const CORE_HALF_V = 4.5;
 const SPEED = 6; // m/s
 const ACCEL = 1.1; // m/s²
@@ -163,36 +167,85 @@ export const RAMP = (() => {
 export const toRamp = (u: number, v: number): Point => { const du = u - RAMP.A[0], dv = v - RAMP.A[1]; return [du * RAMP.e[0] + dv * RAMP.e[1], du * RAMP.n[0] + dv * RAMP.n[1]]; };
 export const fromRamp = (s: number, t: number): Point => [RAMP.A[0] + RAMP.e[0] * s + RAMP.n[0] * t, RAMP.A[1] + RAMP.e[1] * s + RAMP.n[1] * t];
 type Strip = 'A' | 'B' | 'C';
+/**
+ * Every slope between floors: the basement ramps (strips A–C) and the mall's escalators, all in the ramp frame. Each
+ * runs along s from s0 (floor l0) to s1 (floor l1) inside the lane t0…t1; `move` is the escalator's travel along s
+ * (+1, −1) or 0 for a fixed ramp; `tail` is how far past s1 the lane stays part of it (the ramps' run-out onto B2).
+ */
+export type Slope = { id: string; t0: number; t1: number; s0: number; s1: number; l0: number; l1: number; move: number; tail: number; strip?: Strip };
+const strip = (k: Strip, l0: number, l1: number): Slope => ({ id: `${k}${l0}`, t0: RAMP.strips[k][0], t1: RAMP.strips[k][1], s0: RAMP.S0, s1: RAMP.S1, l0, l1, move: 0, tail: 6, strip: k });
 /** Ramps: strip, the floor at the s = S0 end, the floor at the s = S1 end. */
 export const RAMPS: { strip: Strip; l0: number; l1: number }[] = [
   { strip: 'A', l0: 1, l1: -2 }, { strip: 'B', l0: -3, l1: -2 }, { strip: 'B', l0: -5, l1: -4 }, { strip: 'C', l0: -4, l1: -3 },
 ];
-const stripOf = (t: number): Strip | null => { for (const k of ['A', 'B', 'C'] as Strip[]) { const [a, b] = RAMP.strips[k]; if (t > a && t < b) return k; } return null; };
-/** The ramp you are on (or about to enter) at level L, or null. */
-function rampHere(u: number, v: number, L: number) {
-  const [s, t] = toRamp(u, v); const k = stripOf(t); if (!k) return null;
-  if (s < -0.5 || s > RAMP.S1 + 6) return null;
-  const r = RAMPS.find((x) => x.strip === k && (x.l0 === L || x.l1 === L)); if (!r) return null;
-  if (r.l0 === 1 && s < 0) return null; // outside the portal: the street
-  const k01 = Math.min(1, Math.max(0, (s - RAMP.S0) / (RAMP.S1 - RAMP.S0)));
-  return { r, s, t, y: GROUND_HEIGHT + floorY(r.l0) + (floorY(r.l1) - floorY(r.l0)) * k01 };
+/**
+ * The atrium in the middle of the podium (ramp frame) and its escalators, 30° like real ones: 6 m up over 10,4 m.
+ * Up escalators climb +s, down ones run −s; consecutive floors alternate between two lanes of each, so that a lane
+ * never holds two escalators touching the same floor (you walk round the void to the next one, as in a real mall).
+ */
+export const ATRIUM = { s0: 30, s1: 41.4, t0: 23.6, t1: 32.6 };
+const ESC_RUN = 10.4;
+export const ESC_LANES = { U1: [24.0, 25.4], U2: [25.8, 27.2], D1: [28.8, 30.2], D2: [30.6, 32.0] } as Record<'U1' | 'U2' | 'D1' | 'D2', [number, number]>;
+export const ESCALATORS: Slope[] = [];
+for (let f = 1; f <= 5; f++) {
+  const [ua, ub] = ESC_LANES[f % 2 ? 'U1' : 'U2'], [da, db] = ESC_LANES[f % 2 ? 'D1' : 'D2'];
+  const s0 = ATRIUM.s0 + 0.5, s1 = s0 + ESC_RUN;
+  ESCALATORS.push({ id: `up${f}`, t0: ua, t1: ub, s0, s1, l0: f, l1: f + 1, move: 1, tail: 0 });
+  ESCALATORS.push({ id: `dn${f}`, t0: da, t1: db, s0, s1, l0: f, l1: f + 1, move: -1, tail: 0 });
 }
-/** Change level when you reach the far end of a ramp (called every frame with the player's or vehicle's position). */
+export const SLOPES: Slope[] = [...RAMPS.map((r) => strip(r.strip, r.l0, r.l1)), ...ESCALATORS];
+/** The slope you are on (or about to step onto) at floor L, or null. */
+function rampHere(u: number, v: number, L: number) {
+  const [s, t] = toRamp(u, v);
+  for (const r of SLOPES) {
+    if (r.l0 !== L && r.l1 !== L) continue;
+    if (t <= r.t0 || t >= r.t1) continue;
+    const lo = r.move ? r.s0 - 0.6 : -0.5, hi = r.s1 + (r.move ? 0.6 : r.tail);
+    if (s < lo || s > hi) continue;
+    if (r.strip && r.l0 === 1 && s < 0) continue; // outside the street portal
+    const k01 = Math.min(1, Math.max(0, (s - r.s0) / (r.s1 - r.s0)));
+    return { r, s, t, y: GROUND_HEIGHT + floorY(r.l0) + (floorY(r.l1) - floorY(r.l0)) * k01 };
+  }
+  return null;
+}
+/** The escalator under you, if any (for the moving steps). */
+export function escalatorHere(p: Point) {
+  const [u, v] = toTower(p); const h = rampHere(u, v, lift.playerFloor); if (!h || !h.r.move) return null;
+  // carried between the comb plates; let go just before the far landing so you step off onto the floor
+  const a = h.r.move > 0 ? h.r.s0 + 0.1 : h.r.s0 + 0.6, b = h.r.move > 0 ? h.r.s1 - 0.6 : h.r.s1 - 0.1;
+  return h.s > a && h.s < b ? h.r : null;
+}
+/** Change level when you reach the far end of a slope (called every frame with the player's or vehicle's position). */
 export function stepLevel(p: Point) {
-  const [u, v] = toTower(p); const L = lift.playerFloor; if (L > 1 || lift.riding) return;
+  const [u, v] = toTower(p); const L = lift.playerFloor; if (lift.riding) return;
   const h = rampHere(u, v, L); if (!h) return;
-  if (h.r.l0 === L && h.s > RAMP.S1 - 0.5) lift.playerFloor = h.r.l1;
-  else if (h.r.l1 === L && h.s < RAMP.S0 + 0.5) lift.playerFloor = h.r.l0;
+  if (h.r.l0 === L && h.s > h.r.s1 - 0.4) lift.playerFloor = h.r.l1;
+  else if (h.r.l1 === L && h.s < h.r.s0 + 0.4) lift.playerFloor = h.r.l0;
 }
 /** Extra blockers on the basement levels (columns, booth…), registered by world/LotteBasement. Arguments: u, v, floor. */
 export const basementBlockers: ((u: number, v: number, f: number) => boolean)[] = [];
+/** Extra blockers on the mall floors 1–6 (shop counters, benches…), registered by world/LotteMall. */
+export const mallBlockers: ((u: number, v: number, f: number) => boolean)[] = [];
 /** Exit barrier at the top of the street ramp: closed while the player's ticket is unpaid (set by the parking UI). */
 export const gates = { exitClosed: () => false };
 export const inBasementPlate = (u: number, v: number) => insidePolygon([u, v], BASEMENT_RING);
+/** Mall floors 1–6 cover the podium as well as the tower. */
+export const MALL_TOP = 6;
+const PODIUM_IN = offsetRing(signedArea(frame.podiumRing) > 0 ? frame.podiumRing : [...frame.podiumRing].reverse(), -0.8);
+export const inPodiumPlate = (u: number, v: number) => insidePolygon([u, v], PODIUM_IN);
+/** The atrium void on floors 2–6 (railings round it), except where an escalator serving this floor lands. */
+export function inAtriumVoid(u: number, v: number, f: number) {
+  if (f < 2 || f > MALL_TOP) return false;
+  const [s, t] = toRamp(u, v);
+  return s > ATRIUM.s0 + 1 && s < ATRIUM.s1 - 1 && t > ATRIUM.t0 && t < ATRIUM.t1;
+}
+/** Doors into the podium at street level (ramp frame centre s, the wall it is in): a 6 m glass front on its north-west side. */
+export const PODIUM_DOORS: { s: number; t: number; half: number }[] = [];
 
 // ---- plan layout (tower local) ----
 const inner = (u: number, v: number, f: number) => {
   if (f < 0) return inBasementPlate(u, v);
+  if (f <= MALL_TOP && inPodiumPlate(u, v)) return true;
   if (Math.abs(u) > TOWER.halfU + 2 || Math.abs(v) > TOWER.halfV + 2) return false;
   return insidePolygon([u, v], towerRingCached(floorY(f), 0.8));
 };
@@ -273,12 +326,12 @@ export function lotteBlocks(p: Point): boolean {
   const [u, v] = toTower(p);
   if (Math.abs(u) > 160 || Math.abs(v) > 160) return false;
   const f = lift.playerFloor;
-  const ramp = f <= 1 ? rampHere(u, v, f) : null;
+  const ramp = rampHere(u, v, f);
   if (ramp) {
-    // inside a ramp strip: its side walls, and the exit barrier near the top of the street ramp
-    const [a, b] = RAMP.strips[ramp.r.strip];
-    if ((ramp.t < a + 0.35 || ramp.t > b - 0.35) && ramp.s > 0.5 && ramp.s < RAMP.S1) return true;
-    if (ramp.r.strip === 'A' && f === -2 && ramp.s > RAMP.S0 + 1 && ramp.s < RAMP.S0 + 1.6 && gates.exitClosed()) return true;
+    // on a slope: its side walls / balustrades, and the exit barrier near the top of the street ramp
+    const r = ramp.r; const inRun = r.move ? ramp.s > r.s0 + 0.3 && ramp.s < r.s1 - 0.3 : ramp.s > 0.5 && ramp.s < r.s1;
+    if ((ramp.t < r.t0 + 0.3 || ramp.t > r.t1 - 0.3) && inRun) return true;
+    if (r.strip === 'A' && f === -2 && ramp.s > RAMP.S0 + 1 && ramp.s < RAMP.S0 + 1.6 && gates.exitClosed()) return true;
     return false;
   }
   const here = inner(u, v, f);
@@ -288,12 +341,16 @@ export function lotteBlocks(p: Point): boolean {
     // a ramp strip whose ramp does not serve this floor overhead is low: plain floor; strips serving it are handled above
   } else if (f > 1) {
     if (!lift.inside) return false;
-    if (!here) return true; // upper floors: only the tower's floor plate
+    if (!here) return true; // upper floors: only the floor plate (tower, plus the podium on 2–6)
+    if (inAtriumVoid(u, v, f)) return true; // railings round the atrium
+    if (f <= MALL_TOP) for (const test of mallBlockers) if (test(u, v, f)) return true;
   } else {
     const towerOuter = Math.abs(u) < TOWER.halfU + 1 && Math.abs(v) < TOWER.halfV + 1 && insidePolygon([u, v], towerRingCached(0, -0.3));
     const door = u > TOWER.halfU - 1.5 && u < TOWER.halfU + 1 && Math.abs(v) < DOOR_HALF;
     const inPodium = insidePolygon([u, v], frame.podiumRing);
-    if ((inPodium || towerOuter) && !here && !door) return true;
+    const [ps, pt] = toRamp(u, v); const podiumDoor = ps > -1.2 && ps < 1.6 && Math.abs(pt - 28) < 3; // glass doors in the south-west wall, off the service road
+    if ((inPodium || towerOuter) && !here && !door && !podiumDoor) return true;
+    if (here && lift.inside) for (const test of mallBlockers) if (test(u, v, f)) return true;
   }
   if (inCore(u, v)) {
     const cabinHere = (cabinAt(f) || lift.riding) && (inCabin(u, v) || inDoorway(u, v));
@@ -305,7 +362,7 @@ export function lotteBlocks(p: Point): boolean {
 export function lotteHeight(p: Point): number | null {
   const [u, v] = toTower(p);
   const f = lift.playerFloor;
-  if (f <= 1) { const r = rampHere(u, v, f); if (r) return r.y; }
+  { const r = rampHere(u, v, f); if (r) return r.y; }
   if (!inner(u, v, f)) return null;
   if ((inCabin(u, v) || inDoorway(u, v)) && (lift.riding || cabinAt(f))) return GROUND_HEIGHT + lift.cabinY;
   return GROUND_HEIGHT + floorY(f);
@@ -319,4 +376,4 @@ export function insideTower(p: Point) {
   return inner(u, v, lift.playerFloor);
 }
 
-if (import.meta.env.DEV) (window as unknown as { __lotte?: unknown }).__lotte = { lift, sendLift, lotteDoor, fromTower, toTower, LOTTE, RAMP, fromRamp, toRamp, liftState };
+if (import.meta.env.DEV) (window as unknown as { __lotte?: unknown }).__lotte = { lift, sendLift, lotteDoor, fromTower, toTower, LOTTE, RAMP, fromRamp, toRamp, liftState, ESCALATORS, ATRIUM };

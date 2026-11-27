@@ -3,9 +3,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GROUND_HEIGHT, registerBlocker, registerHeight } from '../geo';
 import { insidePolygon } from '../geo';
-import { DOOR_HALF, CABIN, cabinAt, cabinFloorShown, CORE, FLOOR_IDS, floorInfo, floorLabel, floorY, FLOOR_H, GROOVE_LIPS, inCabin, insideTower, LOTTE, lift, liftState, lotteBlocks, lotteHeight, sendLift, stepLevel, stepLift, taper, toTower, TOWER, TOWER_TOP, towerRing } from '../lotte';
+import { DOOR_HALF, CABIN, cabinAt, cabinFloorShown, CORE, FLOOR_IDS, floorInfo, floorLabel, floorY, FLOOR_H, GROOVE_LIPS, inCabin, insideTower, LOTTE, lift, liftState, MALL_TOP, lotteBlocks, lotteHeight, sendLift, stepLevel, stepLift, taper, toTower, TOWER, TOWER_TOP, towerRing } from '../lotte';
 import { LotteBasement, LottePortal, ParkingPanel, useParkingFlow } from './LotteBasement';
 import { LotteMart, MartPanel, useMartFlow } from './LotteMart';
+import { LotteMall, MallPanel, useMallFlow } from './LotteMall';
 import { materials as worldMaterials } from './materials';
 import { game, player, useGame } from '../state';
 
@@ -181,7 +182,7 @@ function Interior({ f, doorsRef, display }: { f: number; doorsRef: React.RefObje
   const s = taper(floorY(f));
   const hu = TOWER.halfU * s - 0.4, hv = TOWER.halfV * s - 0.4;
   const kind = floorKind(f);
-  const H = kind === 'deck' ? 4.6 : 3.6;
+  const H = f <= MALL_TOP ? 5.6 : kind === 'deck' ? 4.6 : 3.6; // the store floors share the podium's 6 m storeys
   const items = useMemo(() => {
     const boxes: { p: [number, number, number]; s: [number, number, number]; m: keyof ReturnType<typeof makeMats> }[] = [];
     if (kind === 'office') for (let u = -hu + 3; u < hu - 3; u += 4) for (const v of [-hv + 3, hv - 3]) if (Math.abs(u) > CORE.halfU + 1.5 || Math.abs(v) > CORE.halfV + 2) boxes.push({ p: [u, 0.38, v], s: [2.6, 0.06, 1.2], m: 'desk' }, { p: [u, 0.19, v], s: [0.08, 0.38, 1.0], m: 'rack' });
@@ -203,6 +204,8 @@ function Interior({ f, doorsRef, display }: { f: number; doorsRef: React.RefObje
     for (let i = 0; i < ring.length; i++) {
       const a = ring[i], b = ring[(i + 1) % ring.length];
       if (f === 1 && a[0] > hu && b[0] > hu && Math.abs((a[1] + b[1]) / 2) < DOOR_HALF) continue;
+      // floors 1–6 open into the podium: no glass on the side the tower shares with it
+      if (f <= MALL_TOP) { const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; const mx = (a[0] + b[0]) / 2 + ((b[1] - a[1]) / l) * 1.2, mz = (a[1] + b[1]) / 2 - ((b[0] - a[0]) / l) * 1.2; if (insidePolygon([mx, mz], LOTTE.podiumRing)) continue; }
       pos.push(a[0], 0, a[1], b[0], 0, b[1], b[0], H, b[1], a[0], 0, a[1], b[0], H, b[1], a[0], H, a[1]);
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g;
@@ -328,6 +331,7 @@ export function Lotte() {
   }, []);
   useParkingFlow();
   useMartFlow();
+  useMallFlow();
   useFrame((_, delta) => {
     if (!LOTTE) return;
     const dt = Math.min(delta, 0.05);
@@ -421,7 +425,9 @@ export function Lotte() {
     <mesh position={[TOWER.halfU + 2.2, GROUND_HEIGHT + 0.09, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}><planeGeometry args={[DOOR_HALF * 2 - 1, 3.5]} /><meshStandardMaterial color="#7a1f2a" roughness={0.9} /></mesh>
     <LottePortal />
     {near && <>
-      {floor >= 1 ? <Interior key={floor} f={floor} doorsRef={landingDoors} display={display} /> : floor === -1 ? <LotteMart /> : <LotteBasement key={floor} f={floor} />}
+      {floor >= 1 && <Interior key={floor} f={floor} doorsRef={landingDoors} display={display} />}
+      {floor >= 1 && floor <= MALL_TOP && <LotteMall key={'m' + floor} f={floor} />}
+      {floor >= 1 ? null : floor === -1 ? <LotteMart /> : <LotteBasement key={floor} f={floor} />}
       <group position={[0, 0, 0]}><Cabin cabin={cabin} doors={cabinDoors} /></group>
     </>}
     {/* the ground-floor glass is part of Interior; seen from outside when far, a plain glass band */}
@@ -436,7 +442,7 @@ export function LiftPanel() {
   const [, force] = useState(0);
   const [note, setNote] = useState('');
   useEffect(() => { const id = setInterval(() => force((n) => n + 1), 200); return () => clearInterval(id); }, []);
-  if (!lift.panel) return <><ParkingPanel /><MartPanel /></>;
+  if (!lift.panel) return <><ParkingPanel /><MartPanel /><MallPanel /></>;
   return <div className="lift-panel" role="dialog" aria-label="Bảng chọn tầng">
     <div className="lift-head"><b>LOTTE CENTER</b><span>Thang máy · tầng {floorLabel(lift.cabinFloor)} · {LIFT_STATE_VI[liftState()]}</span></div>
     <div className="lift-grid">
