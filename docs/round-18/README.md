@@ -280,3 +280,45 @@ Mình chạy bằng script Playwright trên Edge. Ga xe được giữ bằng sc
 - **NPC:** chưa có người đi dạo hay nhân viên đi lại (giai đoạn 6).
 - **Tủ đồ:** chỉ lưu tên món đã mua, chưa có màn hình tủ đồ để thay qua lại.
 - **Nội thất cửa hàng:** còn đơn giản (giá treo, ma-nơ-canh, quầy); chưa có gương thử đồ riêng.
+
+---
+
+# Giai đoạn 5: đài quan sát LOTTE Hanoi Sky, tầng 65
+
+## Đã làm
+
+- **Vé:** bán ở quầy cạnh thang máy tầng 65 và ở B1 (đúng như đặc tả: mua vé tại B1 hoặc tầng 65).
+  - Giá trong game 230.000đ, vé dùng trong ngày, có lưu lại.
+  - Giờ mở cửa ghi 9:30–22:30 (`skyConfig`), nhưng hiện chưa bắt buộc theo giờ thật (`enforceHours: false`). Lý do: game chưa có đồng hồ riêng, bật lên thì ai chơi buổi tối sẽ bị khoá.
+- **Cửa soát vé:** chưa có vé thì chỉ đứng được trong sảnh thang máy; có vé thì vào được cả sàn.
+- **Skywalk:** sàn kính ở đầu phía đông.
+  - Sàn bê tông khoét lỗ, đặt tấm kính khung thép.
+  - Nhìn xuống thấy thành phố 3D thật của game ở dưới 263 m, không phải ảnh nền.
+- **Ống nhòm** dọc vách kính: bấm E thì ống nhòm cho biết đang nhìn hướng nào và có địa danh nào trong khoảng ±40°, kèm khoảng cách. Toạ độ lấy từ bản đồ công khai, đã làm tròn.
+- **Bản đồ địa danh:** đặt tháp ở giữa, mỗi vòng 1 km.
+- **Đồ khác:** góc chụp ảnh "HANOI SKY · 272 m", quầy đồ lưu niệm, khách tham quan và nhân viên (tượng tĩnh). Vách kính từ sàn tới trần và ghế ngắm cảnh là phần có sẵn của tầng.
+
+## Kiểm tra trong game
+
+Mình chạy trên một server dev riêng, dựng từ bản đã commit cộng file của giai đoạn này. Server dev chung của dự án tự nạp lại trang mỗi khi phiên khác sửa file.
+
+- Tầng 65, chưa có vé: điểm trên sàn bị chặn, sảnh thang máy đi được.
+- Mua vé ở quầy: ví từ 300.000đ còn 70.000đ, vé lưu trong `doi-viet-hanoi-sky-v1`, sau đó vào được sàn.
+- Đứng trên Skywalk: hiện "Đang đứng trên Skywalk: sàn kính, 263 m phía dưới", nhân vật ở độ cao 263,6 m.
+- Ống nhòm hướng tây: "Công viên Thủ Lệ". Toạ độ Thủ Lệ ban đầu đặt lệch quá gần, đã chỉnh lại.
+- **Về lần nhân vật "bị đưa về tầng 1":** mình đặt bẫy ghi lại mọi lần đổi tầng thì thấy trình duyệt headless bị treo khoảng 36 giây (mất WebGL), sau đó nhân vật xuất hiện lại ở điểm xuất phát. Đó mới là lý do tầng bị đặt về 1, không phải lỗi logic của đài quan sát.
+- FPS: sảnh 38, sàn 37, nhìn xuống qua Skywalk 35.
+- `tsc --noEmit` và `vite build` sạch.
+
+## Ảnh
+
+- [sảnh, quầy vé, cửa soát vé](sky-sanh-ban-ve.png)
+- [sàn quan sát: ống nhòm, quầy lưu niệm, khách](sky-dai-quan-sat.png)
+- [Skywalk: nhìn thẳng xuống thành phố](sky-skywalk.png)
+
+## Chưa làm hoặc còn hạn chế
+
+- **Ống nhòm:** chưa có camera phóng to, mới chỉ báo tên địa danh và khoảng cách.
+- **Chụp ảnh:** góc chụp ảnh chỉ hiện thông báo, chưa lưu ảnh màn hình.
+- **Tầm nhìn:** bản đồ game mới chỉ có trung tâm, đường tới Lotte, Ba Đình và Thủ Lệ. Hồ Tây và phần lớn thành phố chưa có trong game nên chưa nhìn thấy từ tầng 65.
+- **NPC:** khách và nhân viên còn đứng yên.

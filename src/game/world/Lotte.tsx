@@ -7,6 +7,7 @@ import { DOOR_HALF, CABIN, cabinAt, cabinFloorShown, CORE, FLOOR_IDS, floorInfo,
 import { LotteBasement, LottePortal, ParkingPanel, useParkingFlow } from './LotteBasement';
 import { LotteMart, MartPanel, useMartFlow } from './LotteMart';
 import { LotteMall, MallPanel, useMallFlow } from './LotteMall';
+import { LotteSky, SKYWALK, SkyDeskB1, SkyPanel, SKY_FLOOR, useSkyFlow } from './LotteSky';
 import { materials as worldMaterials } from './materials';
 import { game, player, useGame } from '../state';
 
@@ -210,10 +211,16 @@ function Interior({ f, doorsRef, display }: { f: number; doorsRef: React.RefObje
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g;
   }, [ring, f, hu, H]);
-  const slab = useMemo(() => { const shape = new THREE.Shape(ring.map(([x, z]) => new THREE.Vector2(x, -z))); const g = new THREE.ShapeGeometry(shape); g.rotateX(-Math.PI / 2); return g; }, [ring]);
+  const slab = useMemo(() => {
+    const shape = new THREE.Shape(ring.map(([x, z]) => new THREE.Vector2(x, -z)));
+    // floor 65: the Skywalk is glass (LotteSky draws it), so the slab has a hole there
+    if (f === SKY_FLOOR) shape.holes.push(new THREE.Path([[SKYWALK.u0, SKYWALK.v0], [SKYWALK.u1, SKYWALK.v0], [SKYWALK.u1, SKYWALK.v1], [SKYWALK.u0, SKYWALK.v1]].map(([x, z]) => new THREE.Vector2(x, -z))));
+    const g = new THREE.ShapeGeometry(shape); g.rotateX(-Math.PI / 2); return g;
+  }, [ring, f]);
+  const ceilingSlab = useMemo(() => { const g = new THREE.ShapeGeometry(new THREE.Shape(ring.map(([x, z]) => new THREE.Vector2(x, -z)))); g.rotateX(-Math.PI / 2); return g; }, [ring]);
   return <group position={[0, GROUND_HEIGHT + floorY(f), 0]}>
     <mesh geometry={slab} material={kind === 'hotel' ? m.carpet : m.floor} position={[0, 0.02, 0]} receiveShadow />
-    <mesh geometry={slab} material={m.ceiling} position={[0, H, 0]} />
+    <mesh geometry={ceilingSlab} material={m.ceiling} position={[0, H, 0]} />
     <mesh geometry={windowGeo} material={m.window} />
     {/* the lift core: walls round it, the landing doorway on the +v face */}
     <mesh material={m.core} position={[0, H / 2, -CORE.halfV]}><boxGeometry args={[CORE.halfU * 2, H, 0.3]} /></mesh>
@@ -332,6 +339,7 @@ export function Lotte() {
   useParkingFlow();
   useMartFlow();
   useMallFlow();
+  useSkyFlow();
   useFrame((_, delta) => {
     if (!LOTTE) return;
     const dt = Math.min(delta, 0.05);
@@ -427,6 +435,8 @@ export function Lotte() {
     {near && <>
       {floor >= 1 && <Interior key={floor} f={floor} doorsRef={landingDoors} display={display} />}
       {floor >= 1 && floor <= MALL_TOP && <LotteMall key={'m' + floor} f={floor} />}
+      {floor === SKY_FLOOR && <LotteSky />}
+      {floor === -1 && <SkyDeskB1 />}
       {floor >= 1 ? null : floor === -1 ? <LotteMart /> : <LotteBasement key={floor} f={floor} />}
       <group position={[0, 0, 0]}><Cabin cabin={cabin} doors={cabinDoors} /></group>
     </>}
@@ -442,7 +452,7 @@ export function LiftPanel() {
   const [, force] = useState(0);
   const [note, setNote] = useState('');
   useEffect(() => { const id = setInterval(() => force((n) => n + 1), 200); return () => clearInterval(id); }, []);
-  if (!lift.panel) return <><ParkingPanel /><MartPanel /><MallPanel /></>;
+  if (!lift.panel) return <><ParkingPanel /><MartPanel /><MallPanel /><SkyPanel /></>;
   return <div className="lift-panel" role="dialog" aria-label="Bảng chọn tầng">
     <div className="lift-head"><b>LOTTE CENTER</b><span>Thang máy · tầng {floorLabel(lift.cabinFloor)} · {LIFT_STATE_VI[liftState()]}</span></div>
     <div className="lift-grid">

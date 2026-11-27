@@ -226,6 +226,8 @@ export function stepLevel(p: Point) {
 export const basementBlockers: ((u: number, v: number, f: number) => boolean)[] = [];
 /** Extra blockers on the mall floors 1–6 (shop counters, benches…), registered by world/LotteMall. */
 export const mallBlockers: ((u: number, v: number, f: number) => boolean)[] = [];
+/** Extra blockers on any tower floor above the street (the Hanoi Sky turnstile…), registered by world components. */
+export const towerBlockers: ((u: number, v: number, f: number) => boolean)[] = [];
 /** Exit barrier at the top of the street ramp: closed while the player's ticket is unpaid (set by the parking UI). */
 export const gates = { exitClosed: () => false };
 export const inBasementPlate = (u: number, v: number) => insidePolygon([u, v], BASEMENT_RING);
@@ -239,8 +241,6 @@ export function inAtriumVoid(u: number, v: number, f: number) {
   const [s, t] = toRamp(u, v);
   return s > ATRIUM.s0 + 1 && s < ATRIUM.s1 - 1 && t > ATRIUM.t0 && t < ATRIUM.t1;
 }
-/** Doors into the podium at street level (ramp frame centre s, the wall it is in): a 6 m glass front on its north-west side. */
-export const PODIUM_DOORS: { s: number; t: number; half: number }[] = [];
 
 // ---- plan layout (tower local) ----
 const inner = (u: number, v: number, f: number) => {
@@ -344,6 +344,7 @@ export function lotteBlocks(p: Point): boolean {
     if (!here) return true; // upper floors: only the floor plate (tower, plus the podium on 2–6)
     if (inAtriumVoid(u, v, f)) return true; // railings round the atrium
     if (f <= MALL_TOP) for (const test of mallBlockers) if (test(u, v, f)) return true;
+    for (const test of towerBlockers) if (test(u, v, f)) return true;
   } else {
     const towerOuter = Math.abs(u) < TOWER.halfU + 1 && Math.abs(v) < TOWER.halfV + 1 && insidePolygon([u, v], towerRingCached(0, -0.3));
     const door = u > TOWER.halfU - 1.5 && u < TOWER.halfU + 1 && Math.abs(v) < DOOR_HALF;
@@ -376,4 +377,4 @@ export function insideTower(p: Point) {
   return inner(u, v, lift.playerFloor);
 }
 
-if (import.meta.env.DEV) (window as unknown as { __lotte?: unknown }).__lotte = { lift, sendLift, lotteDoor, fromTower, toTower, LOTTE, RAMP, fromRamp, toRamp, liftState, ESCALATORS, ATRIUM };
+if (import.meta.env.DEV) (window as unknown as { __lotte?: unknown }).__lotte = { lift, sendLift, lotteDoor, fromTower, toTower, LOTTE, RAMP, fromRamp, toRamp, liftState, ESCALATORS, ATRIUM, insideTower, towerRingCached, floorY };
