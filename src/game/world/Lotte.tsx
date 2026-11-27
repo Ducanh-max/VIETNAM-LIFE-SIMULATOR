@@ -8,6 +8,7 @@ import { LotteBasement, LottePortal, ParkingPanel, useParkingFlow } from './Lott
 import { LotteMart, MartPanel, useMartFlow } from './LotteMart';
 import { LotteMall, MallPanel, useMallFlow } from './LotteMall';
 import { LotteSky, SKYWALK, SkyDeskB1, SkyPanel, SKY_FLOOR, useSkyFlow } from './LotteSky';
+import { LotteRooms, RoomsPanel, useRoomsFlow, Walkers } from './LotteRooms';
 import { materials as worldMaterials } from './materials';
 import { game, player, useGame } from '../state';
 
@@ -186,12 +187,7 @@ function Interior({ f, doorsRef, display }: { f: number; doorsRef: React.RefObje
   const H = f <= MALL_TOP ? 5.6 : kind === 'deck' ? 4.6 : 3.6; // the store floors share the podium's 6 m storeys
   const items = useMemo(() => {
     const boxes: { p: [number, number, number]; s: [number, number, number]; m: keyof ReturnType<typeof makeMats> }[] = [];
-    if (kind === 'office') for (let u = -hu + 3; u < hu - 3; u += 4) for (const v of [-hv + 3, hv - 3]) if (Math.abs(u) > CORE.halfU + 1.5 || Math.abs(v) > CORE.halfV + 2) boxes.push({ p: [u, 0.38, v], s: [2.6, 0.06, 1.2], m: 'desk' }, { p: [u, 0.19, v], s: [0.08, 0.38, 1.0], m: 'rack' });
-    if (kind === 'hotel') {
-      // corridor round the core, rooms along the facade: partition walls with doors
-      for (let u = -hu + 4; u < hu - 1; u += 4.2) for (const side of [-1, 1]) boxes.push({ p: [u, H / 2, side * (CORE.halfV + 3.6)], s: [0.15, H, 0.15], m: 'wall' }, { p: [u, H / 2, side * (CORE.halfV + 3.6 + (hv - CORE.halfV - 3.6) / 2)], s: [0.12, H, hv - CORE.halfV - 3.6], m: 'wall' });
-      for (const side of [-1, 1]) for (let u = -hu + 2; u < hu - 2; u += 4.2) boxes.push({ p: [u + 1.1, H / 2 - 0.4, side * (CORE.halfV + 3.6)], s: [2.4, H - 0.8, 0.12], m: 'wall' });
-    }
+    // offices (7–32) and hotel / apartment floors (33–64) are furnished by world/LotteRooms
     if (kind === 'store') for (let u = -hu + 4; u < hu - 3; u += 5) for (const v of [-hv + 3.5, hv - 3.5]) boxes.push({ p: [u, 0.9, v], s: [3, 1.8, 0.6], m: 'rack' }, { p: [u, 1.3, v + Math.sign(v) * -0.32], s: [2.6, 0.5, 0.05], m: 'goods' });
     if (kind === 'lobby') boxes.push({ p: [hu - 9, 0.55, -hv + 4], s: [5, 1.1, 1.2], m: 'desk' }, { p: [hu - 9, 1.15, -hv + 4], s: [5.2, 0.08, 1.4], m: 'steel' });
     if (kind === 'deck') for (let u = -hu + 6; u < hu - 4; u += 8) boxes.push({ p: [u, 0.25, hv - 1.8], s: [2.4, 0.45, 0.6], m: 'desk' }, { p: [u, 0.25, -hv + 1.8], s: [2.4, 0.45, 0.6], m: 'desk' });
@@ -206,7 +202,7 @@ function Interior({ f, doorsRef, display }: { f: number; doorsRef: React.RefObje
       const a = ring[i], b = ring[(i + 1) % ring.length];
       if (f === 1 && a[0] > hu && b[0] > hu && Math.abs((a[1] + b[1]) / 2) < DOOR_HALF) continue;
       // floors 1–6 open into the podium: no glass on the side the tower shares with it
-      if (f <= MALL_TOP) { const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; const mx = (a[0] + b[0]) / 2 + ((b[1] - a[1]) / l) * 1.2, mz = (a[1] + b[1]) / 2 - ((b[0] - a[0]) / l) * 1.2; if (insidePolygon([mx, mz], LOTTE.podiumRing)) continue; }
+      if (f <= MALL_TOP + 1) { const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; const mx = (a[0] + b[0]) / 2 + ((b[1] - a[1]) / l) * 1.2, mz = (a[1] + b[1]) / 2 - ((b[0] - a[0]) / l) * 1.2; if (insidePolygon([mx, mz], LOTTE.podiumRing)) continue; }
       pos.push(a[0], 0, a[1], b[0], 0, b[1], b[0], H, b[1], a[0], 0, a[1], b[0], H, b[1], a[0], H, a[1]);
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g;
@@ -340,6 +336,7 @@ export function Lotte() {
   useMartFlow();
   useMallFlow();
   useSkyFlow();
+  useRoomsFlow();
   useFrame((_, delta) => {
     if (!LOTTE) return;
     const dt = Math.min(delta, 0.05);
@@ -436,6 +433,8 @@ export function Lotte() {
       {floor >= 1 && <Interior key={floor} f={floor} doorsRef={landingDoors} display={display} />}
       {floor >= 1 && floor <= MALL_TOP && <LotteMall key={'m' + floor} f={floor} />}
       {floor === SKY_FLOOR && <LotteSky />}
+      {floor > MALL_TOP && floor < SKY_FLOOR && <LotteRooms key={'r' + floor} f={floor} />}
+      {floor >= 1 && <Walkers key={'w' + floor} f={floor} />}
       {floor === -1 && <SkyDeskB1 />}
       {floor >= 1 ? null : floor === -1 ? <LotteMart /> : <LotteBasement key={floor} f={floor} />}
       <group position={[0, 0, 0]}><Cabin cabin={cabin} doors={cabinDoors} /></group>
@@ -452,7 +451,7 @@ export function LiftPanel() {
   const [, force] = useState(0);
   const [note, setNote] = useState('');
   useEffect(() => { const id = setInterval(() => force((n) => n + 1), 200); return () => clearInterval(id); }, []);
-  if (!lift.panel) return <><ParkingPanel /><MartPanel /><MallPanel /><SkyPanel /></>;
+  if (!lift.panel) return <><ParkingPanel /><MartPanel /><MallPanel /><SkyPanel /><RoomsPanel /></>;
   return <div className="lift-panel" role="dialog" aria-label="Bảng chọn tầng">
     <div className="lift-head"><b>LOTTE CENTER</b><span>Thang máy · tầng {floorLabel(lift.cabinFloor)} · {LIFT_STATE_VI[liftState()]}</span></div>
     <div className="lift-grid">

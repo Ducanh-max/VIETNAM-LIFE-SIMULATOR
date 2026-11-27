@@ -233,6 +233,8 @@ export const gates = { exitClosed: () => false };
 export const inBasementPlate = (u: number, v: number) => insidePolygon([u, v], BASEMENT_RING);
 /** Mall floors 1–6 cover the podium as well as the tower. */
 export const MALL_TOP = 6;
+/** Hotel amenities: the gym inside, the outdoor pool on the podium roof (36 m). */
+export const AMENITY_FLOOR = 7;
 const PODIUM_IN = offsetRing(signedArea(frame.podiumRing) > 0 ? frame.podiumRing : [...frame.podiumRing].reverse(), -0.8);
 export const inPodiumPlate = (u: number, v: number) => insidePolygon([u, v], PODIUM_IN);
 /** The atrium void on floors 2–6 (railings round it), except where an escalator serving this floor lands. */
@@ -245,7 +247,7 @@ export function inAtriumVoid(u: number, v: number, f: number) {
 // ---- plan layout (tower local) ----
 const inner = (u: number, v: number, f: number) => {
   if (f < 0) return inBasementPlate(u, v);
-  if (f <= MALL_TOP && inPodiumPlate(u, v)) return true;
+  if ((f <= MALL_TOP || f === AMENITY_FLOOR) && inPodiumPlate(u, v)) return true; // floor 7 opens onto the podium roof (pool)
   if (Math.abs(u) > TOWER.halfU + 2 || Math.abs(v) > TOWER.halfV + 2) return false;
   return insidePolygon([u, v], towerRingCached(floorY(f), 0.8));
 };

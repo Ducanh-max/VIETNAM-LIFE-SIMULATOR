@@ -322,3 +322,65 @@ Mình chạy trên một server dev riêng, dựng từ bản đã commit cộng
 - **Chụp ảnh:** góc chụp ảnh chỉ hiện thông báo, chưa lưu ảnh màn hình.
 - **Tầm nhìn:** bản đồ game mới chỉ có trung tâm, đường tới Lotte, Ba Đình và Thủ Lệ. Hồ Tây và phần lớn thành phố chưa có trong game nên chưa nhìn thấy từ tầng 65.
 - **NPC:** khách và nhân viên còn đứng yên.
+
+---
+
+# Giai đoạn 6: văn phòng, khách sạn, căn hộ, tiện ích và NPC
+
+## Đã làm
+
+Các tầng dưới đây đều là module do game tự thiết kế, không phải mặt bằng thật. Dữ liệu ở `src/game/lotteLife.ts`, dựng hình ở `src/game/world/LotteRooms.tsx`.
+
+- **Tầng 7 (tiện ích khách sạn):**
+  - Phòng gym trong tháp: máy chạy, xe đạp tập, thảm, giá tạ.
+  - Hồ bơi ngoài trời trên mái khối đế (36 m): ghế nằm, khăn, ô che.
+  - Tầng 7 thông ra mái khối đế. Không lội xuống hồ được (có va chạm); bấm E ở khu hồ để "bơi vài vòng".
+- **Tầng 8–31 (văn phòng):**
+  - Quầy lễ tân cạnh sảnh thang máy, bàn làm việc mở có màn hình và ghế, phòng họp kính.
+  - Bấm E ở lễ tân để bắt đầu một ca 45 giây, lương 180.000đ (cấu hình trong `lifeConfig`). Rời tầng giữa ca thì huỷ ca, không có lương.
+- **Tầng 33–56 (LOTTE HOTEL):**
+  - Lễ tân ở tầng 33. Phòng Standard 2.500.000đ/đêm, Deluxe 3.800.000đ/đêm (giá trong game).
+  - Đặt xong được số phòng (ví dụ 3519) ở một tầng ngẫu nhiên.
+  - Hành lang quanh lõi thang, cửa phòng có số. Chỉ cửa phòng mình mở được, các phòng khác bị chặn.
+  - Trong phòng: giường, TV, tủ, bàn, buồng tắm. Bấm E để nghỉ.
+- **Tầng 57–64 (căn hộ dịch vụ):**
+  - Căn rộng hai gian. Vài cửa có biển "CHO THUÊ".
+  - Thuê 12.000.000đ/tháng thì căn đó lưu làm nhà của bạn và mở cửa được.
+  - Trong căn: sofa, TV, bếp, tủ lạnh, bàn ăn, giường, buồng tắm.
+- **NPC đi lại:**
+  - Ở tầng 1–6, 8 người đi vòng quanh giếng trời.
+  - Ở tầng 65, khách đi dọc vách kính.
+  - Ở văn phòng và tầng 7, người đi quanh lõi thang. Ở hành lang khách sạn và căn hộ cũng có người đi lại.
+  - Chỉ vẽ NPC của tầng đang đứng, đi theo vòng cố định, không xuyên tường.
+
+## Kiểm tra trong game
+
+Mình chạy Playwright trên server dev riêng, rút ca làm còn 6 giây bằng hook dev để thử cho nhanh.
+
+- **Văn phòng tầng 20:** ca làm xong, ví từ 6.000.000đ lên 6.180.000đ, hiện "Hết ca! Nhận 180.000đ tiền lương".
+- **Khách sạn tầng 33:** đặt phòng Standard, được phòng 3519 (tầng 35, ô 19), ví giảm 2.500.000đ.
+- **Tầng 35:**
+  - Trong phòng mình: đi được. Phòng bên cạnh: bị chặn. Cửa phòng mình: đi qua được.
+  - Đứng trong phòng 3519 thì thấy nội thất và cửa kính nhìn ra thành phố.
+- **Tầng 7:** hồ bơi trên mái khối đế, sát mặt kính tháp (xem ảnh).
+- **Về các lần nhân vật tự "về điểm xuất phát" khi thử:**
+  - Nguyên nhân: tính năng tự giảm đồ hoạ khi FPS thấp (vòng 13) làm cả thế giới dựng lại, nên nhân vật quay về điểm xuất phát.
+  - Tắt tự động (`doi-viet-quality-auto=off`) thì không còn xảy ra.
+  - Lỗi này có từ trước, không thuộc phần Lotte. Ai chơi trên máy yếu cũng có thể gặp đúng một lần, ngay lúc game tự giảm đồ hoạ.
+- **FPS:** trong lượt thử này máy rất tải nên chỉ còn 4–12 FPS (cùng lúc có phiên khác đang build). Các giai đoạn trước, cùng các góc tương tự, đo được 35–45.
+- `tsc --noEmit` và `vite build` sạch.
+
+## Ảnh
+
+- [phòng khách sạn 3519](ks-phong-3519.png)
+- [hồ bơi tầng 7 trên mái khối đế](tang7-ho-boi.png)
+- [văn phòng](van-phong.png)
+- [NPC đi quanh giếng trời tầng 2](tttm-npc.png)
+
+## Chưa làm
+
+- **Nghỉ ngơi:** chưa có tác dụng gì về chỉ số (game chưa có chỉ số năng lượng hay đồng hồ ngày đêm).
+- **Lương:** cố định mỗi ca, chưa có cấp bậc.
+- **Đặt phòng:** mới đặt được một đêm.
+- **Nhà khi tải lại game:** chưa xuất hiện ở căn hộ đã thuê. Điểm xuất phát nằm trong code của Player, mình không sửa.
+- **NPC:** chỉ đi theo vòng cố định, chưa có tránh vật cản động, chưa làm nghề (thu ngân, phục vụ… vẫn đứng yên).
