@@ -4,3 +4,9 @@ dist
 *.tsbuildinfo
 .DS_Store
 *.local
+
+# private test build: full-detail test assets are never committed
+public/private-assets/
+.vercel
+nm_broken_*
+.env.private

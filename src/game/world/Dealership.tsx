@@ -3,7 +3,8 @@ import { Suspense, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { GROUND_HEIGHT, registerBlocker, type Point } from '../geo';
 import { CarModel, newControl, type CarControl } from '../cars/CarModel';
-import { GltfCar, anchorsOf } from '../cars/GltfCar';
+import { GltfCar, PrivateFullCar, anchorsOf } from '../cars/GltfCar';
+import { PRIVATE_CAR_URL } from '../privateBuild';
 import { BRANDS, VEHICLES, modelAsset } from '../cars/vehicleRegistry';
 import { cabinFloor, seatRows } from '../cars/carGeometry';
 import { buyCar, carPrices, cars, useCars } from '../cars/carRegistry';
@@ -32,6 +33,7 @@ function useShowroomNear() { const [, f] = useState(0); useEffect(() => { const 
 function AnyCar({ model, paint, plate, control }: { model: ModelId; paint: string; plate: string; control: React.RefObject<CarControl> }) {
   const near = useShowroomNear();
   const proc = <CarModel model={model} paint={paint} control={control} plate={plate} />;
+  if (PRIVATE_CAR_URL && model === 'luhanh' && near) return <Suspense fallback={proc}><PrivateFullCar url={PRIVATE_CAR_URL} model={model} paint={paint} /></Suspense>;
   if (!modelAsset(model) || !near) return proc;
   return <Suspense fallback={proc}><GltfCar model={model} paint={paint} plate={plate} control={control} /></Suspense>;
 }

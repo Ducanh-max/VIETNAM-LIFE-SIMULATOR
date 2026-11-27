@@ -9,6 +9,17 @@ service cloud.firestore {
         && request.auth.token.email.lower() == email;
       allow write: if false;
     }
+    // Invite-only test build: vlife_testers/{lowercase email}. A verified user may read only their own document;
+    // only game admins (a vlife_admins document for their own verified email) may list, add or remove testers.
+    match /vlife_testers/{email} {
+      allow read: if request.auth != null && request.auth.token.email_verified == true
+        && (request.auth.token.email.lower() == email || isAdmin());
+      allow write: if isAdmin();
+    }
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/vlife_admins/$(request.auth.token.email.lower()));
+    }
     match /{document=**} {
       allow read, write: if false;
     }

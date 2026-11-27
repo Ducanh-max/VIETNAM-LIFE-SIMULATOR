@@ -118,3 +118,23 @@ export function GltfCar({ model, paint, plate = '30A-000.00', control }: { model
   });
   return <primitive object={built.lod} />;
 }
+
+/**
+ * Private test build only: the full-detail test car (a file that is not in the repository, uploaded only to the
+ * private deployment). Shown as it is, at full detail; the body paint is recoloured where its material allows it.
+ */
+export function PrivateFullCar({ url, model, paint }: { url: string; model: ModelId; paint: string }) {
+  const { gl } = useThree(); const g = useGLTF(url, false, true);
+  const root = useMemo(() => {
+    const env = ensureEnv(gl); const r = g.scene.clone(true);
+    r.traverse((o) => {
+      const m = o as THREE.Mesh; if (!m.isMesh) return; m.castShadow = false; m.receiveShadow = false;
+      const mat = m.material as THREE.MeshStandardMaterial;
+      if (mat.name === 'mat_199247467' || mat.name === 'mat_199247467_uvless') { /* the body paint of this test model */ const c = mat.clone(); c.color.set(paint); c.envMap = env; c.envMapIntensity = 0.8; m.material = c; m.castShadow = true; }
+      else if (mat.metalness > 0.5 && !mat.envMap) { mat.envMap = env; mat.envMapIntensity = 0.8; }
+    });
+    return r;
+  }, [g, paint, gl]);
+  useEffect(() => { anchorsOf.set(model, { driver: new THREE.Vector3(-0.38, 1.27, 0.12), rear: new THREE.Vector3(0.0, 1.25, -0.85) }); }, [model]);
+  return <primitive object={root} />;
+}
