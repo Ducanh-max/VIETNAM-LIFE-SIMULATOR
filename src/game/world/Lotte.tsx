@@ -5,6 +5,7 @@ import { GROUND_HEIGHT, registerBlocker, registerHeight } from '../geo';
 import { insidePolygon } from '../geo';
 import { DOOR_HALF, CABIN, cabinAt, cabinFloorShown, CORE, FLOOR_IDS, floorInfo, floorLabel, floorY, FLOOR_H, GROOVE_LIPS, inCabin, insideTower, LOTTE, lift, liftState, lotteBlocks, lotteHeight, sendLift, stepLevel, stepLift, taper, toTower, TOWER, TOWER_TOP, towerRing } from '../lotte';
 import { LotteBasement, LottePortal, ParkingPanel, useParkingFlow } from './LotteBasement';
+import { LotteMart, MartPanel, useMartFlow } from './LotteMart';
 import { materials as worldMaterials } from './materials';
 import { game, player, useGame } from '../state';
 
@@ -326,6 +327,7 @@ export function Lotte() {
     return () => { lift.onArrive = null; };
   }, []);
   useParkingFlow();
+  useMartFlow();
   useFrame((_, delta) => {
     if (!LOTTE) return;
     const dt = Math.min(delta, 0.05);
@@ -336,7 +338,7 @@ export function Lotte() {
     const [u, v] = toTower(p);
     const isNear = Math.abs(u) < 260 && Math.abs(v) < 260;
     if (isNear !== near) setNear(isNear);
-    if (!isNear) return;
+    if (!isNear) { if (lift.playerFloor !== 1 && !lift.riding) lift.playerFloor = 1; return; } // far away (teleported off): back at street level
     stepLevel(p); // up or down a basement ramp
     const inside = insideTower(p);
     lift.inside = inside;
@@ -419,7 +421,7 @@ export function Lotte() {
     <mesh position={[TOWER.halfU + 2.2, GROUND_HEIGHT + 0.09, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}><planeGeometry args={[DOOR_HALF * 2 - 1, 3.5]} /><meshStandardMaterial color="#7a1f2a" roughness={0.9} /></mesh>
     <LottePortal />
     {near && <>
-      {floor >= 1 ? <Interior key={floor} f={floor} doorsRef={landingDoors} display={display} /> : <LotteBasement key={floor} f={floor} />}
+      {floor >= 1 ? <Interior key={floor} f={floor} doorsRef={landingDoors} display={display} /> : floor === -1 ? <LotteMart /> : <LotteBasement key={floor} f={floor} />}
       <group position={[0, 0, 0]}><Cabin cabin={cabin} doors={cabinDoors} /></group>
     </>}
     {/* the ground-floor glass is part of Interior; seen from outside when far, a plain glass band */}
@@ -434,13 +436,13 @@ export function LiftPanel() {
   const [, force] = useState(0);
   const [note, setNote] = useState('');
   useEffect(() => { const id = setInterval(() => force((n) => n + 1), 200); return () => clearInterval(id); }, []);
-  if (!lift.panel) return <ParkingPanel />;
+  if (!lift.panel) return <><ParkingPanel /><MartPanel /></>;
   return <div className="lift-panel" role="dialog" aria-label="Bảng chọn tầng">
     <div className="lift-head"><b>LOTTE CENTER</b><span>Thang máy · tầng {floorLabel(lift.cabinFloor)} · {LIFT_STATE_VI[liftState()]}</span></div>
     <div className="lift-grid">
       {[...FLOOR_IDS].reverse().map((f) => { const info = floorInfo(f); return <button key={f} title={info.displayName} disabled={!info.availableInGame} className={f === lift.cabinFloor ? 'here' : f === 65 ? 'deck' : f < 0 ? 'basement' : ''} onClick={() => { if (!sendLift(f, true)) setNote(info.availableInGame ? 'Thang đang bận, chờ một chút.' : `${info.displayName}: chưa mở trong game.`); force((n) => n + 1); }}>{floorLabel(f)}</button>; })}
     </div>
     {note && <p className="parking-msg">{note}</p>}
-    <div className="lift-foot"><span>65 · Hanoi Sky · 33–64 Khách sạn/căn hộ · 8–31 Văn phòng · 7 Tiện ích · 1–6 TTTM · B1 LOTTE Mart (sắp mở) · B2–B5 Gửi xe</span><button onClick={() => { lift.panel = false; lift.doorTimer = 2; force((n) => n + 1); }}>Đóng</button></div>
+    <div className="lift-foot"><span>65 · Hanoi Sky · 33–64 Khách sạn/căn hộ · 8–31 Văn phòng · 7 Tiện ích · 1–6 TTTM · B1 LOTTE Mart · B2–B5 Gửi xe</span><button onClick={() => { lift.panel = false; lift.doorTimer = 2; force((n) => n + 1); }}>Đóng</button></div>
   </div>;
 }

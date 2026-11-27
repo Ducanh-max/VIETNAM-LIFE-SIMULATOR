@@ -43,6 +43,7 @@ export function addToBag(shop: ShopId, basket: Record<string, number>) {
 /** Take something out of the bag: start eating / drinking it, or open the book. */
 export function takeOut(uid: number) {
   const b = st.items.find((i) => i.uid === uid); if (!b) return;
+  if (itemOf(b).keep) { game.toast(`${itemOf(b).name}: để dành trong balo (mang về nhà dùng).`); return; }
   if (st.held) putAway();
   const kind = kindOf(b);
   bagStore.set({ held: { ...b, kind, progress: 0 }, open: false, page: 0 });

@@ -5,7 +5,7 @@ import { shopById } from '../game/shops';
 import { formatVnd, game, player } from '../game/state';
 
 const ICON: Record<string, string> = { food: '🍜', drink: '🥤', book: '📖' };
-const icon = (b: BagItem) => (shopById(b.shop).kind === 'banhmi' && b.item !== 'suadau' ? '🥖' : shopById(b.shop).kind === 'coffee' ? '☕' : ICON[kindOf(b)]);
+const icon = (b: BagItem) => (shopById(b.shop).kind === 'mart' ? '🛒' : shopById(b.shop).kind === 'banhmi' && b.item !== 'suadau' ? '🥖' : shopById(b.shop).kind === 'coffee' ? '☕' : ICON[kindOf(b)]);
 
 /** The balo button (also B) and what is inside: take things out to eat, drink or read. */
 export function Backpack() {

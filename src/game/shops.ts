@@ -10,9 +10,9 @@ import { addToBag, bagStore, takeOut } from './bag';
  * walk in and buy at the counter, or order on the phone and a shipper brings it on a xe máy. Prices are typical of
  * Hà Nội's old quarter in 2026.
  */
-export type ShopKind = 'coffee' | 'banhmi' | 'pho' | 'books' | 'buncha';
+export type ShopKind = 'coffee' | 'banhmi' | 'pho' | 'books' | 'buncha' | 'mart';
 export type ShopId = string;
-export type ShopItem = { id: string; name: string; note: string; price: number; hunger: number; thirst: number; book?: boolean };
+export type ShopItem = { id: string; name: string; note: string; price: number; hunger: number; thirst: number; book?: boolean; /** kept in the backpack, not eaten (raw food, housewares) */ keep?: boolean };
 export type Shop = {
   id: ShopId; kind: ShopKind; name: string; sign: string; tagline: string; color: string; seller: string; role: string; street: string;
   /** restaurant-local x of the shopfront (see Restaurant.tsx), 0 for the bún chả shop itself; unused for street stalls */
@@ -83,7 +83,10 @@ function stallSpot(street: string) {
 }
 for (const st0 of STALLS) { const at = stallSpot(st0.street); if (at) SHOPS.push({ ...st0, x: 0, w: 4, walkIn: false, items: menuOf(st0.kind), at }); }
 
-export const shopById = (id: ShopId) => SHOPS.find((s) => s.id === id)!;
+/** Shops that sell into the backpack but have no shopfront on a street (LOTTE Mart in Lotte Center's basement). */
+const EXTRA_SHOPS: Shop[] = [];
+export function registerExtraShop(shop: Shop) { if (!EXTRA_SHOPS.some((x) => x.id === shop.id)) EXTRA_SHOPS.push(shop); }
+export const shopById = (id: ShopId) => (SHOPS.find((s) => s.id === id) ?? EXTRA_SHOPS.find((s) => s.id === id))!;
 export const shopKind = (id: ShopId) => shopById(id).kind;
 /** Pavement in front of a shop (world), where the shipper picks up. */
 export const shopFront = (s: Shop): Point => (s.at ? [s.at.p[0] + Math.sin(s.at.facing) * 1.2, s.at.p[1] + Math.cos(s.at.facing) * 1.2] : restaurantToWorld(s.x, RESTAURANT.depth / 2 + 2.2));

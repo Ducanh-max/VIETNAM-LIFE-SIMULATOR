@@ -156,3 +156,68 @@ Mình chạy bằng script Playwright trên Edge. Ga xe được giữ bằng sc
 - **Mô hình xe:** xe NPC là khối hộp đơn giản.
 - **Camera lái xe:** camera đuổi theo xe (code của Player, mình không sửa) có thể nhô lên trên trần 3,4 m. Khi đó trần trong suốt nhìn từ trên xuống (kiểu cắt lớp), còn nắp tối chặn không cho thấy thành phố.
 - **Tầng không có cảnh:** chỉ có B1. Mình chưa làm trường hợp lỗi tải cảnh, vì các tầng dựng bằng React tại chỗ, không tải file.
+
+---
+
+# Giai đoạn 3: siêu thị LOTTE Mart, tầng B1
+
+## Đã làm
+
+- **Tầng B1** mở trong thang máy (`FLOOR_REGISTRY`: `availableInGame: true`). Cách bố trí do game tự đặt, không phải sơ đồ cửa hàng thật.
+  - Sàn gạch kem #E5DFD1, trần trắng có đèn tấm.
+  - Dốc đường ↔ B2 đi xuyên qua tầng này, có tường ngăn bên cạnh.
+- **Khu hàng (8 khu):**
+  - rau củ và trái cây: bàn gỗ nghiêng;
+  - thực phẩm tươi: tủ kính;
+  - đông lạnh: tủ đông nắp kính;
+  - đồ uống: tủ mát cửa kính;
+  - bánh kẹo và gia dụng: kệ 4 tầng;
+  - bánh mì: bàn trưng bày.
+  - Mỗi khu có biển treo, đọc được từ cả hai phía. Có biển khuyến mãi.
+- **Quầy và người:**
+  - 4 quầy thu ngân (băng chuyền, máy quét, màn hình, biển QUẦY 1–4), mỗi quầy có nhân viên.
+  - Bãi xe đẩy và giỏ ở lối vào.
+  - 1 nhân viên xếp hàng và vài khách cầm giỏ (tượng tĩnh).
+- **Hàng hoá** (`src/game/lotteMart.ts`): 23 sản phẩm, mỗi món có productId, name, price, stock, category, icon, meshVariant.
+  - Món ăn hoặc uống được thì có thêm hunger/thirst.
+  - Rau sống, thịt cá và đồ gia dụng thì "để dành trong balo".
+  - Giá trong game đặt trong file, dễ sửa.
+- **Mua hàng:**
+  - Lấy xe đẩy (bên trái) hoặc giỏ (bên phải, tối đa 12 món); xe đẩy đi theo trước mặt.
+  - Bấm E ở kệ để mở danh sách món của khu đó, thêm hoặc bớt.
+  - Ở quầy, bấm E để xem giỏ, bớt món, thấy tổng tiền và số dư ví.
+  - Bấm thanh toán: thiếu tiền thì báo và không trừ. Đủ tiền thì trừ một lần, giảm tồn kho, hiện hoá đơn, cho hàng vào balo và trả lại xe đẩy.
+- **Hiệu năng:**
+  - Hàng hoá vẽ bằng một `InstancedMesh` cho mỗi hình (khối đa giác thấp).
+  - Toàn bộ kệ, tủ, bàn vẽ bằng một `InstancedMesh` cho mỗi vật liệu.
+- **Sửa thêm:**
+  - Lúc cabin vừa tới tầng (ARRIVED), vùng cabin bị coi là tường, nên game "gỡ kẹt" đẩy người ra khỏi thang máy. Đã sửa: cabin luôn đứng được khi nó dừng ở tầng đó.
+  - Dịch chuyển đi xa khi đang ở tầng hầm thì tầng được đặt lại về mặt đất.
+
+## Kiểm tra trong game (Playwright, Edge)
+
+- Đi thang máy từ tầng 1 xuống B1 (−4,68 m, tầng −1). Có 91 kệ/tủ, đủ 8 khu.
+- Lấy xe đẩy, mở kệ Trái cây, thêm táo × 2 và chuối × 1. Ra quầy 3 thanh toán: ví từ 300.000đ còn 254.000đ (24.000 + 22.000). Balo có `tao, tao, chuoi`, xe đẩy được trả lại.
+- Theo dõi độ cao từng 0,7 giây khi xuống B1: không còn bị đẩy ra lúc vừa tới tầng.
+- Số liệu đo:
+
+  | | Số tam giác | Draw call | FPS (Edge headless) |
+  |---|---|---|---|
+  | Nhìn toàn siêu thị, trước khi gộp kệ | ~1,14–1,16 triệu | 571–607 | 14–30 |
+  | Nhìn toàn siêu thị, sau khi gộp kệ | ~1,14–1,16 triệu | 318–422 | ~40 |
+
+- `tsc --noEmit` và `vite build` sạch trên bản đã commit cộng 7 file của giai đoạn này.
+
+## Ảnh
+
+- [toàn cảnh siêu thị](mart-tong-quan.png)
+- [kệ và biển khu](mart-ke-hang.png)
+- [quầy thu ngân và bãi xe đẩy](mart-quay-thu-ngan.png)
+- [chọn hàng ở kệ Trái cây](mart-chon-hang.png)
+- [hoá đơn sau khi trả tiền](mart-hoa-don.png)
+
+## Chưa làm
+
+- **NPC:** người mua và nhân viên chưa đi lại, chưa có hàng chờ thật ở quầy. Phần NPC đi lại để ở giai đoạn 6.
+- **Lối vào:** chỉ vào được bằng thang máy. Thang cuốn từ sảnh xuống thuộc giai đoạn 4.
+- **Tồn kho:** chỉ giảm trong lượt chơi, chưa lưu khi tải lại game.

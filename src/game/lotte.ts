@@ -128,7 +128,7 @@ export type FloorInfo = { floorId: number; displayName: string; category: FloorC
 export const FLOOR_REGISTRY: FloorInfo[] = FLOOR_IDS.map((f): FloorInfo => {
   const at: Point = [0, CORE_HALF_V + 2.5];
   if (f <= -2) return { floorId: f, displayName: `Hầm ${floorLabel(f)} · gửi xe`, category: 'parking', sceneAsset: 'LotteBasement', availableInGame: true, spawnAnchor: at };
-  if (f === -1) return { floorId: f, displayName: 'B1 · LOTTE Mart (đang chuẩn bị)', category: 'supermarket', sceneAsset: 'LotteMart', availableInGame: false, spawnAnchor: at };
+  if (f === -1) return { floorId: f, displayName: 'B1 · LOTTE Mart', category: 'supermarket', sceneAsset: 'LotteMart', availableInGame: true, spawnAnchor: at };
   if (f === 1) return { floorId: f, displayName: 'Sảnh · trung tâm thương mại', category: 'lobby', sceneAsset: 'Interior:lobby', availableInGame: true, spawnAnchor: at };
   if (f <= 6) return { floorId: f, displayName: `Tầng ${f} · trung tâm thương mại`, category: 'store', sceneAsset: 'Interior:store', availableInGame: true, spawnAnchor: at };
   if (f === 7) return { floorId: f, displayName: 'Tầng 7 · tiện ích khách sạn', category: 'amenity', sceneAsset: 'Interior:office', availableInGame: true, spawnAnchor: at };
@@ -217,7 +217,8 @@ export const lift = {
   queue: [] as number[], // landing calls made while the cabin was busy, served in order
   onArrive: null as ((f: number) => void) | null,
 };
-export const cabinAt = (f: number) => !lift.moving && lift.arrive <= 0 && lift.cabinFloor === f;
+/** The cabin is standing at floor f (also during ARRIVED, when its doors have not opened yet: you must not be pushed out). */
+export const cabinAt = (f: number) => !lift.moving && lift.cabinFloor === f;
 export function liftState(): LiftState {
   if (lift.moving) return 'MOVING';
   if (lift.arrive > 0) return 'ARRIVED';
