@@ -1,6 +1,6 @@
 import { getApp } from 'firebase/app';
 import { collection, deleteDoc, doc, getDoc, getDocs, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { accountsReady, signIn, signInGoogle, signOut, useAccount, viError } from '../game/account';
 import { PRIVATE_BUILD } from '../game/privateBuild';
 
@@ -48,10 +48,26 @@ export function PrivateGate({ children }: { children: ReactNode }) {
   return <>{children}{admin && <TesterAdmin />}</>;
 }
 
+/*
+ * Keyboard guard (whole app): key events typed into a text field, or pressed while the tester panel is open, never
+ * reach the game's key handlers (they listen on window; this listener on document runs first and stops the bubbling).
+ */
+const isEditable = (t: EventTarget | null) => { const el = t as HTMLElement | null; return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable); };
+const panel = { open: false, close: () => {} };
+if (typeof document !== 'undefined') for (const type of ['keydown', 'keyup'] as const) document.addEventListener(type, (e) => {
+  if (panel.open) {
+    if (type === 'keydown' && (e.code === 'Escape' || ((e.code === 'Digit0' || e.code === 'Numpad0') && !isEditable(e.target)))) panel.close();
+    e.stopPropagation(); return;
+  }
+  if (isEditable(e.target)) e.stopPropagation();
+});
+
 /** Admin-only: add / remove the emails allowed into the private build. */
 function TesterAdmin() {
   const [open, setOpen] = useState(false);
-  useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.code === 'Digit0' || e.code === 'Numpad0') && !e.repeat && (e.target as HTMLElement)?.tagName !== 'INPUT') setOpen((o) => !o); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, []); const [list, setList] = useState<string[]>([]); const [email, setEmail] = useState(''); const [msg, setMsg] = useState('');
+  useEffect(() => { const k = (e: KeyboardEvent) => { if ((e.code === 'Digit0' || e.code === 'Numpad0') && !e.repeat && !isEditable(e.target) && !panel.open) setOpen(true); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, []);
+  const field = useRef<HTMLInputElement>(null);
+  useEffect(() => { panel.open = open; panel.close = () => setOpen(false); if (open) { if (document.pointerLockElement) document.exitPointerLock(); setTimeout(() => field.current?.focus(), 30); } return () => { panel.open = false; }; }, [open]); const [list, setList] = useState<string[]>([]); const [email, setEmail] = useState(''); const [msg, setMsg] = useState('');
   const user = useAccount((s) => s.user);
   const load = () => getDocs(collection(db(), 'vlife_testers')).then((s) => setList(s.docs.map((d) => d.id).sort())).catch((e) => setMsg(String(e?.message ?? e)));
   useEffect(() => { if (open) void load(); }, [open]);
@@ -63,9 +79,9 @@ function TesterAdmin() {
   return <div style={{ position: 'fixed', left: 16, bottom: 70, zIndex: 900, fontFamily: 'Be Vietnam Pro, Arial, sans-serif' }}>
 
     {open && <div style={{ ...card, width: 340, color: '#eef1f3' }}>
-      <b style={{ color: '#ffd36b' }}>Người được xem bản thử nghiệm</b> <span style={{ fontSize: 11, color: '#9aa3a9' }}>(phím 0 để ẩn/hiện)</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}><span><b style={{ color: '#ffd36b' }}>Người được xem bản thử nghiệm</b><br /><span style={{ fontSize: 11, color: '#9aa3a9' }}>Esc hoặc 0 (khi không gõ chữ) để đóng · trong lúc mở, phím không điều khiển game</span></span><button aria-label="Đóng" style={{ ...btn, padding: '2px 8px', background: 'transparent', color: '#c3c9cd' }} onClick={() => setOpen(false)}>✕</button></div>
       <p style={{ fontSize: 12, color: '#9aa3a9', margin: '4px 0 8px' }}>Thêm email để cấp quyền; người đó đăng nhập bằng đúng email này là vào được. Admin luôn vào được.</p>
-      <div style={{ display: 'flex', gap: 6 }}><input style={{ ...input, margin: 0 }} placeholder="email@vidu.com" value={email} onChange={(e) => setEmail(e.target.value)} /><button style={{ ...btn, background: '#2fa35b', color: '#fff' }} onClick={() => void add()}>Thêm</button></div>
+      <div style={{ display: 'flex', gap: 6 }}><input ref={field} style={{ ...input, margin: 0 }} placeholder="email@vidu.com" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void add(); }} /><button style={{ ...btn, background: '#2fa35b', color: '#fff' }} onClick={() => void add()}>Thêm</button></div>
       <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0', maxHeight: 220, overflowY: 'auto' }}>
         {list.length === 0 && <li style={{ fontSize: 13, color: '#9aa3a9' }}>Chưa có ai.</li>}
         {list.map((e) => <li key={e} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 14 }}>{e}<button style={{ ...btn, padding: '4px 8px', fontSize: 12, background: '#5a2a2a', color: '#fff' }} onClick={() => void remove(e)}>Thu quyền</button></li>)}
