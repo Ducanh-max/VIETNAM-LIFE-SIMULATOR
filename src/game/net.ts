@@ -1,12 +1,14 @@
 import { joinRoom, type Room } from 'trystero';
 import * as THREE from 'three';
 import type { Outfit } from './character/outfit';
+import { commitRoomPayment, formatVnd, game, markRoomPaymentSent, pushMessage, type RoomPayment } from './state';
+import { PRIVATE_BUILD } from './privateBuild';
 
 /*
  * Playing together: up to 10 browsers in a room, connected peer-to-peer over WebRTC with trystero (the
  * signalling goes through public Nostr relays; no game server, so it works from a static Vercel site).
  * Each player broadcasts its pose ~12 times a second; positions are interpolated on the receiving side.
- * Wallet, needs, jobs and orders stay local. Vehicles: the driver is the authority over its seats —
+ * Wallet, needs, jobs and orders stay local. Private builds can test peer-to-peer virtual transfers; they are not a server ledger. Vehicles: the driver is the authority over its seats —
  * passengers ask for a seat, the driver grants the first free one (scooter 2, car 5 incl. the driver).
  */
 export const APP_ID = 'doi-viet-hanoi-3d';
@@ -20,6 +22,15 @@ export type NetVehicle = { kind: VehicleKind; x: number; y: number; z: number; h
 export type NetPose = { t: number; x: number; y: number; z: number; yaw: number; a: string; s: number; e: string; v: NetVehicle | null; ride: { host: string; seat: number } | null };
 export type Remote = { id: string; name: string; outfit: Outfit | null; poses: NetPose[]; last: number; shown: NetPose | null };
 
+type PayPacket = { id: string; room: string; from: string; to: string; amount: number; note: string };
+const isUuid = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+function getWalletId(): string {
+  const key = 'doi-viet-room-wallet-id-v1';
+  const existing = localStorage.getItem(key);
+  if (isUuid(existing)) return existing;
+  const id = crypto.randomUUID(); localStorage.setItem(key, id); return id;
+}
+const walletId = PRIVATE_BUILD ? getWalletId() : '';
 type Status = 'off' | 'connecting' | 'online' | 'full' | 'error';
 export const net = {
   room: null as Room | null,
@@ -28,6 +39,9 @@ export const net = {
   message: '',
   selfId: '',
   remotes: new Map<string, Remote>(),
+  payPeers: new Map<string, string>(),
+  paySend: null as null | { transfer: (p: PayPacket, peer: string) => void; ack: (p: PayPacket, peer: string) => void },
+
   /** Seat this player holds in someone else's vehicle. */
   riding: null as null | { host: string; seat: number; since?: number },
   /** Seats of the vehicle this player drives (index 0 = driver = me). */
@@ -73,6 +87,52 @@ export async function joinGame(code: string) {
   const seatReq = room.makeAction<{ seat: number | null; leave?: boolean }>('seatReq');
   const seatRes = room.makeAction<{ ok: boolean; seat: number; reason?: string }>('seatRes');
   const chat = room.makeAction<string>('chat');
+  const payHello = room.makeAction<string>('payHello');
+  const payTransfer = room.makeAction<PayPacket>('payTransfer');
+  const payAck = room.makeAction<PayPacket>('payAck');
+  if (PRIVATE_BUILD) {
+    net.paySend = {
+      transfer: (p, peer) => { void Promise.resolve(payTransfer.send(p, { target: peer })).catch(() => { /* stays pending */ }); },
+      ack: (p, peer) => { void Promise.resolve(payAck.send(p, { target: peer })).catch(() => { /* retry will receive another ack */ }); },
+    };
+    payHello.onMessage((id, { peerId }) => {
+      if (net.room !== room || !isUuid(id) || id === walletId) return;
+      const previous = net.payPeers.get(peerId);
+      if (previous && previous !== id) return;
+      if (!previous) {
+        net.payPeers.set(peerId, id);
+        void Promise.resolve(payHello.send(walletId, { target: peerId })).catch(() => {});
+        notify();
+      }
+    });
+    const validPacket = (p: PayPacket, peer: string) => net.room === room && p && isUuid(p.id) && p.room === code &&
+      isUuid(p.from) && isUuid(p.to) && p.from !== p.to && Number.isSafeInteger(p.amount) && p.amount > 0 &&
+      p.amount <= 1_000_000_000 && typeof p.note === 'string' && p.note.length <= 100 && net.payPeers.has(peer);
+    const matches = (r: RoomPayment, p: PayPacket) => r.id === p.id && r.room === p.room && r.from === p.from && r.to === p.to && r.amount === p.amount && r.note === p.note;
+    payTransfer.onMessage((p, { peerId }) => {
+      if (!validPacket(p, peerId) || p.to !== walletId || p.from !== net.payPeers.get(peerId)) return;
+      const old = game.get().roomPayments.find((r) => r.id === p.id);
+      if (old) {
+        if (old.status === 'received' && matches(old, p)) net.paySend?.ack(p, peerId);
+        return;
+      }
+      const name = net.remotes.get(peerId)?.name ?? 'Bạn cùng phòng';
+      try {
+        if (!commitRoomPayment({ ...p, peerName: name, at: Date.now(), status: 'received' })) return;
+      } catch { return; } // do not acknowledge a credit that could not be persisted
+      net.paySend?.ack(p, peerId);
+      game.toast('Đời Việt Pay: nhận ' + formatVnd(p.amount) + ' từ ' + name);
+      pushMessage('Đời Việt Pay', 'Bạn nhận ' + formatVnd(p.amount) + ' từ ' + name + (p.note ? ' · ' + p.note : ''));
+    });
+    payAck.onMessage((p, { peerId }) => {
+      if (!validPacket(p, peerId) || p.from !== walletId || p.to !== net.payPeers.get(peerId)) return;
+      const old = game.get().roomPayments.find((r) => r.id === p.id);
+      if (!old || old.status !== 'pending' || !matches(old, p)) return;
+      try {
+        if (markRoomPaymentSent(p.id)) game.toast('Đã chuyển ' + formatVnd(p.amount) + ' cho ' + old.peerName);
+      } catch { /* stays pending for retry */ }
+    });
+  }
   net.send = {
     pose: (p) => { void pose.send(p); },
     hello: (h, to) => { void hello.send(h, to ? { target: to } : undefined); },
@@ -83,11 +143,12 @@ export async function joinGame(code: string) {
   const remote = (id: string) => { let r = net.remotes.get(id); if (!r) { r = { id, name: '…', outfit: null, poses: [], last: performance.now(), shown: null }; net.remotes.set(id, r); } return r; };
   room.onPeerJoin(({ peerId }) => {
     remote(peerId);
+    if (PRIVATE_BUILD) void Promise.resolve(payHello.send(walletId, { target: peerId })).catch(() => {});
     if (identity.outfit) net.send?.hello(identity, peerId);
     notify();
   });
   room.onPeerLeave(({ peerId }) => {
-    net.remotes.delete(peerId);
+    net.remotes.delete(peerId); net.payPeers.delete(peerId);
     const i = net.seats.indexOf(peerId); if (i > 0) net.seats[i] = null;
     if (net.riding?.host === peerId) net.riding = null;
     notify();
@@ -128,10 +189,36 @@ export async function joinGame(code: string) {
 }
 export async function leaveGame(keepCode = false) {
   const r = net.room;
-  net.room = null; net.send = null; net.remotes.clear(); net.riding = null; net.seats = [];
+  net.room = null; net.send = null; net.paySend = null; net.payPeers.clear(); net.remotes.clear(); net.riding = null; net.seats = [];
   if (!keepCode) { net.status = 'off'; net.message = ''; net.code = ''; }
   notify();
   if (r) { try { await r.leave(); } catch { /* ignore */ } }
+}
+
+/** Only for trusted private rooms. Peer identities and balances are not server authenticated. */
+export function sendRoomPayment(peerId: string, amount: number, note: string): string | null {
+  if (!PRIVATE_BUILD || !net.room || net.status !== 'online' || !net.paySend) return 'Bạn chưa kết nối phòng chơi.';
+  const target = net.payPeers.get(peerId);
+  const peer = net.remotes.get(peerId);
+  if (!peer || !target || target === walletId) return 'Người nhận không còn trong phòng hoặc chưa cập nhật game.';
+  if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 1_000_000_000) return 'Số tiền không hợp lệ.';
+  if (amount > game.get().money) return 'Số dư không đủ.';
+  const packet: PayPacket = { id: crypto.randomUUID(), room: net.code, from: walletId, to: target, amount, note: note.trim().slice(0, 100) };
+  try {
+    if (!commitRoomPayment({ ...packet, peerName: peer.name, at: Date.now(), status: 'pending' })) return 'Không thể ghi giao dịch.';
+  } catch { return 'Không thể lưu ví trên trình duyệt.'; }
+  net.paySend.transfer(packet, peerId);
+  return null;
+}
+export function retryRoomPayment(id: string): string | null {
+  if (!PRIVATE_BUILD || !net.room || net.status !== 'online' || !net.paySend) return 'Bạn chưa kết nối phòng chơi.';
+  const p = game.get().roomPayments.find((x) => x.id === id && x.status === 'pending');
+  if (!p || p.room !== net.code || p.from !== walletId) return 'Hãy vào lại đúng phòng của giao dịch.';
+  const peer = [...net.payPeers].find(([key, v]) => v === p.to && net.remotes.has(key))?.[0];
+  if (!peer) return 'Người nhận chưa kết nối lại.';
+  const { room, from, to, amount, note } = p;
+  net.paySend.transfer({ id, room, from, to, amount, note }, peer);
+  return null;
 }
 
 /** Ask a driver for a free seat. */
