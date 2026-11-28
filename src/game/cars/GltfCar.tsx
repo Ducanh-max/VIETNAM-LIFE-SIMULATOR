@@ -171,7 +171,7 @@ export function PrivateRigCar({ url, model, paint, control, rigKey }: { url: str
     s.spin += (c.speed * dt) / 0.37;
     for (const w of built.spin) w.rotation.x = s.spin;
     for (const w of built.steer) w.rotation.y = c.steer * 0.55;
-    if (built.sw && built.swBase) { const ang = THREE.MathUtils.clamp(c.steer * 2.6, -2.5, 2.5); built.sw.quaternion.copy(built.swBase).multiply(new THREE.Quaternion().setFromAxisAngle(built.swAxis, ang)); } // about the column's own axis, from the rest pose
+    if (built.sw && built.swBase) { const ang = THREE.MathUtils.clamp(-c.steer * 2.6, -2.5, 2.5); built.sw.quaternion.copy(built.swBase).multiply(new THREE.Quaternion().setFromAxisAngle(built.swAxis, ang)); } // about the column's own axis, from the rest pose
     for (const m of built.lights) { m.emissiveIntensity = c.lights.low ? 3 : 1; }
     for (const m of built.brakes) { m.emissiveIntensity = c.lights.brake ? 3 : c.lights.low ? 1.2 : 0.6; }
   });

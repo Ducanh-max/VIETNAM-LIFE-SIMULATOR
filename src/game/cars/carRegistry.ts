@@ -2,6 +2,9 @@ import { useSyncExternalStore } from 'react';
 import { isAdmin } from '../admin';
 import { addMoney, formatVnd, game, pushMessage } from '../state';
 import { CAR_COLORS, CAR_SPECS, type ModelId } from './carSpecs';
+import { PRIVATE_BUILD } from '../privateBuild';
+/** The private test build keeps bought cars and the My Car pairing for this visit only (a reload starts empty). */
+const PERSIST = !PRIVATE_BUILD;
 
 /*
  * Vehicle registry (bible section 10): the cars the player owns, bought with game money at the dealership. Each record
@@ -19,11 +22,11 @@ type RegState = { cars: OwnedCar[]; driving: string | null; paired: string | nul
 const KEY = 'doi-viet-cars-v1'; const SCHEMA = 1;
 function code8() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const r = new Uint32Array(8); crypto.getRandomValues(r); return Array.from(r, (x) => A[x % A.length]).join(''); }
 export const newPairCode = code8;
-function load(): OwnedCar[] { try { const s = JSON.parse(localStorage.getItem(KEY) ?? 'null'); if (s?.schema === SCHEMA && Array.isArray(s.cars)) return (s.cars as OwnedCar[]).map((c) => (c.pairCode ? c : { ...c, pairCode: code8() })); } catch { /* fresh */ } return []; }
+function load(): OwnedCar[] { if (!PERSIST) return []; try { const s = JSON.parse(localStorage.getItem(KEY) ?? 'null'); if (s?.schema === SCHEMA && Array.isArray(s.cars)) return (s.cars as OwnedCar[]).map((c) => (c.pairCode ? c : { ...c, pairCode: code8() })); } catch { /* fresh */ } return []; }
 const PAIR_KEY = 'doi-viet-mycar-v1';
-let st: RegState = { cars: load(), viewer: null, message: '', driving: null, paired: localStorage.getItem(PAIR_KEY) };
+let st: RegState = { cars: load(), viewer: null, message: '', driving: null, paired: PERSIST ? localStorage.getItem(PAIR_KEY) : null };
 const subs = new Set<() => void>();
-export const cars = { get: () => st, set(p: Partial<RegState>) { st = { ...st, ...p }; if ('cars' in p) localStorage.setItem(KEY, JSON.stringify({ schema: SCHEMA, cars: st.cars })); if ('paired' in p) { if (st.paired) localStorage.setItem(PAIR_KEY, st.paired); else localStorage.removeItem(PAIR_KEY); } subs.forEach((f) => f()); }, subscribe(f: () => void) { subs.add(f); return () => { subs.delete(f); }; } };
+export const cars = { get: () => st, set(p: Partial<RegState>) { st = { ...st, ...p }; if (PERSIST && 'cars' in p) localStorage.setItem(KEY, JSON.stringify({ schema: SCHEMA, cars: st.cars })); if (PERSIST && 'paired' in p) { if (st.paired) localStorage.setItem(PAIR_KEY, st.paired); else localStorage.removeItem(PAIR_KEY); } subs.forEach((f) => f()); }, subscribe(f: () => void) { subs.add(f); return () => { subs.delete(f); }; } };
 export function useCars<T>(sel: (s: RegState) => T): T { return useSyncExternalStore(cars.subscribe, () => sel(st)); }
 /** Prices are configurable here (game money; the bible quotes the maker's listed prices). */
 export const carPrices: Record<ModelId, number> = { luhanh: CAR_SPECS.luhanh.priceGame, phonho: CAR_SPECS.phonho.priceGame, doixa: CAR_SPECS.doixa.priceGame };
