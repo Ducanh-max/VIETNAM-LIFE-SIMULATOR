@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { net, onNet } from '../game/net';
+import { net, onNet, sendRoomPayment, retryRoomPayment } from '../game/net';
 import { loadPlayerName } from './player';
 import { driverActions } from '../game/driver';
 import { jobActions } from '../game/job';
@@ -154,11 +154,52 @@ function OrdersApp() {
   </div>;
 }
 
+function RoomTransfer() {
+  const [, refresh] = useState(0);
+  useEffect(() => onNet(() => refresh(n => n + 1)), []);
+  const money = useGame(s => s.money);
+  const receipts = useGame(s => s.roomPayments);
+  const [peer, setPeer] = useState('');
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const [confirm, setConfirm] = useState(false);
+  const [message, setMessage] = useState('');
+  const peers = [...net.remotes.values()].filter(r => net.payPeers.has(r.id));
+  const selected = peers.find(r => r.id === peer);
+  const value = Number(amount);
+  const valid = net.status === 'online' && !!selected && /^\d+$/.test(amount) && Number.isSafeInteger(value) && value > 0 && value <= 1_000_000_000 && value <= money;
+  const edit = () => { setConfirm(false); setMessage(''); };
+  const submit = () => {
+    if (!valid) { setConfirm(false); setMessage('Kiểm tra người nhận và số tiền.'); return; }
+    if (!confirm) { setConfirm(true); return; }
+    const error = sendRoomPayment(peer, value, note);
+    setMessage(error ?? 'Đã ghi giao dịch. Đang chờ xác nhận từ người nhận.');
+    setConfirm(false);
+    if (!error) { setAmount(''); setNote(''); }
+  };
+  return <section style={{ display: 'grid', gap: 10, margin: '14px 0' }} onKeyDown={e => e.stopPropagation()}>
+    <h4>Chuyển tiền cùng phòng</h4>
+    <small>Tiền ảo trong game · Bản thử nghiệm riêng · Không dùng tiền thật.</small>
+    {net.status !== 'online' ? <p className="app-empty">Hãy vào phòng chơi cùng bạn bè trước.</p> : <>
+      <small>Phòng {net.code} · {peers.length} người có thể nhận</small>
+      <label>Người nhận<select className="phone-search" value={peer} onChange={e => { setPeer(e.target.value); edit(); }} style={{ width: '100%' }}><option value="">Chọn người chơi</option>{peers.map(r => <option key={r.id} value={r.id}>{r.name} · {r.id.slice(0, 6)}</option>)}</select></label>
+      <label>Số tiền (đ)<input className="phone-search" style={{ width: '100%' }} inputMode="numeric" value={amount} placeholder="VD: 50000" onChange={e => { setAmount(e.target.value); edit(); }} /></label>
+      <div className="den-tabs">{[10000, 50000, 100000].map(n => <button key={n} onClick={() => { setAmount(String(n)); edit(); }}>{formatVnd(n)}</button>)}</div>
+      <label>Nội dung<input className="phone-search" style={{ width: '100%' }} value={note} maxLength={100} onChange={e => { setNote(e.target.value); edit(); }} placeholder="Không bắt buộc" /></label>
+      {confirm && valid && <div className="confirm-box"><p>Chuyển {formatVnd(value)} cho {selected?.name}? Số dư còn {formatVnd(money-value)}.</p><button onClick={edit}>Hủy</button></div>}
+      <button className="den-button" disabled={!valid} onClick={submit}>{confirm && valid ? 'Xác nhận chuyển tiền' : 'Tiếp tục'}</button>
+    </>}
+    {message && <p role="status">{message}</p>}
+    {receipts.length > 0 && <><h4>Lịch sử chuyển tiền</h4><ul className="txn-list">{receipts.slice(0, 30).map(p => <li key={p.id}><span>{p.status === 'received' ? 'Nhận từ ' : 'Chuyển cho '}{p.peerName}<small>{hhmm.format(p.at)} · {p.status === 'pending' ? 'Chờ xác nhận' : 'Đã ghi nhận'}{p.note ? ' · ' + p.note : ''}</small>{p.status === 'pending' && <button onClick={() => setMessage(retryRoomPayment(p.id) ?? 'Đã gửi lại yêu cầu xác nhận, không trừ thêm tiền.')}>Gửi lại</button>}</span><b className={p.status === 'received' ? 'plus' : 'minus'}>{p.status === 'received' ? '+' : '−'}{formatVnd(p.amount)}</b></li>)}</ul></>}
+  </section>;
+}
+
 function WalletApp() {
   const money = useGame((s) => s.money);
   const txns = useGame((s) => s.txns);
   return <div className="app-page">
     <div className="wallet-card"><span>Số dư ví</span><strong>{formatVnd(money)}</strong><small>Đời Việt Pay · {player.position ? 'Hà Nội' : ''}</small></div>
+    {PRIVATE_BUILD && <RoomTransfer />}
     <h4>Giao dịch gần đây</h4>
     {txns.length === 0 ? <p className="app-empty">Chưa có giao dịch.</p>
       : <ul className="txn-list">{txns.slice(0, 20).map((t, i) => <li key={i}><span>{t.text}<small>{hhmm.format(t.at)}</small></span><b className={t.amount >= 0 ? 'plus' : 'minus'}>{t.amount >= 0 ? '+' : '−'}{formatVnd(Math.abs(t.amount))}</b></li>)}</ul>}

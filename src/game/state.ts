@@ -47,30 +47,36 @@ type State = {
   rentalOpen: boolean;
   /** Wallet history (newest first) and phone messages (newest first). */
   txns: Txn[];
+  roomPayments: RoomPayment[];
   messages: Message[];
 };
 export type Txn = { text: string; amount: number; at: number };
+/** Local-only test wallet ledger. Never treat these records as server-authorized money. */
+export type RoomPayment = { id: string; room: string; from: string; to: string; amount: number; note: string; peerName: string; at: number; status: 'pending' | 'sent' | 'received' };
 export type Message = { from: string; text: string; at: number };
 
 const SAVE_KEY = 'doi-viet-needs-v1';
-function load(): Pick<State, 'hunger' | 'thirst' | 'money'> {
+function load(): Pick<State, 'hunger' | 'thirst' | 'money' | 'txns' | 'roomPayments'> {
   try {
     const saved = JSON.parse(localStorage.getItem(SAVE_KEY) ?? 'null');
-    if (saved && typeof saved.hunger === 'number') return { hunger: saved.hunger, thirst: saved.thirst, money: saved.money };
+    if (saved && typeof saved.hunger === 'number' && Number.isSafeInteger(saved.money) && saved.money >= 0) return { hunger: saved.hunger, thirst: saved.thirst, money: saved.money, txns: Array.isArray(saved.txns) ? saved.txns : [], roomPayments: Array.isArray(saved.roomPayments) ? saved.roomPayments : [] };
   } catch { /* ignore */ }
-  return { hunger: 72, thirst: 64, money: 300_000 };
+  return { hunger: 72, thirst: 64, money: 300_000, txns: [], roomPayments: [] };
 }
 
-let state: State = { ...load(), phase: 'none', order: {}, table: -1, eatProgress: 0, prompt: null, toast: null, dialog: null, job: null, phone: false, ride: null, driver: null, rental: null, rentalOpen: false, txns: [], messages: [], outfit: loadPlayerOutfit() };
+let state: State = { ...load(), phase: 'none', order: {}, table: -1, eatProgress: 0, prompt: null, toast: null, dialog: null, job: null, phone: false, ride: null, driver: null, rental: null, rentalOpen: false, messages: [], outfit: loadPlayerOutfit() };
 
 // One-time gift of 500.000đ for existing and new saves.
+function persistWallet(s: State) {
+  localStorage.setItem(SAVE_KEY, JSON.stringify({ hunger: s.hunger, thirst: s.thirst, money: s.money, txns: s.txns, roomPayments: s.roomPayments }));
+}
 const BONUS_KEY = 'doi-viet-bonus-500k';
 if (!localStorage.getItem(BONUS_KEY)) {
   localStorage.setItem(BONUS_KEY, '1');
   state.money += 500_000;
-  state.txns = [{ text: 'Quà tặng từ Đời Việt', amount: 500_000, at: Date.now() }];
+  state.txns = [{ text: 'Quà tặng từ Đời Việt', amount: 500_000, at: Date.now() }, ...state.txns].slice(0, 60);
   state.messages = [{ from: 'Đời Việt', text: 'Bạn vừa được tặng 500.000đ vào ví. Chúc bạn khám phá Hồ Gươm vui vẻ!', at: Date.now() }];
-  localStorage.setItem(SAVE_KEY, JSON.stringify({ hunger: state.hunger, thirst: state.thirst, money: state.money }));
+  persistWallet(state);
 }
 
 /** Record money in/out (amount negative for spending) and keep the wallet history. */
@@ -93,10 +99,13 @@ let lastSave = 0;
 export const game = {
   get: () => state,
   set(patch: Partial<State>) {
-    state = { ...state, ...patch };
-    listeners.forEach((l) => l());
+    const next = { ...state, ...patch };
     const now = performance.now();
-    if (now - lastSave > 2000) { lastSave = now; localStorage.setItem(SAVE_KEY, JSON.stringify({ hunger: state.hunger, thirst: state.thirst, money: state.money })); }
+    if (patch.money !== undefined || patch.txns !== undefined || now - lastSave > 2000) {
+      persistWallet(next); lastSave = now;
+    }
+    state = next;
+    listeners.forEach((l) => l());
   },
   subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
   toast(text: string) { game.set({ toast: { text, id: Math.random() } }); },
@@ -106,6 +115,29 @@ export const game = {
    */
   offer(prompt: Prompt) { pending.push(prompt); },
 };
+
+/** Save the balance and receipt together before notifying the UI or acknowledging the peer. */
+export function commitRoomPayment(payment: RoomPayment): boolean {
+  if (state.roomPayments.some((p) => p.id === payment.id)) return false;
+  if (!Number.isSafeInteger(payment.amount) || payment.amount <= 0 || payment.amount > 1_000_000_000) return false;
+  if (payment.status === 'sent') return false;
+  const delta = payment.status === 'received' ? payment.amount : -payment.amount;
+  const money = state.money + delta;
+  if (!Number.isSafeInteger(money) || money < 0) return false;
+  const text = payment.status === 'received' ? 'Nhận từ ' + payment.peerName : 'Chuyển cho ' + payment.peerName;
+  const next: State = { ...state, money, roomPayments: [payment, ...state.roomPayments], txns: [{ text, amount: delta, at: payment.at }, ...state.txns].slice(0, 60) };
+  persistWallet(next);
+  state = next;
+  listeners.forEach((l) => l());
+  return true;
+}
+export function markRoomPaymentSent(id: string): boolean {
+  const found = state.roomPayments.find((p) => p.id === id);
+  if (!found || found.status !== 'pending') return false;
+  const next: State = { ...state, roomPayments: state.roomPayments.map((p) => p.id === id ? { ...p, status: 'sent' as const } : p) };
+  persistWallet(next); state = next; listeners.forEach((l) => l());
+  return true;
+}
 
 /** Context action shown above the bottom bar. key null = information only. */
 export type Prompt = { id: string; text: string; key: 'E' | 'F' | null; priority?: number; run?: () => void };
